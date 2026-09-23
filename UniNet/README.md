@@ -1,56 +1,43 @@
-# Welcome to your Expo app 👋
+# UniNet Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+React Native, Expo Router, and TypeScript frontend for UniNet.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run
 
 ```bash
-npm run reset-project
+npm ci
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Use `npm run android`, `npm run ios`, or `npm run web` to open a platform. Check types with `npx tsc --noEmit` and bundle all platforms with `npx expo export --platform all --no-bytecode --max-workers 1` if Hermes cannot run in your environment.
 
-### Other setup steps
+## Android APK on Windows
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+To make a standalone APK locally with Android SDK and JDK installed:
 
-## Learn more
+```powershell
+npx expo prebuild --platform android --no-install
+cd android
+.\gradlew.bat assembleRelease --no-daemon
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+The APK is `android/app/build/outputs/apk/release/app-release.apk` relative to the project root. Install and launch it on a connected Android device with:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```powershell
+adb install android/app/build/outputs/apk/release/app-release.apk
+adb shell am start -n com.uninet.mobile/.MainActivity
+```
 
-## Join the community
+This preview APK uses the template's debug signing key. It is for direct testing, not Play Store submission. The `preview` profile in `eas.json` can also produce an APK through EAS Build if uploading the repository to Expo is approved.
 
-Join our community of developers creating universal apps.
+## Structure
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `src/app/(auth)`: welcome, login, student and partner registration, profile steps, password reset UI.
+- `src/app/(tabs)`: existing starter Home/Explore plus prepared section routes.
+- `src/components`: shared UI and auth forms.
+- `src/services`, `src/store`, `src/hooks`, `src/utils`: API boundary, auth state, and validation.
+- `src/constants`, `src/types`: semantic colors, configuration, roles, and auth contracts.
+
+Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` when the backend is available. The current endpoint paths are provisional. Authentication cannot succeed until the backend contract is connected. Google OAuth, password reset email, partner submission, and profile saving also require backend work. Tokens are currently held in memory only.
+
+Implementation details and verification are in [the auth handoff](docs/handoffs/mobile-auth.md).
