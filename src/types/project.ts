@@ -38,7 +38,7 @@ export type ProjectMember = {
 export type Project = {
   id: string;
   title: string;
-  objective: string;
+  projectField: string;
   description: string;
   technologies: string[];
   memberTarget: number;
@@ -60,15 +60,11 @@ export type Project = {
 
 export type CreateProjectRequest = {
   title: string;
-  objective: string;
+  projectField: string;
   description: string;
   technologies: string[];
   memberTarget: number;
-  roles: {
-    role: string;
-    quantity: number;
-    requirements: string;
-  }[];
+  roles: ProjectRoleRequirement[];
   recruitmentDeadline: string;
   estimatedDuration?: string;
   expectedOutput?: string;
@@ -76,7 +72,6 @@ export type CreateProjectRequest = {
   status?: ProjectStatus;
   recruitmentStatus?: RecruitmentStatus;
 };
-
 export type ProjectJoinRequest = {
   id: string;
   projectId: string;

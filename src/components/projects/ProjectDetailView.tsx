@@ -122,6 +122,16 @@ export function ProjectDetailScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      <Pressable
+        onPress={() => router.back()}
+        style={({ pressed }) => [
+          styles.backButton,
+          pressed && styles.backButtonPressed,
+        ]}
+      >
+        <Text style={styles.backIcon}>‹</Text>
+        <Text style={styles.backText}>Quay lại</Text>
+      </Pressable>
       <Text style={styles.kicker}>UNINET</Text>
       <Text style={styles.title}>{project.title}</Text>
       <Text style={styles.creator}>
@@ -385,6 +395,32 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionLabel: { color: colors.navy, fontSize: 15, fontWeight: "800" },
+  backButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minHeight: 40,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+
+  backButtonPressed: {
+    opacity: 0.6,
+  },
+
+  backIcon: {
+    color: colors.primary,
+    fontSize: 30,
+    fontWeight: "500",
+    lineHeight: 32,
+  },
+
+  backText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "700",
+  },
   bodyText: { color: colors.textPrimary, fontSize: 14, lineHeight: 22 },
   tagsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tag: {
