@@ -5,8 +5,8 @@ React Native, Expo Router, and TypeScript frontend for UniNet.
 ## Run
 
 ```bash
-npm ci
-npm start
+npx expo prebuild --clean
+npx expo run:android
 ```
 
 Use `npm run android`, `npm run ios`, or `npm run web` to open a platform. Check types with `npx tsc --noEmit` and bundle all platforms with `npx expo export --platform all --no-bytecode --max-workers 1` if Hermes cannot run in your environment.
