@@ -1,2 +1,5 @@
-import { ComingSoon } from '@/components/ui/ComingSoon';
-export default function GroupDetailScreen() { return <ComingSoon title="Nhóm" />; }
+import { ProjectDetailScreen } from "@/components/projects/ProjectDetailView";
+
+export default function GroupDetailScreen() {
+  return <ProjectDetailScreen />;
+}
