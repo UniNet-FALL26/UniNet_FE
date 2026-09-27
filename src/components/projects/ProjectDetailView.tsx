@@ -207,27 +207,11 @@ export function ProjectDetailScreen() {
         </View>
 
         <View style={styles.metricCard}>
-          <Text style={styles.metricIcon}>⏳</Text>
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {project.estimatedDuration || "Tự do"}
-          </Text>
-          <Text style={styles.metricLabel}>Thời lượng</Text>
-        </View>
-
-        <View style={styles.metricCard}>
           <Text style={styles.metricIcon}>📅</Text>
           <Text style={styles.metricValue} numberOfLines={1}>
             {formatDate(project.recruitmentDeadline)}
           </Text>
           <Text style={styles.metricLabel}>Hạn chót tuyển</Text>
-        </View>
-
-        <View style={styles.metricCard}>
-          <Text style={styles.metricIcon}>⚡</Text>
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {project.commitmentLevel || "Thỏa thuận"}
-          </Text>
-          <Text style={styles.metricLabel}>Cam kết</Text>
         </View>
       </View>
 
@@ -311,20 +295,6 @@ export function ProjectDetailScreen() {
             {project.expectedOutput
               ? formatDate(project.expectedOutput)
               : "Chưa thiết lập"}
-          </Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Thời gian ước tính:</Text>
-          <Text style={styles.detailValue}>
-            {project.estimatedDuration ?? "Linh hoạt"}
-          </Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Mức độ cam kết thời gian:</Text>
-          <Text style={styles.detailValue}>
-            {project.commitmentLevel ?? "Không bắt buộc"}
           </Text>
         </View>
       </View>

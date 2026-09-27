@@ -3,12 +3,13 @@ import { Input } from "@/components/ui/Input";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
 import type { CreateProjectRequest } from "@/types/project";
-import { DateTimePicker, Host } from "@expo/ui/jetpack-compose";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -73,11 +74,9 @@ export function ProjectCreateScreen() {
   const [recruitmentDeadline, setRecruitmentDeadline] = useState<Date | null>(
     null,
   );
-  const [estimatedDuration, setEstimatedDuration] = useState("");
   const [expectedOutputDate, setExpectedOutputDate] = useState<Date | null>(
     null,
   );
-  const [commitmentLevel, setCommitmentLevel] = useState("");
 
   const [isPrivate, setIsPrivate] = useState(false);
   const [showFieldDropdown, setShowFieldDropdown] = useState(false);
@@ -185,9 +184,50 @@ export function ProjectCreateScreen() {
     const initialDate = recruitmentDeadline
       ? new Date(recruitmentDeadline)
       : new Date();
+
     if (!recruitmentDeadline) {
       initialDate.setHours(23, 59, 0, 0);
     }
+
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: initialDate,
+        mode: "date",
+        display: "calendar",
+        minimumDate: new Date(),
+        onValueChange: (_event, selectedDate) => {
+          if (!selectedDate) return;
+
+          const selectedDay = new Date(initialDate);
+          selectedDay.setFullYear(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+          );
+
+          DateTimePickerAndroid.open({
+            value: selectedDay,
+            mode: "time",
+            display: "clock",
+            is24Hour: true,
+            onValueChange: (_timeEvent, selectedTime) => {
+              if (!selectedTime) return;
+
+              const finalDate = new Date(selectedDay);
+              finalDate.setHours(
+                selectedTime.getHours(),
+                selectedTime.getMinutes(),
+                0,
+                0,
+              );
+              setRecruitmentDeadline(finalDate);
+            },
+          });
+        },
+      });
+      return;
+    }
+
     setTempDate(initialDate);
     setDatePickerTarget("recruitmentDeadline");
     setDatePickerStep("date");
@@ -197,6 +237,22 @@ export function ProjectCreateScreen() {
     const initialDate = expectedOutputDate
       ? new Date(expectedOutputDate)
       : new Date();
+
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: initialDate,
+        mode: "date",
+        display: "calendar",
+        minimumDate: new Date(),
+        onValueChange: (_event, selectedDate) => {
+          if (selectedDate) {
+            setExpectedOutputDate(new Date(selectedDate));
+          }
+        },
+      });
+      return;
+    }
+
     setTempDate(initialDate);
     setDatePickerTarget("expectedOutput");
     setDatePickerStep("date");
@@ -284,9 +340,7 @@ export function ProjectCreateScreen() {
         requirements: role.requirements.trim(),
       })),
       recruitmentDeadline: formatDateTimeForApi(recruitmentDeadline)!,
-      estimatedDuration: estimatedDuration.trim() || undefined,
       expectedOutput: formatDateForApi(expectedOutputDate),
-      commitmentLevel: commitmentLevel.trim() || undefined,
       status: isPrivate ? "RIÊNG TƯ" : "CÔNG KHAI",
       recruitmentStatus: "ĐANG TUYỂN",
     };
@@ -309,122 +363,53 @@ export function ProjectCreateScreen() {
   };
 
   const renderDateTimePicker = () => {
-    if (!datePickerTarget) return null;
+    if (!datePickerTarget || Platform.OS === "android") return null;
 
     const isOutputDate = datePickerTarget === "expectedOutput";
+    const mode = isOutputDate ? "date" : datePickerStep;
 
     return (
-      <Modal
-        visible
-        transparent
-        animationType="fade"
-        onRequestClose={closeDatePicker}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.datePickerModal}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalEyebrow}>
-                  {isOutputDate
-                    ? "CHỌN NGÀY"
-                    : datePickerStep === "date"
-                      ? "CHỌN NGÀY"
-                      : "CHỌN GIỜ"}
-                </Text>
-                <Text style={styles.modalTitle}>
-                  {isOutputDate
-                    ? "Thời hạn bàn giao sản phẩm"
-                    : "Hạn chót nộp đơn"}
-                </Text>
-              </View>
+      <DateTimePicker
+        key={`${datePickerTarget}-${mode}`}
+        value={tempDate}
+        mode={mode}
+        display="compact"
+        minimumDate={new Date()}
+        onChange={(event, selectedDate) => {
+          if (event.type === "dismissed" || !selectedDate) {
+            closeDatePicker();
+            return;
+          }
 
-              <Pressable
-                onPress={closeDatePicker}
-                style={styles.modalCloseButton}
-              >
-                <Text style={styles.modalCloseText}>×</Text>
-              </Pressable>
-            </View>
+          if (isOutputDate) {
+            setExpectedOutputDate(new Date(selectedDate));
+            closeDatePicker();
+            return;
+          }
 
-            <View style={styles.pickerWrapper}>
-              <Host style={styles.pickerHost}>
-                <DateTimePicker
-                  onDateSelected={(selectedDate) => {
-                    if (isOutputDate) {
-                      const nextDate = new Date(tempDate);
-                      nextDate.setFullYear(
-                        selectedDate.getFullYear(),
-                        selectedDate.getMonth(),
-                        selectedDate.getDate(),
-                      );
-                      setTempDate(nextDate);
-                      return;
-                    }
+          if (datePickerStep === "date") {
+            const nextDate = new Date(tempDate);
+            nextDate.setFullYear(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              selectedDate.getDate(),
+            );
+            setTempDate(nextDate);
+            setDatePickerStep("time");
+            return;
+          }
 
-                    if (datePickerStep === "date") {
-                      const nextDate = new Date(tempDate);
-                      nextDate.setFullYear(
-                        selectedDate.getFullYear(),
-                        selectedDate.getMonth(),
-                        selectedDate.getDate(),
-                      );
-                      setTempDate(nextDate);
-                      setDatePickerStep("time");
-                      return;
-                    }
-
-                    const nextDate = new Date(tempDate);
-                    nextDate.setHours(
-                      selectedDate.getHours(),
-                      selectedDate.getMinutes(),
-                      0,
-                      0,
-                    );
-                    setTempDate(nextDate);
-                  }}
-                  displayedComponents={
-                    isOutputDate || datePickerStep === "date"
-                      ? "date"
-                      : "hourAndMinute"
-                  }
-                  initialDate={tempDate.toISOString()}
-                  is24Hour
-                  variant="picker"
-                />
-              </Host>
-            </View>
-
-            <View style={styles.datePreview}>
-              <Text style={styles.datePreviewLabel}>
-                {isOutputDate || datePickerStep === "date"
-                  ? "Ngày đã chọn"
-                  : "Ngày và giờ đã chọn"}
-              </Text>
-              <Text style={styles.datePreviewValue}>
-                {isOutputDate
-                  ? formatDateOnly(tempDate)
-                  : formatDateTime(tempDate)}
-              </Text>
-            </View>
-
-            {isOutputDate || datePickerStep === "time" ? (
-              <Button
-                title="Xác nhận"
-                variant="primary"
-                onPress={() => {
-                  if (datePickerTarget === "recruitmentDeadline") {
-                    setRecruitmentDeadline(new Date(tempDate));
-                  } else if (datePickerTarget === "expectedOutput") {
-                    setExpectedOutputDate(new Date(tempDate));
-                  }
-                  closeDatePicker();
-                }}
-                style={styles.modalConfirmButton}
-              />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+          const finalDate = new Date(tempDate);
+          finalDate.setHours(
+            selectedDate.getHours(),
+            selectedDate.getMinutes(),
+            0,
+            0,
+          );
+          setRecruitmentDeadline(finalDate);
+          closeDatePicker();
+        }}
+      />
     );
   };
 
@@ -830,22 +815,6 @@ export function ProjectCreateScreen() {
                 <Text style={styles.dateArrow}>›</Text>
               </Pressable>
             </View>
-
-            {/* ESTIMATED DURATION */}
-            <Input
-              label="Thời gian dự kiến thực hiện"
-              value={estimatedDuration}
-              onChangeText={setEstimatedDuration}
-              placeholder="Ví dụ: 3 tháng, 12 tuần..."
-            />
-
-            {/* COMMITMENT */}
-            <Input
-              label="Mức độ cam kết"
-              value={commitmentLevel}
-              onChangeText={setCommitmentLevel}
-              placeholder="Ví dụ: 6 giờ / tuần"
-            />
           </View>
         </View>
 
@@ -1464,99 +1433,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
     paddingHorizontal: 20,
-  },
-
-  /* DATE MODAL */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
-    justifyContent: "center",
-    paddingHorizontal: 18,
-  },
-
-  datePickerModal: {
-    width: "100%",
-    maxWidth: 480,
-    alignSelf: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    padding: 18,
-    gap: 16,
-    maxHeight: "90%",
-  },
-
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-
-  modalEyebrow: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-
-  modalTitle: {
-    color: colors.navy,
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 3,
-  },
-
-  modalCloseButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  modalCloseText: {
-    color: colors.textSecondary,
-    fontSize: 24,
-    lineHeight: 26,
-  },
-
-  pickerWrapper: {
-    width: "100%",
-    minHeight: 340,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  pickerHost: {
-    width: "100%",
-    minHeight: 340,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  datePreview: {
-    borderRadius: 13,
-    backgroundColor: "#F4F7FB",
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-
-  datePreviewLabel: {
-    color: colors.textSecondary,
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-
-  datePreviewValue: {
-    color: colors.navy,
-    fontSize: 15,
-    fontWeight: "800",
-    marginTop: 3,
-  },
-
-  modalConfirmButton: {
-    width: "100%",
   },
 });

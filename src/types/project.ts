@@ -50,9 +50,7 @@ export type Project = {
   };
   roles: ProjectRoleRequirement[];
   recruitmentDeadline: string;
-  estimatedDuration?: string;
   expectedOutput?: string;
-  commitmentLevel?: string;
   status: ProjectStatus;
   recruitmentStatus: RecruitmentStatus;
   createdAt: string;

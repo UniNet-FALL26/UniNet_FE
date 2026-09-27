@@ -1,20 +1,19 @@
 import { apiRequest } from "@/services/api";
 import type {
-    CreateProjectRequest,
-    InvitationPayload,
-    JoinRequestPayload,
-    Project,
-    ProjectInvitation,
-    ProjectJoinRequest,
-    ProjectRecommendation,
+  CreateProjectRequest,
+  InvitationPayload,
+  JoinRequestPayload,
+  Project,
+  ProjectInvitation,
+  ProjectJoinRequest,
+  ProjectRecommendation,
 } from "@/types/project";
 
 const mockProjects: Project[] = [
   {
     id: "project-1",
     title: "Hệ thống hỗ trợ nghiên cứu sinh viên",
-    objective:
-      "Xây dựng nền tảng giúp sinh viên tìm mentor và quản lý tiến độ nghiên cứu.",
+    projectField: "Edtech",
     description:
       "Dự án nhằm xây dựng giải pháp hỗ trợ sinh viên kết nối mentor, lên kế hoạch nghiên cứu và theo dõi tiến độ.",
     technologies: ["React Native", "TypeScript", "Node.js", "PostgreSQL"],
@@ -42,9 +41,8 @@ const mockProjects: Project[] = [
       },
     ],
     recruitmentDeadline: "2026-10-15",
-    estimatedDuration: "3 tháng",
+
     expectedOutput: "MVP hỗ trợ tìm mentor và quản lý tiến độ.",
-    commitmentLevel: "Tập trung 8 giờ/tuần",
     status: "CÔNG KHAI",
     recruitmentStatus: "ĐANG TUYỂN",
     createdAt: "2026-09-15T08:00:00.000Z",
@@ -52,8 +50,7 @@ const mockProjects: Project[] = [
   {
     id: "project-2",
     title: "Ứng dụng học tập cộng đồng",
-    objective:
-      "Phát triển cộng đồng học tập nơi sinh viên chia sẻ tài liệu và bài tập.",
+    projectField: "Ecommerce",
     description:
       "Dự án này tập trung vào một ứng dụng hỗ trợ học tập cộng đồng với nhóm hội thảo và tài liệu.",
     technologies: ["Expo", "Firebase", "TypeScript", "AI"],
@@ -75,9 +72,7 @@ const mockProjects: Project[] = [
       },
     ],
     recruitmentDeadline: "2026-09-30",
-    estimatedDuration: "2 tháng",
     expectedOutput: "Phiên bản beta ứng dụng học tập cộng đồng.",
-    commitmentLevel: "Tập trung 6 giờ/tuần",
     status: "CÔNG KHAI",
     recruitmentStatus: "ĐANG TUYỂN",
     createdAt: "2026-09-10T08:00:00.000Z",
@@ -143,7 +138,7 @@ export const projectService = {
       const created: Project = {
         id: `project-${Date.now()}`,
         title: payload.title,
-        objective: payload.objective,
+        projectField: payload.projectField,
         description: payload.description,
         technologies: payload.technologies,
         memberTarget: payload.memberTarget,
@@ -156,9 +151,7 @@ export const projectService = {
           requirements: role.requirements,
         })),
         recruitmentDeadline: payload.recruitmentDeadline,
-        estimatedDuration: payload.estimatedDuration,
         expectedOutput: payload.expectedOutput,
-        commitmentLevel: payload.commitmentLevel,
         status: payload.status ?? "CÔNG KHAI",
         recruitmentStatus: payload.recruitmentStatus ?? "ĐANG TUYỂN",
         createdAt: new Date().toISOString(),
