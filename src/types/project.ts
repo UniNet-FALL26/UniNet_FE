@@ -1,24 +1,53 @@
 export type ProjectStatus =
-  | "RIÊNG TƯ"
-  | "CÔNG KHAI"
-  | "ĐANG HOẠT ĐỘNG"
-  | "HOÀN THÀNH"
-  | "LƯU TRỮ";
-export type RecruitmentStatus =
-  | "ĐANG TUYỂN"
-  | "ĐÃ ĐỦ THÀNH VIÊN"
-  | "ĐÃ ĐÓNG"
-  | "HẾT HẠN";
+  | "Private"
+  | "Public"
+  | "Active"
+  | "Completed"
+  | "Archived";
+export type RecruitmentStatus = "Open" | "Full" | "Closed" | "Expired";
 export type ProjectJoinRequestStatus =
-  | "ĐANG CHỜ"
-  | "ĐÃ CHẤP NHẬN"
-  | "ĐÃ TỪ CHỐI"
-  | "HỦY";
+  | "Pending"
+  | "Accepted"
+  | "Rejected"
+  | "Cancelled";
 export type ProjectInvitationStatus =
-  | "ĐÃ GỬI"
-  | "ĐÃ CHẤP NHẬN"
-  | "ĐÃ TỪ CHỐI"
-  | "ĐÃ HẾT HẠN";
+  | "Sent"
+  | "Accepted"
+  | "Declined"
+  | "Expired";
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  Private: "RIÊNG TƯ",
+  Public: "CÔNG KHAI",
+  Active: "ĐANG HOẠT ĐỘNG",
+  Completed: "HOÀN THÀNH",
+  Archived: "LƯU TRỮ",
+};
+
+export const RECRUITMENT_STATUS_LABEL: Record<RecruitmentStatus, string> = {
+  Open: "ĐANG TUYỂN",
+  Full: "ĐÃ ĐỦ THÀNH VIÊN",
+  Closed: "ĐÃ ĐÓNG",
+  Expired: "HẾT HẠN",
+};
+
+export const JOIN_REQUEST_STATUS_LABEL: Record<
+  ProjectJoinRequestStatus,
+  string
+> = {
+  Pending: "ĐANG CHỜ",
+  Accepted: "ĐÃ CHẤP NHẬN",
+  Rejected: "ĐÃ TỪ CHỐI",
+  Cancelled: "HỦY",
+};
+
+export const INVITATION_STATUS_LABEL: Record<ProjectInvitationStatus, string> =
+  {
+    Sent: "ĐÃ GỬI",
+    Accepted: "ĐÃ CHẤP NHẬN",
+    Declined: "ĐÃ TỪ CHỐI",
+    Expired: "ĐÃ HẾT HẠN",
+  };
 
 export type ProjectRoleRequirement = {
   id: string;

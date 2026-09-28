@@ -59,13 +59,12 @@ export function ProjectDetailScreen() {
     ? project.currentMemberCount > 1 && account?.id === "current-user"
     : false;
   const canRecruit = project
-    ? project.recruitmentStatus === "ĐANG TUYỂN" &&
-      project.status === "CÔNG KHAI"
+    ? project.recruitmentStatus === "Open" && project.status === "Public"
     : false;
 
   useEffect(() => {
     if (!project) return;
-    const pendingOrRejected = project.recruitmentStatus === "ĐANG TUYỂN";
+    const pendingOrRejected = project.recruitmentStatus === "Open";
     if (pendingOrRejected && account?.id === "current-user")
       setJoinRequestState("pending");
     else if (isMember) setJoinRequestState("member");
@@ -116,8 +115,8 @@ export function ProjectDetailScreen() {
       </View>
     );
 
-  const isRecruiting = project.recruitmentStatus === "ĐANG TUYỂN";
-  const isPublic = project.status === "CÔNG KHAI";
+  const isRecruiting = project.recruitmentStatus === "Open";
+  const isPublic = project.status === "Public";
 
   return (
     <ScrollView

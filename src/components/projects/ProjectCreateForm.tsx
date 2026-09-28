@@ -341,8 +341,8 @@ export function ProjectCreateScreen() {
       })),
       recruitmentDeadline: formatDateTimeForApi(recruitmentDeadline)!,
       expectedOutput: formatDateForApi(expectedOutputDate),
-      status: isPrivate ? "RIÊNG TƯ" : "CÔNG KHAI",
-      recruitmentStatus: "ĐANG TUYỂN",
+      status: isPrivate ? "Private" : "Public",
+      recruitmentStatus: "Open",
     };
 
     try {

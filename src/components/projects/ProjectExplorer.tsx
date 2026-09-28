@@ -228,7 +228,7 @@ export function ProjectExplorerScreen() {
           break;
 
         case "Yêu cầu tham gia":
-          matchesTab = project.recruitmentStatus === "ĐANG TUYỂN";
+          matchesTab = project.recruitmentStatus === "Open";
           break;
 
         case "Lời mời đã gửi":
@@ -236,18 +236,18 @@ export function ProjectExplorerScreen() {
           break;
 
         case "Lời mời nhận được":
-          matchesTab = project.recruitmentStatus === "ĐANG TUYỂN";
+          matchesTab = project.recruitmentStatus === "Open";
           break;
 
         case "Đã đóng tuyển":
           matchesTab =
-            project.recruitmentStatus === "ĐÃ ĐÓNG" ||
-            project.recruitmentStatus === "HẾT HẠN";
+            project.recruitmentStatus === "Closed" ||
+            project.recruitmentStatus === "Expired";
           break;
 
         case "Đang tuyển":
         default:
-          matchesTab = project.recruitmentStatus === "ĐANG TUYỂN";
+          matchesTab = project.recruitmentStatus === "Open";
           break;
       }
 
@@ -545,7 +545,7 @@ export function ProjectExplorerScreen() {
             </View>
           ) : (
             filteredProjects.map((project) => {
-              const isOpen = project.recruitmentStatus === "ĐANG TUYỂN";
+              const isOpen = project.recruitmentStatus === "Open";
 
               const progress =
                 project.memberTarget > 0
