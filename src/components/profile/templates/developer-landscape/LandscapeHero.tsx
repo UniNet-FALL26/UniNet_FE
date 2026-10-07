@@ -16,12 +16,12 @@ export function LandscapeHero({ data, theme, width, portraitMode }: LandscapePro
   const words = data.profile.fullName.trim().split(/\s+/);
   const nickname = data.profile.nickname?.trim();
   const title = <View style={s.titles}>
-    <EditField field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.name, { color: theme.heroText, fontSize: compact ? 36 : 42, lineHeight: compact ? 46 : 52 }]}>{words.slice(0, -1).join(' ')}{words.length > 1 ? ' ' : ''}<Text style={{ color: theme.accent }}>{words.at(-1)}</Text></Text></EditField>
-    {(nickname || editing) && <EditField field="nickname" label="Biệt danh" color={theme.heroMuted}><Text testID="landscape-nickname" style={[s.nickname, { color: theme.heroMuted }]}>{nickname || 'Biệt danh'}</Text></EditField>}
-    {(data.portfolio.headline || editing) && <EditField field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{data.portfolio.headline || 'Thêm chức danh'}</Text></EditField>}
+    <EditField overlay field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.name, { color: theme.heroText, fontSize: compact ? 36 : 42, lineHeight: compact ? 46 : 52 }]}>{words.slice(0, -1).join(' ')}{words.length > 1 ? ' ' : ''}<Text style={{ color: theme.accent }}>{words.at(-1)}</Text></Text></EditField>
+    {(nickname || editing) && <EditField overlay field="nickname" label="Biệt danh" color={theme.heroMuted}><Text testID="landscape-nickname" style={[s.nickname, { color: theme.heroMuted }]}>{nickname || 'Biệt danh'}</Text></EditField>}
+    {(data.portfolio.headline || editing) && <EditField overlay field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{data.portfolio.headline || 'Thêm chức danh'}</Text></EditField>}
   </View>;
   const details = <View style={s.details}>
-    {(data.profile.bio || data.portfolio.careerObjective || editing) && <EditField field="bio" label="Giới thiệu" color={theme.heroMuted}><Text style={[s.bio, { color: theme.heroMuted }]}>{data.profile.bio || data.portfolio.careerObjective || 'Thêm giới thiệu về bạn'}</Text></EditField>}
+    {(data.profile.bio || data.portfolio.careerObjective || editing) && <EditField overlay field="bio" label="Giới thiệu" color={theme.heroMuted}><Text style={[s.bio, { color: theme.heroMuted }]}>{data.profile.bio || data.portfolio.careerObjective || 'Thêm giới thiệu về bạn'}</Text></EditField>}
   </View>;
   return <View testID="landscape-hero" style={[s.hero, { backgroundColor: theme.heroBackground, paddingHorizontal: compact ? 22 : 40 }]}>
     <Image source={(!isSampleLink(data.profile.coverUrl) && profileMedia(data.profile.coverUrl)) || theme.heroBackgroundImage} style={StyleSheet.absoluteFill} contentFit="cover" priority="high" loading="eager" accessible={false} />
@@ -35,7 +35,6 @@ export function LandscapeHero({ data, theme, width, portraitMode }: LandscapePro
         <View style={[s.code, { backgroundColor: theme.heroPanel, borderColor: theme.heroBorder }]}><View style={s.dots}>{[0, 1, 2].map(index => <View key={index} style={[s.dot, { backgroundColor: theme.accent, opacity: 1 - index * 0.2 }]} />)}</View><Text style={[s.codeText, { color: theme.heroMuted }]}><Text style={{ color: theme.accent }}>const</Text>{' mindset = {\n  learn: true,\n  build: true,\n  improve: true,\n  repeat: true\n}'}</Text></View>
       </View>}
     </View>
-    <EditPhoto field="coverUrl" color={theme.accentStrong} />
   </View>;
 }
 export function LandscapeStatistics({ data, theme, width }: LandscapeProps) {

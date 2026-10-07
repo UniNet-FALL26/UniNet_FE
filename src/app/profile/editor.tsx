@@ -7,13 +7,16 @@ import { Button } from '@/components/ui/Button';
 import { ProfileEditableTemplate } from '@/components/profile/ProfileEditableTemplate';
 import { ProfileEntryForm } from '@/components/profile/ProfileEntryForm';
 import { ProfileFieldForm } from '@/components/profile/ProfileFieldForm';
+import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
+import type { ImagePickerAsset } from 'expo-image-picker';
+import { pickProfileImage } from '@/utils/profile-image-picker';
 import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
 import { colors } from '@/constants/colors';
 import { portfolioService } from '@/services/portfolio.service';
 import { authStore, useAuthStore } from '@/store/auth.store';
 import type { PortfolioContent, PortfolioResponse } from '@/types/portfolio';
 import type { ProfileEditorSection } from '@/utils/profile-editor';
-import { updateProfileImage, type ProfileEditField, type ProfileImageTarget } from '@/utils/profile-fields';
+import { updateProfileField, updateProfileImage, type ProfileEditField, type ProfileImageTarget } from '@/utils/profile-fields';
 
 export default function ProfileEditorScreen() {
   const params = useLocalSearchParams<{ template?: string; theme?: string }>();
@@ -29,13 +32,16 @@ export default function ProfileEditorScreen() {
   const [message, setMessage] = useState('');
   const [section, setSection] = useState<ProfileEditorSection | null>(null);
   const [field, setField] = useState<ProfileEditField | null>(null);
-  const [photo, setPhoto] = useState<ProfileImageTarget | null>(null);
+  const [photo, setPhoto] = useState<{ target: ProfileImageTarget | 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null);
+  const [choosingPhoto, setChoosingPhoto] = useState(false);
+  const pickerVersion = useRef(0);
   const [leaving, setLeaving] = useState(false);
   const [frameWidth, setFrameWidth] = useState(0);
   const { width: windowWidth } = useWindowDimensions();
   const saveController = useRef<AbortController | null>(null);
   const width = Math.min(frameWidth || windowWidth, 1120);
   useEffect(() => {
+    pickerVersion.current++; setChoosingPhoto(false);
     setLoaded(null); setError(''); setSection(null); setField(null); setPhoto(null); setDirty(false); setMessage(''); setSaving(false); setLeaving(false);
     if (isLoading || !isAuthenticated || !account?.id) return;
     const controller = new AbortController();
@@ -44,8 +50,16 @@ export default function ProfileEditorScreen() {
       if (!result.isOwner) throw new Error('Bạn không có quyền chỉnh sửa hồ sơ này.');
       setLoaded({ accountId: account.id, data: result });
     }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tải được hồ sơ. Vui lòng thử lại.'); });
-    return () => { controller.abort(); saveController.current?.abort(); saveController.current = null; };
+    return () => { pickerVersion.current++; controller.abort(); saveController.current?.abort(); saveController.current = null; };
   }, [account?.id, isAuthenticated, isLoading, attempt]);
+  const choosePhoto = async (target: ProfileImageTarget | 'avatarUrl' | 'coverUrl') => {
+    if (!data || saving || choosingPhoto) return;
+    const version = pickerVersion.current;
+    setChoosingPhoto(true); setMessage('');
+    try { const asset = await pickProfileImage(); if (version === pickerVersion.current && asset) setPhoto({ target, asset }); }
+    catch (cause) { if (version === pickerVersion.current) setMessage(cause instanceof Error ? cause.message : 'Không mở được thư viện ảnh.'); }
+    finally { if (version === pickerVersion.current) setChoosingPhoto(false); }
+  };
   const back = () => router.canGoBack() ? router.back() : router.replace({ pathname: '/profile/preview', params: { template: template.id, theme: theme.id } });
   const add = (content: PortfolioContent) => {
     if (!data || saving) return;
@@ -78,12 +92,12 @@ export default function ProfileEditorScreen() {
     {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.state}><Text style={s.stateTitle}>Đăng nhập để tạo hồ sơ của bạn</Text><Text style={s.hint}>Mẫu đã chọn sẽ được giữ lại khi bạn quay lại trang này.</Text><Button title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ của bạn" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.notice}><Text style={s.hint}>Bạn đang xem thông tin của mình với mẫu đã chọn. Mẫu và màu chỉ dùng để xem trước tại đây; quyền riêng tư của hồ sơ được giữ nguyên.</Text>{dirty && <Text accessibilityLiveRegion="polite" style={s.pending}>Có thay đổi chưa lưu.</Text>}{!!message && <Text accessibilityLiveRegion="polite" accessibilityRole={dirty ? 'alert' : undefined} style={dirty ? s.error : s.success}>{message}</Text>}</View>
       <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)} style={s.frame}>
-        <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving} onAdd={setSection} onField={setField} onPhoto={setPhoto} />
+        <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={setSection} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} />
       </View>
     </ScrollView>}
     {section && data && <ProfileEntryForm key={`${account?.id}-${section.id}`} section={section} data={data} onAdd={add} onClose={() => setSection(null)} />}
     {field && data && <ProfileFieldForm key={`${account?.id}-${field}`} data={data} field={field} onClose={() => setField(null)} onConfirm={next => { if (!saving && account) { setLoaded({ accountId: account.id, data: next }); setDirty(true); setMessage(''); setField(null); } }} />}
-    {photo && data && <ProfileFieldForm key={`${account?.id}-${photo.section}-${photo.index}`} field="avatarUrl" label="Đổi ảnh mục hồ sơ" data={{ ...data, profile: { ...data.profile, avatarUrl: (data.portfolio[photo.section][photo.index] as { logoUrl?: string | null; coverUrl?: string | null })[photo.section === 'certificates' ? 'logoUrl' : 'coverUrl'] ?? null } }} onClose={() => setPhoto(null)} onConfirm={next => { if (!saving && account) { setLoaded({ accountId: account.id, data: updateProfileImage(data, photo, next.profile.avatarUrl ?? '') }); setDirty(true); setMessage(''); setPhoto(null); } }} />}
+    {photo && data && <ProfilePhotoForm key={`${account?.id}-${typeof photo.target === 'string' ? photo.target : `${photo.target.section}-${photo.target.index}`}`} initialAsset={photo.asset} onClose={() => setPhoto(null)} onConfirm={url => { if (!saving && account) { const next = typeof photo.target === 'string' ? updateProfileField(data, photo.target, url) : updateProfileImage(data, photo.target, url); setLoaded({ accountId: account.id, data: next }); setDirty(true); setMessage(''); setPhoto(null); } }} />}
     <Modal visible={leaving} transparent animationType="fade" onRequestClose={() => setLeaving(false)}><View style={s.overlay}><View style={s.confirm}><Text style={s.stateTitle}>Thay đổi chưa được lưu</Text><Text style={s.hint}>Rời trang sẽ bỏ các thông tin bạn vừa thêm.</Text><Button title="Tiếp tục chỉnh sửa" onPress={() => setLeaving(false)} /><Button title="Bỏ thay đổi và quay lại" variant="outline" onPress={back} /></View></View></Modal>
   </SafeAreaView>;
 }

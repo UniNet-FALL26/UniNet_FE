@@ -18,6 +18,7 @@ export const profileMedia = (url?: string | null, theme?: string, mobileCover = 
   if (url === `${prefix}developer-cover.svg` && theme === 'amber') return samples['developer-cover-amber.svg'];
   return url?.startsWith(prefix) ? samples[url.slice(prefix.length)] : url ? { uri: url } : undefined;
 };
-export const profileMobileDecoration = (url?: string | null, theme?: string) => url === `${prefix}developer-cover.svg`
+export const profileHeroCover = (url?: string | null, theme?: string, compact = false) => profileMedia(url || `${prefix}developer-cover.svg`, theme, compact);
+export const profileMobileDecoration = (url?: string | null, theme?: string) => !url || url === `${prefix}developer-cover.svg`
   ? samples[theme === 'amber' ? 'developer-decoration-amber.svg' : 'developer-decoration.svg'] : undefined;
 export const isSampleLink = (url?: string | null) => !url || /^https?:\/\/example\.com(?:\/|$)/i.test(url);

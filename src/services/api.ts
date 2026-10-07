@@ -56,7 +56,7 @@ export async function refreshSession(expected?: AuthSession): Promise<LoginRespo
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const original = tokenStorage.getSession();
   const headers = new Headers(options.headers);
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!headers.has('Content-Type') && !(typeof FormData !== 'undefined' && options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (original?.accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${original.accessToken}`);
   let response = await fetchResponse(path, { ...options, headers });
   // Never refresh failed authentication, public requests or a caller-supplied unrelated bearer.

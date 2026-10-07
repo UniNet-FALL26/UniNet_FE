@@ -1,21 +1,21 @@
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioResponse, ProfileTheme } from '@/types/portfolio';
-import { profileMedia, profileMobileDecoration } from '@/components/profile/profile-media';
+import { profileMedia, profileHeroCover, profileMobileDecoration } from '@/components/profile/profile-media';
 import { EditField, EditPhoto, useProfileEditing } from '@/components/profile/ProfileEditContext';
 
 type Props = { data: PortfolioResponse; theme: ProfileTheme; compact: boolean; thumbnail?: boolean; onNavigate?: (id: string) => void };
 export function DeveloperHero({ data: { profile, portfolio }, theme, compact }: Props) {
   const editing = useProfileEditing();
   const decoration = compact ? profileMobileDecoration(profile.coverUrl, theme.id) : undefined;
-  return <View style={{ backgroundColor: theme.heroBackground }}>
+  return <View testID="modern-hero" style={{ backgroundColor: theme.heroBackground }}>
     <View style={[s.hero, compact && s.compactHero]}>
-      <Image source={profileMedia(profile.coverUrl, theme.id, compact)} contentFit={decoration ? 'fill' : 'cover'} style={StyleSheet.absoluteFill} accessibilityLabel="Ảnh bìa hồ sơ" />
+      <Image testID="modern-hero-cover" source={profileHeroCover(profile.coverUrl, theme.id, compact)} contentFit={decoration ? 'fill' : 'cover'} style={StyleSheet.absoluteFill} accessibilityLabel="Ảnh bìa hồ sơ" />
       <View style={[s.intro, compact && s.compactIntro]}>
-        <EditField field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.fullName, compact && s.compactName, { color: theme.heroText }]}>{profile.fullName.split(' ').slice(0, -1).join(' ')} <Text style={{ color: theme.accent }}>{profile.fullName.split(' ').at(-1)}</Text></Text></EditField>
-        {(profile.nickname || editing) && <EditField field="nickname" label="Biệt danh" color={theme.heroMuted}><Text style={[s.nickname, { color: theme.heroMuted }]}>@{profile.nickname || 'Biệt danh'}</Text></EditField>}
-        <EditField field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{portfolio.headline || (editing ? 'Thêm chức danh' : '')}</Text></EditField>
-        <EditField field="bio" label="Giới thiệu" color={theme.heroMuted}><Text style={[s.bio, { color: theme.heroMuted }]}>{profile.bio || portfolio.careerObjective || (editing ? 'Thêm giới thiệu về bạn' : '')}</Text></EditField>
+        <EditField overlay field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.fullName, compact && s.compactName, { color: theme.heroText }]}>{profile.fullName.split(' ').slice(0, -1).join(' ')} <Text style={{ color: theme.accent }}>{profile.fullName.split(' ').at(-1)}</Text></Text></EditField>
+        {(profile.nickname || editing) && <EditField overlay field="nickname" label="Biệt danh" color={theme.heroMuted}><Text style={[s.nickname, { color: theme.heroMuted }]}>@{profile.nickname || 'Biệt danh'}</Text></EditField>}
+        <EditField overlay field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{portfolio.headline || (editing ? 'Thêm chức danh' : '')}</Text></EditField>
+        <EditField overlay field="bio" label="Giới thiệu" color={theme.heroMuted}><Text style={[s.bio, { color: theme.heroMuted }]}>{profile.bio || portfolio.careerObjective || (editing ? 'Thêm giới thiệu về bạn' : '')}</Text></EditField>
       </View>
       <View style={[s.portraitBox, compact && s.compactPortrait]}>
         {!!decoration && <Image source={decoration} contentFit="contain" style={s.compactPortraitCover} accessible={false} />}
@@ -24,7 +24,6 @@ export function DeveloperHero({ data: { profile, portfolio }, theme, compact }: 
         {compact && <View pointerEvents="none" style={[s.handwritten, s.compactHandwritten]}><Text style={[s.handwriting, s.compactHandwriting, { color: theme.id === 'blue' ? '#A7BBFF' : theme.accentStrong }]}>Code{ '\n' }Create{ '\n' }Learn{ '\n' }Grow{ '\n' }Together.</Text></View>}
       </View>
       {!compact && <View pointerEvents="none" style={s.handwritten}><Text style={[s.handwriting, { color: theme.id === 'blue' ? '#A7BBFF' : theme.accentStrong }]}>Code{ '\n' }Create{ '\n' }Learn{ '\n' }Grow{ '\n' }Together.</Text></View>}
-      <EditPhoto field="coverUrl" color={theme.accentStrong} />
     </View>
   </View>;
 }
