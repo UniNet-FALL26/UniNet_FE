@@ -33,7 +33,8 @@
           "imageWidth": 150
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/with-android-dev-support"
     ],
     "experiments": {
       "typedRoutes": true,

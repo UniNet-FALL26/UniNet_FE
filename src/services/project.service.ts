@@ -43,8 +43,8 @@ const mockProjects: Project[] = [
     recruitmentDeadline: "2026-10-15",
 
     expectedOutput: "MVP hỗ trợ tìm mentor và quản lý tiến độ.",
-    status: "CÔNG KHAI",
-    recruitmentStatus: "ĐANG TUYỂN",
+    status: "Public",
+    recruitmentStatus: "Open",
     createdAt: "2026-09-15T08:00:00.000Z",
   },
   {
@@ -73,8 +73,8 @@ const mockProjects: Project[] = [
     ],
     recruitmentDeadline: "2026-09-30",
     expectedOutput: "Phiên bản beta ứng dụng học tập cộng đồng.",
-    status: "CÔNG KHAI",
-    recruitmentStatus: "ĐANG TUYỂN",
+    status: "Public",
+    recruitmentStatus: "Open",
     createdAt: "2026-09-10T08:00:00.000Z",
   },
 ];
@@ -152,8 +152,8 @@ export const projectService = {
         })),
         recruitmentDeadline: payload.recruitmentDeadline,
         expectedOutput: payload.expectedOutput,
-        status: payload.status ?? "CÔNG KHAI",
-        recruitmentStatus: payload.recruitmentStatus ?? "ĐANG TUYỂN",
+        status: payload.status ?? "Public",
+        recruitmentStatus: payload.recruitmentStatus ?? "Open",
         createdAt: new Date().toISOString(),
       };
       mockProjects.unshift(created);
@@ -182,7 +182,7 @@ export const projectService = {
         userId: "current-user",
         role: payload.role,
         message: payload.message,
-        status: "ĐANG CHỜ",
+        status: "Pending",
         createdAt: new Date().toISOString(),
       };
     }
@@ -209,7 +209,7 @@ export const projectService = {
         inviterId: "current-user",
         role: payload.role,
         message: payload.message,
-        status: "ĐÃ GỬI",
+        status: "Sent",
         createdAt: new Date().toISOString(),
       };
     }

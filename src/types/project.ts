@@ -136,6 +136,8 @@ export type InvitationPayload = {
 export type ProjectRecommendation = {
   id: string;
   fullName: string;
+  nickname?: string;
+  displayName?: string;
   avatarUrl?: string;
   recommendedRole: string;
   skills: string;
