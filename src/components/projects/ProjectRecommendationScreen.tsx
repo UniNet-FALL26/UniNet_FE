@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
+import { getDisplayName } from "@/utils/display-name";
 import type { Project, ProjectRecommendation } from "@/types/project";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -101,11 +102,11 @@ export function ProjectRecommendationScreen() {
             <View style={styles.profileRow}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>
-                  {initials(recommendation.fullName)}
+                  {initials(getDisplayName(recommendation))}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{recommendation.fullName}</Text>
+                <Text style={styles.name}>{getDisplayName(recommendation)}</Text>
                 <Text style={styles.role}>
                   {recommendation.recommendedRole}
                 </Text>

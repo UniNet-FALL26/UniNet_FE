@@ -4,6 +4,7 @@ import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
 import { useAuthStore } from "@/store/auth.store";
+import { getDisplayName } from "@/utils/display-name";
 import type { Project, ProjectRecommendation } from "@/types/project";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -401,11 +402,11 @@ export function ProjectDetailScreen() {
                   <View style={styles.candidateTop}>
                     <View style={styles.avatar}>
                       <Text style={styles.avatarText}>
-                        {initials(rec.fullName)}
+                        {initials(getDisplayName(rec))}
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.candidateName}>{rec.fullName}</Text>
+                      <Text style={styles.candidateName}>{getDisplayName(rec)}</Text>
                       <Text style={styles.candidateRole}>
                         Vị trí gợi ý: {rec.recommendedRole}
                       </Text>

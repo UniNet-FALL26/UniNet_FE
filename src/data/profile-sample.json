@@ -1,0 +1,82 @@
+{
+  "profile": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "fullName": "Trịnh Trọng Quyền",
+    "nickname": "Quyền Dev",
+    "displayName": "Quyền Dev",
+    "avatarUrl": "https://example.com/uninet-samples/developer-portrait.png",
+    "coverUrl": "https://example.com/uninet-samples/developer-cover.svg",
+    "bio": "Build real products. Solve real problems.",
+    "universityName": "Đại học FPT",
+    "major": "Kỹ thuật phần mềm",
+    "organizationName": null,
+    "isVerified": false
+  },
+  "portfolio": {
+    "headline": "Software Developer",
+    "careerObjective": "Mình xây dựng những sản phẩm số hữu ích, kết nối con người và biến ý tưởng thành trải nghiệm thực tế.",
+    "location": "Hồ Chí Minh, Việt Nam",
+    "availability": "Sẵn sàng cho cơ hội mới",
+    "contactEmail": "quyen.dev@example.com",
+    "cvUrl": null,
+    "isPublic": false,
+    "appearance": { "profile": { "template": "developer-modern", "theme": "blue", "font": "Inter", "sectionOrder": ["featured-projects", "stats", "skills", "journey", "other-projects", "certificates", "activities", "languages", "articles"], "hiddenSections": [] } },
+    "skills": [
+      { "name": "React", "category": "Frontend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Next.js", "category": "Frontend", "level": 2, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "React Native", "category": "Frontend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "TypeScript", "category": "Frontend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Tailwind CSS", "category": "Frontend", "level": 2, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Zustand", "category": "Frontend", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": ".NET", "category": "Backend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "ASP.NET Core", "category": "Backend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Node.js", "category": "Backend", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "PostgreSQL", "category": "Backend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "SQL Server", "category": "Backend", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Firebase", "category": "Backend", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Git", "category": "Tools & Others", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Docker", "category": "Tools & Others", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Linux", "category": "Tools & Others", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "VS Code", "category": "Tools & Others", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Postman", "category": "Tools & Others", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "SonarQube", "category": "Tools & Others", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Figma", "category": "Design", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "UI/UX", "category": "Design", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Canva", "category": "Design", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
+      { "name": "Photoshop", "category": "Design", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Illustrator", "category": "Design", "level": 1, "yearsOfExperience": 1, "iconUrl": null },
+      { "name": "Premiere", "category": "Design", "level": 1, "yearsOfExperience": 1, "iconUrl": null }
+    ],
+    "projects": [
+      { "title": "Viora Social App", "description": "Mạng xã hội với bài viết, video ngắn, nhắn tin và thông báo realtime.", "type": "Mobile App", "coverUrl": "https://example.com/uninet-samples/mobile.svg", "technologies": ["React Native", "ASP.NET Core", "PostgreSQL"], "url": null, "githubUrl": null, "featured": true },
+      { "title": "Digital Creative", "description": "Nền tảng kết nối freelancer và khách hàng trong lĩnh vực sáng tạo.", "type": "Web Platform", "coverUrl": "https://example.com/uninet-samples/web.svg", "technologies": ["Next.js", "ASP.NET Core", "PostgreSQL"], "url": null, "githubUrl": null, "featured": true },
+      { "title": "ANKT Social App", "description": "Ứng dụng mạng xã hội tích hợp AI, livestream và hệ sinh thái mini-apps.", "type": "Mobile App", "coverUrl": "https://example.com/uninet-samples/social.svg", "technologies": ["Expo", "Firebase", "TypeScript"], "url": null, "githubUrl": null, "featured": true },
+      { "title": "UniNet", "description": "Nền tảng tích hợp hỗ trợ hợp tác nhóm.", "type": "Web & Mobile", "coverUrl": "https://example.com/uninet-samples/web.svg", "technologies": ["Web", "Mobile"], "url": null, "githubUrl": null, "featured": false },
+      { "title": "Antifake", "description": "Công cụ kiểm tra và phòng chống thông tin giả.", "type": "Web", "coverUrl": "https://example.com/uninet-samples/social.svg", "technologies": ["Web", "API"], "url": null, "githubUrl": null, "featured": false },
+      { "title": "Game 2D", "description": "Dự án game học tập và khám phá cá nhân.", "type": "Game", "coverUrl": "https://example.com/uninet-samples/game.svg", "technologies": ["Unity", "C#"], "url": null, "githubUrl": null, "featured": false },
+      { "title": "Portfolio", "description": "Website giới thiệu sản phẩm và hành trình của mình.", "type": "Web", "coverUrl": "https://example.com/uninet-samples/web.svg", "technologies": ["Next.js", "TypeScript"], "url": null, "githubUrl": null, "featured": false }
+    ],
+    "education": [ { "title": "Sinh viên FPTU", "organization": "Đại học FPT", "period": "2022", "startDate": "2022-09-01", "endDate": null, "gpa": "7.1/10", "description": "Bắt đầu hành trình với ngành Kỹ thuật phần mềm." } ],
+    "experience": [
+      { "title": "Freelance Developer", "organization": "Freelance", "period": "2023", "startDate": "2023-01-01", "description": "Thực hiện các dự án web/mobile theo yêu cầu." },
+      { "title": "Teaching Assistant", "organization": "IoT Teens Connect", "period": "2024", "startDate": "2024-01-01", "description": "Hỗ trợ giảng dạy, hướng dẫn học sinh về IoT và lập trình cơ bản." },
+      { "title": "OJT — React Native", "organization": "FPT University", "period": "07/2026 – 08/2026", "startDate": "2026-07-01", "endDate": "2026-08-31", "description": "Tham gia phát triển ứng dụng di động thực tế bằng React Native (Expo)." }
+    ],
+    "certificates": [
+      { "title": "Azure Fundamentals", "issuer": "Microsoft", "year": "2024", "logoUrl": null, "url": null },
+      { "title": "FE Standard Certificate", "issuer": "FPT University", "year": "2024", "logoUrl": null, "url": null },
+      { "title": "English Certificate (TOEIC)", "issuer": "IIG Vietnam", "year": "2023", "logoUrl": null, "url": null },
+      { "title": "React Native Certificate", "issuer": "Udemy", "year": "2024", "logoUrl": null, "url": null }
+    ],
+    "articles": [
+      { "title": "Tối ưu hiệu suất React Native với FlatList", "date": "2024-08-12", "coverUrl": "https://example.com/uninet-samples/mobile.svg", "url": "https://example.com/articles/react-native" },
+      { "title": "Triển khai ASP.NET Core lên Render", "date": "2024-07-28", "coverUrl": "https://example.com/uninet-samples/web.svg", "url": "https://example.com/articles/aspnet" },
+      { "title": "Thiết kế UI/UX thân thiện cho mobile app", "date": "2024-07-15", "coverUrl": "https://example.com/uninet-samples/social.svg", "url": "https://example.com/articles/ui-ux" }
+    ],
+    "activities": [ { "title": "IoT Teens Connect", "organization": "FPT University", "description": "Chia sẻ kiến thức lập trình với học sinh.", "date": "2024" } ],
+    "languages": [ { "name": "Tiếng Việt", "level": "Bản ngữ" }, { "name": "Tiếng Anh", "level": "Giao tiếp tốt" } ],
+    "socialLinks": [ { "label": "GitHub", "url": "https://github.com" }, { "label": "LinkedIn", "url": "https://linkedin.com" } ]
+  },
+  "isOwner": false,
+  "skillCatalog": []
+}
