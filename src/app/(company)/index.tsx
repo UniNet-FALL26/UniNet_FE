@@ -1,0 +1,45 @@
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, SectionTitle, Tag } from '@/components/company/company-ui';
+import { companyApplicants, companyJobs } from '@/components/company/company-data';
+
+const stats = [
+  { title: 'Hồ sơ ứng tuyển', value: '40', detail: '36 hồ sơ ở các bài đang tuyển', icon: 'doc.text' },
+  { title: 'Hồ sơ chờ xem', value: '12', detail: 'Cần bạn xem xét', icon: 'tray' },
+  { title: 'Đang phỏng vấn', value: '8', detail: 'Ở 3 bài đang tuyển dụng', icon: 'bubble.left.and.bubble.right' },
+] as const;
+
+const funnel = [
+  { label: 'Chờ xem', value: 12, color: c.amber },
+  { label: 'Đã xem', value: 10, color: c.muted },
+  { label: 'Phỏng vấn', value: 8, color: c.purple },
+  { label: 'Chấp nhận', value: 5, color: c.green },
+  { label: 'Từ chối', value: 5, color: c.rose },
+];
+
+const todoItems = [
+  { title: '6 hồ sơ Frontend đang chờ', detail: 'Dành thời gian xem kỹ năng và dự án.', icon: 'tray', tone: 'purple' },
+  { title: 'Data Analyst sắp hết hạn', detail: 'Hạn ứng tuyển đến 10/10/2026.', icon: 'clock', tone: 'amber' },
+] as const;
+
+export default function CompanyDashboard() {
+  return <CompanyPage><PageScroll>
+    <View style={s.topbar}><View style={s.brand}><View style={s.brandMark}><CompanyIcon name={{ ios: 'building.2.fill', android: 'business', web: 'business' }} color="#FFF" size={17} /></View><View><Text style={s.brandName}>UniNet</Text><Text style={s.brandCaption}>CAREER HUB</Text></View></View><Pressable style={s.avatar}><Text style={s.avatarText}>N</Text></Pressable></View>
+    <View style={s.hero}><View style={s.heroTop}><Text style={s.heroTitle}>Quản lý bài đăng tuyển dụng</Text><Tag tone="gray">3 đang tuyển</Tag></View><Text style={s.heroCopy}>Nexora Studio · 6 bài đăng · 40 hồ sơ</Text><View style={s.heroStats}>{[{ label: 'Đang tuyển', value: '3', sub: '36 hồ sơ' }, { label: 'Bản nháp', value: '1', sub: '0 hồ sơ' }, { label: 'Sắp hết hạn', value: '1', sub: '10/10/2026' }].map((item) => <View key={item.label} style={s.heroStat}><Text style={s.heroStatLabel}>{item.label}</Text><Text style={s.heroStatValue}>{item.value}</Text><Text style={s.heroStatSub}>{item.sub}</Text></View>)}</View><ActionButton title="Tạo bài tuyển dụng" onPress={() => router.push('/(company)/create')} icon={{ ios: 'plus', android: 'add', web: 'add' }} variant="soft" /></View>
+    <View style={s.metricGrid}>{stats.map((item) => <Card key={item.title} style={s.metricCard}><View style={s.metricTop}><Text style={s.metricLabel}>{item.title}</Text><CompanyIcon name={item.icon} size={16} /></View><Text style={s.metricValue}>{item.value}</Text><Text style={s.metricDetail}>{item.detail}</Text></Card>)}</View>
+    <Card><SectionTitle title="Hồ sơ mới gửi" action="Xem ứng viên" onAction={() => router.push('/(company)/applicants')} />{companyApplicants.slice(0, 3).map((applicant) => <View key={applicant.name} style={s.applicantRow}><View style={s.initials}><Text style={s.initialsText}>{applicant.initials}</Text></View><View style={s.personInfo}><Text style={s.personName}>{applicant.name}</Text><Text style={s.personMeta}>{applicant.school}</Text></View><View style={s.applicantAction}><Text style={s.dateText}>{applicant.date}</Text><Tag tone="amber">{applicant.status}</Tag></View></View>)}</Card>
+    <Card><SectionTitle title="Bài đăng đang tuyển" action="Quản lý bài đăng" onAction={() => router.push('/(company)/jobs')} />{companyJobs.filter((job) => job.status === 'Đã đăng').map((job) => <Pressable onPress={() => router.push('/(company)/jobs')} key={job.id} style={s.jobRow}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chart.bar.fill', android: 'bar_chart', web: 'bar_chart' }} size={18} /></View><View style={s.personInfo}><Text style={s.personName}>{job.title}</Text><Text style={s.personMeta}>{job.department} · {job.workplace} · {job.location}</Text></View><View style={s.applicantAction}><Text style={s.appCount}>{job.applicants} ứng viên →</Text><Tag tone="green">{job.status}</Tag></View></Pressable>)}</Card>
+    <Card><SectionTitle title="Tiến độ xem xét" /><Text style={s.progressSub}>40 hồ sơ · tất cả bài đăng</Text>{funnel.map((item) => <View key={item.label} style={s.progressRow}><View style={s.progressHead}><Text style={s.progressLabel}>{item.label}</Text><Text style={s.progressValue}>{item.value}</Text></View><View style={s.track}><View style={[s.fill, { width: `${item.value / 12 * 100}%`, backgroundColor: item.color }]} /></View></View>)}</Card>
+    <Card><SectionTitle title="Việc cần làm" />{todoItems.map((item) => <View key={item.title} style={s.todo}><CompanyIcon name={{ ios: item.icon, android: item.icon === 'tray' ? 'inbox' : 'schedule', web: item.icon === 'tray' ? 'inbox' : 'schedule' }} size={16} color={item.tone === 'amber' ? c.amber : c.purple} /><View style={s.personInfo}><Text style={s.personName}>{item.title}</Text><Text style={s.personMeta}>{item.detail}</Text></View></View>)}</Card>
+    <View style={s.messageCard}><View style={s.msgIcon}><CompanyIcon name={{ ios: 'bubble.left.and.bubble.right', android: 'forum', web: 'forum' }} /></View><View style={s.personInfo}><Text style={s.personName}>Giữ cuộc trò chuyện tiếp tục</Text><Text style={s.personMeta}>Trao đổi trực tiếp với sinh viên giúp các bạn nhận kết nối.</Text></View><ActionButton title="Kết nối" onPress={() => router.push('/(company)/applicants')} icon={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} variant="outline" /></View>
+  </PageScroll></CompanyPage>;
+}
+
+const s = StyleSheet.create({
+  topbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, paddingHorizontal: 3 }, brand: { flexDirection: 'row', alignItems: 'center', gap: 8 }, brandMark: { width: 32, height: 32, borderRadius: 10, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, brandName: { color: c.ink, fontSize: 16, lineHeight: 18, fontWeight: '900' }, brandCaption: { color: c.purple, fontSize: 7, fontWeight: '800', letterSpacing: 0.5 }, avatar: { width: 30, height: 30, borderRadius: 16, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: c.purple, fontWeight: '800' },
+  hero: { backgroundColor: c.purple, padding: 14, borderRadius: 17, gap: 9 }, heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }, heroTitle: { flex: 1, color: '#FFF', fontWeight: '900', fontSize: 18, lineHeight: 23 }, heroCopy: { color: '#E5DBFF', fontSize: 10 }, heroStats: { flexDirection: 'row', gap: 7 }, heroStat: { flex: 1, padding: 9, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 12 }, heroStatLabel: { color: '#F2ECFF', fontSize: 9 }, heroStatValue: { color: '#FFF', fontSize: 19, fontWeight: '900', marginTop: 4 }, heroStatSub: { color: '#E5DBFF', fontSize: 8, marginTop: 1 },
+  metricGrid: { flexDirection: 'row', gap: 8 }, metricCard: { flex: 1, padding: 10, minHeight: 100 }, metricTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, metricLabel: { color: c.muted, fontSize: 9, flex: 1 }, metricValue: { color: c.ink, fontSize: 23, fontWeight: '900', marginTop: 5 }, metricDetail: { color: c.muted, fontSize: 8, lineHeight: 12, marginTop: 2 }, progressSub: { color: c.muted, fontSize: 10, marginTop: -5, marginBottom: 3 },
+  applicantRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, borderTopWidth: 1, borderTopColor: '#F2F1F5' }, initials: { width: 30, height: 30, borderRadius: 16, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' }, initialsText: { fontSize: 9, color: c.purple, fontWeight: '900' }, personInfo: { flex: 1, gap: 3 }, personName: { color: c.ink, fontSize: 10, fontWeight: '800' }, personMeta: { color: c.muted, fontSize: 9, lineHeight: 13 }, applicantAction: { alignItems: 'flex-end', gap: 4 }, dateText: { color: c.muted, fontSize: 8 },
+  jobRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F2F1F5' }, jobIcon: { width: 31, height: 31, borderRadius: 9, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' }, appCount: { color: c.purple, fontSize: 9, fontWeight: '800' },
+  progressRow: { marginTop: 8, gap: 4 }, progressHead: { flexDirection: 'row', justifyContent: 'space-between' }, progressLabel: { color: c.muted, fontSize: 10 }, progressValue: { color: c.ink, fontSize: 10, fontWeight: '800' }, track: { height: 4, borderRadius: 3, backgroundColor: '#F0EFF4', overflow: 'hidden' }, fill: { height: 4, borderRadius: 3 }, todo: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 10, borderRadius: 11, backgroundColor: c.page, marginTop: 7 }, messageCard: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#FFF', borderRadius: 15, borderWidth: 1, borderColor: c.line }, msgIcon: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' },
+});
