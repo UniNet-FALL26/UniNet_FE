@@ -3,21 +3,33 @@ import { Input } from "@/components/ui/Input";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import { useAuthStore } from "@/store/auth.store";
-import { getDisplayName } from "@/utils/display-name";
-import type { Project, ProjectRecommendation } from "@/types/project";
+import {
+  ApiRecruitmentStatus,
+  ProjectVisibility,
+  type ProjectDetail,
+  type ProjectRecommendation,
+} from "@/types/project";
+import { RecommendedMemberCard } from "@/components/projects/RecommendedMemberCard";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 export function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { account } = useAuthStore();
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [recommendations, setRecommendations] = useState<
     ProjectRecommendation[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [joinRole, setJoinRole] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,52 +39,61 @@ export function ProjectDetailScreen() {
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    const projectId = id ?? "project-1";
-    let mounted = true;
+    const controller = new AbortController();
+    setRecommendationsLoading(false);
+    setLoading(true);
+    setError(null);
+    setProject(null);
+    setRecommendations([]);
+    setJoinRole("");
+    setJoinMessage("");
+    setJoinRequestState("idle");
+    setInvitedIds([]);
     async function load() {
-      setLoading(true);
       try {
-        const [detail, recs] = await Promise.all([
-          projectService.getProjectById(projectId),
-          projectService.fetchRecommendations(projectId),
-        ]);
-        if (mounted) {
-          setProject(detail);
-          setRecommendations(recs);
-          if (detail.roles?.[0]) setJoinRole(detail.roles[0].role);
+        if (!id) throw new Error("Không tìm thấy mã dự án.");
+        const detail = await projectService.getProjectById(
+          id,
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        setProject(detail);
+        setJoinRole(detail.roleRequirements[0]?.roleName ?? "");
+        setJoinRequestState(detail.isMember ? "member" : "idle");
+        setLoading(false);
+        if (detail.isCreator) {
+          setRecommendationsLoading(true);
+          const recs = await projectService.fetchRecommendations(id, controller.signal);
+          if (!controller.signal.aborted) setRecommendations(recs);
         }
-      } catch {
-        if (mounted)
-          setError("Không thể tải thông tin dự án. Vui lòng thử lại sau.");
+      } catch (cause) {
+        if (!controller.signal.aborted)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Không thể tải thông tin dự án.",
+          );
       } finally {
-        if (mounted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setRecommendationsLoading(false);
+        }
       }
     }
     load();
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
+    return () => controller.abort();
+  }, [id, retry]);
 
-  const roleOptions = useMemo(() => project?.roles ?? [], [project]);
-  const isCreator = project ? account?.id === project.creator?.id : false;
-  const isMember = project
-    ? project.currentMemberCount > 1 && account?.id === "current-user"
-    : false;
-  const canRecruit = project
-    ? project.recruitmentStatus === "Open" && project.status === "Public"
-    : false;
-
-  useEffect(() => {
-    if (!project) return;
-    const pendingOrRejected = project.recruitmentStatus === "Open";
-    if (pendingOrRejected && account?.id === "current-user")
-      setJoinRequestState("pending");
-    else if (isMember) setJoinRequestState("member");
-  }, [account, isMember, project]);
+  const roleOptions = useMemo(() => project?.roleRequirements ?? [], [project]);
+  const isCreator = project?.isCreator === true;
+  const isMember = project?.isMember === true;
+  const canRecruit =
+    project?.recruitmentStatus === ApiRecruitmentStatus.Open &&
+    project?.visibility === ProjectVisibility.Public;
 
   const handleJoinRequest = async () => {
-    if (!project || !joinRole) {
+    if (!project || isCreator || isMember || !canRecruit) return;
+    if (!joinRole) {
       setError("Bạn cần chọn một vai trò để gửi yêu cầu tham gia.");
       return;
     }
@@ -94,15 +115,15 @@ export function ProjectDetailScreen() {
     setJoinMessage("");
   };
 
-  const handleInvite = async (recommendation: ProjectRecommendation) => {
+  const handleInvite = async (recommendation: ProjectRecommendation, role: string) => {
     if (!project) return;
     try {
       await projectService.sendInvitation({
         projectId: project.id,
-        inviteeId: recommendation.id,
-        role: recommendation.recommendedRole,
+        inviteeId: recommendation.userId,
+        role,
       });
-      setInvitedIds((current) => [...current, recommendation.id]);
+      setInvitedIds((current) => [...current, recommendation.userId]);
     } catch {
       setError("Không thể gửi lời mời. Vui lòng thử lại.");
     }
@@ -112,12 +133,21 @@ export function ProjectDetailScreen() {
   if (!project)
     return (
       <View style={styles.stateContainer}>
-        <Text style={styles.emptyText}>Không tìm thấy dự án.</Text>
+        <Text style={styles.emptyText}>{error || "Không tìm thấy dự án."}</Text>
+        <Button
+          title="Thử lại"
+          onPress={() => setRetry((value) => value + 1)}
+        />
+        <Button
+          title="Quay lại"
+          variant="outline"
+          onPress={() => router.back()}
+        />
       </View>
     );
 
-  const isRecruiting = project.recruitmentStatus === "Open";
-  const isPublic = project.status === "Public";
+  const isRecruiting = project.recruitmentStatus === ApiRecruitmentStatus.Open;
+  const isPublic = project.visibility === ProjectVisibility.Public;
 
   return (
     <ScrollView
@@ -149,14 +179,21 @@ export function ProjectDetailScreen() {
       <View style={styles.creatorBanner}>
         <View style={styles.creatorProfile}>
           <View style={styles.creatorAvatar}>
-            <Text style={styles.creatorAvatarText}>
-              {initials(project.creator?.displayName || "UN")}
-            </Text>
+            {project.creator.avatarUrl ? (
+              <Image
+                source={{ uri: project.creator.avatarUrl }}
+                style={styles.creatorImage}
+              />
+            ) : (
+              <Text style={styles.creatorAvatarText}>
+                {initials(project.creator?.fullName || "UN")}
+              </Text>
+            )}
           </View>
           <View>
             <Text style={styles.creatorLabel}>Người khởi xướng</Text>
             <Text style={styles.creatorName}>
-              {project.creator?.displayName || "Thành viên UniNet"}
+              {project.creator?.fullName || "Thành viên UniNet"}
             </Text>
           </View>
         </View>
@@ -174,7 +211,17 @@ export function ProjectDetailScreen() {
                 isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
               ]}
             >
-              ● {project.recruitmentStatus}
+              ●{" "}
+              {
+                (
+                  [
+                    "Đang tuyển",
+                    "Đã đủ thành viên",
+                    "Đã đóng",
+                    "Hết hạn",
+                  ] as const
+                )[project.recruitmentStatus]
+              }
             </Text>
           </View>
 
@@ -224,15 +271,15 @@ export function ProjectDetailScreen() {
       </View>
 
       {/* TECHNOLOGIES */}
-      {project.technologies?.length > 0 && (
+      {project.skills.length > 0 && (
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Công nghệ sử dụng</Text>
           </View>
           <View style={styles.tagsContainer}>
-            {project.technologies.map((tech) => (
-              <View key={tech} style={styles.techTag}>
-                <Text style={styles.techTagText}>{tech}</Text>
+            {project.skills.map((skill) => (
+              <View key={skill.skillId} style={styles.techTag}>
+                <Text style={styles.techTagText}>{skill.skillName}</Text>
               </View>
             ))}
           </View>
@@ -244,17 +291,17 @@ export function ProjectDetailScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Vị trí đang tìm kiếm</Text>
           <Text style={styles.sectionCountText}>
-            {project.roles?.length || 0} vai trò
+            {project.roleRequirements?.length || 0} vai trò
           </Text>
         </View>
 
         <View style={styles.rolesList}>
-          {project.roles.map((role, idx) => (
+          {project.roleRequirements.map((role, idx) => (
             <View key={role.id || idx} style={styles.roleCard}>
               <View style={styles.roleCardHeader}>
                 <View style={styles.roleNameWrap}>
                   <View style={styles.roleBullet} />
-                  <Text style={styles.roleName}>{role.role}</Text>
+                  <Text style={styles.roleName}>{role.roleName}</Text>
                 </View>
                 <View style={styles.roleQuantityBadge}>
                   <Text style={styles.roleQuantityText}>
@@ -274,6 +321,51 @@ export function ProjectDetailScreen() {
             </View>
           ))}
         </View>
+      </View>
+
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Thành viên trong nhóm</Text>
+          <Text style={styles.sectionCountText}>
+            {project.members.length} thành viên
+          </Text>
+        </View>
+        {project.members.length === 0 ? (
+          <Text style={styles.descriptionText}>
+            Chưa có thành viên trong nhóm.
+          </Text>
+        ) : (
+          project.members.map((member) => (
+            <View key={member.userId} style={styles.memberRow}>
+              <View style={styles.creatorAvatar}>
+                {member.avatarUrl ? (
+                  <Image
+                    source={{ uri: member.avatarUrl }}
+                    style={styles.creatorImage}
+                  />
+                ) : (
+                  <Text style={styles.creatorAvatarText}>
+                    {initials(member.fullName || member.nickname || "UN")}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.memberInfo}>
+                <Text style={styles.creatorName}>
+                  {member.fullName || "Chưa cập nhật tên"}
+                </Text>
+                <Text style={styles.memberMeta}>
+                  Nickname: {member.nickname || "Chưa cập nhật"}
+                </Text>
+                <Text style={styles.candidateRole}>
+                  Vai trò: {member.role || "Chưa cập nhật"}
+                </Text>
+                <Text style={styles.memberMeta}>
+                  Ngày tham gia: {formatDate(member.joinedAt)}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* MORE DETAILS */}
@@ -302,11 +394,12 @@ export function ProjectDetailScreen() {
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>⚠️ {error}</Text>
+          <Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} />
         </View>
       ) : null}
 
       {/* JOIN REQUEST SECTION (GUEST) */}
-      {!isCreator && canRecruit && joinRequestState === "idle" && (
+      {!isCreator && !isMember && canRecruit && joinRequestState === "idle" && (
         <View style={styles.actionCard}>
           <Text style={styles.actionCardTitle}>Tham gia cùng nhóm</Text>
           <Text style={styles.actionCardSub}>
@@ -316,11 +409,11 @@ export function ProjectDetailScreen() {
           <Text style={styles.inputLabel}>Chọn vai trò muốn ứng tuyển *</Text>
           <View style={styles.rolePickerWrap}>
             {roleOptions.map((role) => {
-              const active = joinRole === role.role;
+              const active = joinRole === role.roleName;
               return (
                 <Pressable
                   key={role.id}
-                  onPress={() => setJoinRole(role.role)}
+                  onPress={() => setJoinRole(role.roleName)}
                   style={[
                     styles.roleChoiceChip,
                     active && styles.roleChoiceChipActive,
@@ -332,7 +425,7 @@ export function ProjectDetailScreen() {
                       active && styles.roleChoiceTextActive,
                     ]}
                   >
-                    {role.role}
+                    {role.roleName}
                   </Text>
                 </Pressable>
               );
@@ -358,21 +451,24 @@ export function ProjectDetailScreen() {
         </View>
       )}
 
-      {!isCreator && canRecruit && joinRequestState === "pending" && (
-        <View style={styles.statusBox}>
-          <Text style={styles.statusBoxIcon}>⏳</Text>
-          <Text style={styles.statusBoxTitle}>Đang đợi duyệt hồ sơ</Text>
-          <Text style={styles.statusBoxDesc}>
-            Lời nhắn của bạn đã được chuyển đến người khởi xướng dự án.
-          </Text>
-          <Button
-            title="Rút lại yêu cầu"
-            variant="outline"
-            onPress={handleWithdrawRequest}
-            style={{ marginTop: 8 }}
-          />
-        </View>
-      )}
+      {!isCreator &&
+        !isMember &&
+        canRecruit &&
+        joinRequestState === "pending" && (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusBoxIcon}>⏳</Text>
+            <Text style={styles.statusBoxTitle}>Đang đợi duyệt hồ sơ</Text>
+            <Text style={styles.statusBoxDesc}>
+              Lời nhắn của bạn đã được chuyển đến người khởi xướng dự án.
+            </Text>
+            <Button
+              title="Rút lại yêu cầu"
+              variant="outline"
+              onPress={handleWithdrawRequest}
+              style={{ marginTop: 8 }}
+            />
+          </View>
+        )}
 
       {!isCreator && joinRequestState === "member" && (
         <View style={[styles.statusBox, styles.statusBoxSuccess]}>
@@ -388,58 +484,18 @@ export function ProjectDetailScreen() {
       {isCreator && canRecruit && (
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Gợi ý nhân sự phù hợp (AI)</Text>
+            <Text style={styles.sectionTitle}>Gợi ý thành viên phù hợp:</Text>
             <Text style={styles.sectionCountText}>
               {recommendations.length} ứng viên
             </Text>
           </View>
 
           <View style={{ gap: 12 }}>
-            {recommendations.map((rec) => {
-              const isInvited = invitedIds.includes(rec.id);
-              return (
-                <View key={rec.id} style={styles.candidateCard}>
-                  <View style={styles.candidateTop}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {initials(getDisplayName(rec))}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.candidateName}>{getDisplayName(rec)}</Text>
-                      <Text style={styles.candidateRole}>
-                        Vị trí gợi ý: {rec.recommendedRole}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.candidateSkillBox}>
-                    <Text style={styles.candidateSkillsLabel}>Kỹ năng:</Text>
-                    <Text style={styles.candidateSkills}>{rec.skills}</Text>
-                  </View>
-
-                  {rec.reason ? (
-                    <Text style={styles.candidateReason}>💡 {rec.reason}</Text>
-                  ) : null}
-
-                  <View style={styles.candidateActions}>
-                    <Button
-                      title="Hồ sơ"
-                      variant="outline"
-                      onPress={() => router.back()}
-                      style={{ flex: 1 }}
-                    />
-                    <Button
-                      title={isInvited ? "Đã gửi lời mời" : "Mời tham gia"}
-                      variant="primary"
-                      disabled={isInvited}
-                      onPress={() => handleInvite(rec)}
-                      style={{ flex: 1.4 }}
-                    />
-                  </View>
-                </View>
-              );
-            })}
+            {recommendationsLoading && <Text style={styles.descriptionText}>Đang tải gợi ý thành viên...</Text>}
+            {!recommendationsLoading && recommendations.length === 0 && !error && <Text style={styles.descriptionText}>Chưa có gợi ý thành viên phù hợp.</Text>}
+            {recommendations.map((rec) => (
+              <RecommendedMemberCard key={rec.userId} member={rec} roles={project.roleRequirements} invited={invitedIds.includes(rec.userId)} onInvite={handleInvite} />
+            ))}
           </View>
         </View>
       )}
@@ -468,6 +524,10 @@ function formatDate(value?: string | null) {
 }
 
 const styles = StyleSheet.create({
+  creatorImage: { width: 40, height: 40, borderRadius: 20 },
+  memberRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  memberInfo: { flex: 1, gap: 4 },
+  memberMeta: { color: colors.textSecondary, fontSize: 12 },
   container: {
     flex: 1,
     backgroundColor: colors.background,

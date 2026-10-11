@@ -2,10 +2,11 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import type { Project } from "@/types/project";
+import { ApiRecruitmentStatus, RECRUITMENT_STATUS_LABEL, type ProjectListItem } from "@/types/project";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -27,8 +28,15 @@ const tabs = [
 type Tab = (typeof tabs)[number];
 
 export function ProjectExplorerScreen() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [retry, setRetry] = useState(0);
+  const [keyword, setKeyword] = useState("");
+  const [knownSkills, setKnownSkills] = useState<string[]>([]);
+  const [knownFields, setKnownFields] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState<Tab>("Đang tuyển");
 
@@ -47,10 +55,10 @@ export function ProjectExplorerScreen() {
   const [filterVisible, setFilterVisible] = useState(false);
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
   const [draftSkills, setDraftSkills] = useState<string[]>([]);
-  const [draftRoles, setDraftRoles] = useState<string[]>([]);
+  const [draftFields, setDraftFields] = useState<string[]>([]);
 
   const [filterSearch, setFilterSearch] = useState("");
 
@@ -59,57 +67,31 @@ export function ProjectExplorerScreen() {
   // =========================
 
   useEffect(() => {
-    let mounted = true;
-
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = await projectService.listProjects();
-
-        if (mounted) {
-          setProjects(data);
-        }
-      } catch {
-        if (mounted) {
-          setError("Không thể tải danh sách dự án. Vui lòng thử lại sau.");
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // =========================
-  // AVAILABLE FILTER OPTIONS
-  // =========================
-
-  const availableSkills = useMemo(() => {
-    const skills = projects.flatMap((project) => project.technologies ?? []);
-
-    return Array.from(new Set(skills))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  }, [projects]);
-
-  const availableRoles = useMemo(() => {
-    const roles = projects.flatMap((project) =>
-      (project.roles ?? []).map((role) => role.role),
-    );
-
-    return Array.from(new Set(roles))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  }, [projects]);
+    const timer = setTimeout(() => { setKeyword(searchQuery.trim()); setPage(1); }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  const unsupportedTab = ["Yêu cầu tham gia", "Lời mời đã gửi", "Lời mời nhận được"].includes(activeTab);
+  useEffect(() => {
+    const controller = new AbortController();
+    if (unsupportedTab) { setProjects([]); setLoading(false); setError(null); return () => controller.abort(); }
+    setLoading(true); setError(null); setProjects([]);
+    const request = activeTab === "Dự án của tôi"
+      ? projectService.listMyProjects({ page, pageSize: 10 }, controller.signal)
+      : projectService.listProjects({ page, pageSize: 10, keyword, field: selectedFields[0], skillnames: selectedSkills,
+      recruitmentStatus: activeTab === "Đang tuyển" ? ApiRecruitmentStatus.Open : undefined,
+    }, controller.signal);
+    request.then((data) => {
+      if (controller.signal.aborted) return;
+      setProjects(data.projects); setTotalPages(data.totalPages); setTotalItems(data.totalItems);
+      setKnownSkills((current) => Array.from(new Set([...current, ...data.projects.flatMap((project) => (project.skills ?? []).map((skill) => skill.skillName))])).sort());
+      setKnownFields((current) => Array.from(new Set([...current, ...data.projects.map((project) => project.projectField)])).filter(Boolean).sort());
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Không thể tải danh sách dự án.");
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, unsupportedTab]);
+  const availableSkills = knownSkills;
+  const availableFields = knownFields;
 
   // =========================
   // FILTER OPTIONS SEARCH
@@ -127,17 +109,17 @@ export function ProjectExplorerScreen() {
     );
   }, [availableSkills, filterSearch]);
 
-  const filteredAvailableRoles = useMemo(() => {
+  const filteredAvailableFields = useMemo(() => {
     const keyword = filterSearch.trim().toLowerCase();
 
     if (!keyword) {
-      return availableRoles;
+      return availableFields;
     }
 
-    return availableRoles.filter((role) =>
+    return availableFields.filter((role) =>
       role.toLowerCase().includes(keyword),
     );
-  }, [availableRoles, filterSearch]);
+  }, [availableFields, filterSearch]);
 
   // =========================
   // OPEN FILTER MODAL
@@ -145,7 +127,7 @@ export function ProjectExplorerScreen() {
 
   const openFilter = () => {
     setDraftSkills(selectedSkills);
-    setDraftRoles(selectedRoles);
+    setDraftFields(selectedFields);
     setFilterSearch("");
     setFilterVisible(true);
   };
@@ -168,14 +150,8 @@ export function ProjectExplorerScreen() {
   // TOGGLE ROLE
   // =========================
 
-  const toggleRole = (role: string) => {
-    setDraftRoles((current) => {
-      if (current.includes(role)) {
-        return current.filter((item) => item !== role);
-      }
-
-      return [...current, role];
-    });
+  const toggleField = (field: string) => {
+    setDraftFields((current) => current.includes(field) ? [] : [field]);
   };
 
   // =========================
@@ -183,8 +159,9 @@ export function ProjectExplorerScreen() {
   // =========================
 
   const applyFilter = () => {
+    setPage(1);
     setSelectedSkills(draftSkills);
-    setSelectedRoles(draftRoles);
+    setSelectedFields(draftFields);
     setFilterVisible(false);
   };
 
@@ -194,143 +171,29 @@ export function ProjectExplorerScreen() {
 
   const clearFilter = () => {
     setDraftSkills([]);
-    setDraftRoles([]);
+    setDraftFields([]);
   };
 
   const clearAppliedFilter = () => {
+    setPage(1);
     setSelectedSkills([]);
-    setSelectedRoles([]);
+    setSelectedFields([]);
   };
 
   // =========================
   // ACTIVE FILTER COUNT
   // =========================
 
-  const activeFilterCount = selectedSkills.length + selectedRoles.length;
+  const activeFilterCount = selectedSkills.length + selectedFields.length;
 
   // =========================
   // PROJECT FILTERING
   // =========================
 
-  const filteredProjects = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
-
-    return projects.filter((project) => {
-      // =========================
-      // TAB FILTER
-      // =========================
-
-      let matchesTab = true;
-
-      switch (activeTab) {
-        case "Dự án của tôi":
-          matchesTab = project.creator.id === "current-user";
-          break;
-
-        case "Yêu cầu tham gia":
-          matchesTab = project.recruitmentStatus === "Open";
-          break;
-
-        case "Lời mời đã gửi":
-          matchesTab = project.creator.id === "current-user";
-          break;
-
-        case "Lời mời nhận được":
-          matchesTab = project.recruitmentStatus === "Open";
-          break;
-
-        case "Đã đóng tuyển":
-          matchesTab =
-            project.recruitmentStatus === "Closed" ||
-            project.recruitmentStatus === "Expired";
-          break;
-
-        case "Đang tuyển":
-        default:
-          matchesTab = project.recruitmentStatus === "Open";
-          break;
-      }
-
-      if (!matchesTab) {
-        return false;
-      }
-
-      // =========================
-      // SEARCH FILTER
-      // =========================
-
-      if (keyword) {
-        const title = project.title?.toLowerCase() ?? "";
-
-        const creator = project.creator?.displayName?.toLowerCase() ?? "";
-
-        const technologies = (project.technologies ?? [])
-          .join(" ")
-          .toLowerCase();
-
-        const roles = (project.roles ?? [])
-          .map((role) => role.role)
-          .join(" ")
-          .toLowerCase();
-
-        const matchesSearch =
-          title.includes(keyword) ||
-          creator.includes(keyword) ||
-          technologies.includes(keyword) ||
-          roles.includes(keyword);
-
-        if (!matchesSearch) {
-          return false;
-        }
-      }
-
-      // =========================
-      // SKILL FILTER
-      // =========================
-
-      if (selectedSkills.length > 0) {
-        const projectTechnologies = (project.technologies ?? []).map(
-          (technology) => technology.toLowerCase(),
-        );
-
-        const matchesSkills = selectedSkills.every((skill) =>
-          projectTechnologies.includes(skill.toLowerCase()),
-        );
-
-        if (!matchesSkills) {
-          return false;
-        }
-      }
-
-      // =========================
-      // ROLE FILTER
-      // =========================
-
-      if (selectedRoles.length > 0) {
-        const projectRoles = (project.roles ?? []).map((role) =>
-          role.role.toLowerCase(),
-        );
-
-        const matchesRoles = selectedRoles.some((role) =>
-          projectRoles.includes(role.toLowerCase()),
-        );
-
-        if (!matchesRoles) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [projects, activeTab, searchQuery, selectedSkills, selectedRoles]);
-
-  // =========================
-  // LOADING
-  // =========================
-
-  if (loading) {
-    return <Loading />;
-  }
+  const filteredProjects = projects.filter((project) => {
+    if (activeTab === "Đã đóng tuyển") return project.recruitmentStatus !== ApiRecruitmentStatus.Open;
+    return true;
+  });
 
   // =========================
   // RENDER
@@ -353,7 +216,7 @@ export function ProjectExplorerScreen() {
 
             <Text style={styles.subtitle}>
               {filteredProjects.length > 0
-                ? `${filteredProjects.length} dự án đang hiển thị`
+                ? `${filteredProjects.length} dự án trên trang / ${totalItems} kết quả`
                 : "Tìm đồng đội phù hợp cho ý tưởng của bạn"}
             </Text>
           </View>
@@ -370,7 +233,7 @@ export function ProjectExplorerScreen() {
             SEARCH + FILTER
         ========================= */}
 
-        <View style={styles.searchSection}>
+        {activeTab !== "Dự án của tôi" && <View style={styles.searchSection}>
           <View style={styles.searchRow}>
             <View style={styles.searchContainer}>
               <Text style={styles.searchIcon}>🔍</Text>
@@ -378,7 +241,7 @@ export function ProjectExplorerScreen() {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Tìm kiếm dự án, kỹ năng, vai trò..."
+                placeholder="Tìm kiếm dự án..."
                 placeholderTextColor={colors.textSecondary}
                 style={styles.searchInput}
                 returnKeyType="search"
@@ -443,7 +306,7 @@ export function ProjectExplorerScreen() {
                 </View>
               ))}
 
-              {selectedRoles.map((role) => (
+              {selectedFields.map((role) => (
                 <View key={`role-${role}`} style={styles.activeFilterChip}>
                   <Text style={styles.activeFilterChipText}>{role}</Text>
                 </View>
@@ -457,7 +320,7 @@ export function ProjectExplorerScreen() {
               </Pressable>
             </ScrollView>
           )}
-        </View>
+        </View>}
 
         {/* =========================
             TABS
@@ -475,7 +338,7 @@ export function ProjectExplorerScreen() {
             return (
               <Pressable
                 key={tab}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => { setPage(1); setActiveTab(tab); }}
                 style={({ pressed }) => [
                   styles.tabButton,
                   isActive && styles.activeTabButton,
@@ -502,6 +365,7 @@ export function ProjectExplorerScreen() {
             <Text style={styles.messageIcon}>!</Text>
 
             <Text style={styles.messageText}>{error}</Text>
+            <Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} />
           </View>
         ) : null}
 
@@ -510,7 +374,9 @@ export function ProjectExplorerScreen() {
         ========================= */}
 
         <View style={styles.content}>
-          {filteredProjects.length === 0 ? (
+          {loading ? <Loading /> : error ? null : unsupportedTab ? (
+            <View style={styles.messageCard}><Text style={styles.messageText}>Danh sách yêu cầu và lời mời cần API riêng để hiển thị.</Text></View>
+          ) : filteredProjects.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyBadge}>
                 <View style={styles.emptyBadgeDot} />
@@ -519,10 +385,10 @@ export function ProjectExplorerScreen() {
               <Text style={styles.emptyTitle}>Chưa có dự án nào phù hợp</Text>
 
               <Text style={styles.emptyText}>
-                Thử thay đổi từ khóa hoặc bộ lọc để tìm dự án phù hợp hơn.
+                {activeTab === "Dự án của tôi" ? "Bạn chưa có dự án nào. Hãy tạo dự án mới để bắt đầu." : "Thử thay đổi từ khóa hoặc bộ lọc để tìm dự án phù hợp hơn."}
               </Text>
 
-              {(searchQuery.length > 0 || activeFilterCount > 0) && (
+              {activeTab !== "Dự án của tôi" && (searchQuery.length > 0 || activeFilterCount > 0) && (
                 <Pressable
                   onPress={() => {
                     setSearchQuery("");
@@ -545,7 +411,7 @@ export function ProjectExplorerScreen() {
             </View>
           ) : (
             filteredProjects.map((project) => {
-              const isOpen = project.recruitmentStatus === "Open";
+              const isOpen = project.recruitmentStatus === ApiRecruitmentStatus.Open;
 
               const progress =
                 project.memberTarget > 0
@@ -585,9 +451,13 @@ export function ProjectExplorerScreen() {
 
                     <View style={styles.cardHeader}>
                       <View style={styles.creatorAvatar}>
+                        {project.creator.avatarUrl ? (
+                          <Image source={{ uri: project.creator.avatarUrl }} style={{ width: "100%", height: "100%", borderRadius: 24 }} />
+                        ) : (
                         <Text style={styles.creatorAvatarText}>
-                          {getInitials(project.creator.displayName)}
+                          {getInitials((project.creator.fullName || project.creator.nickname || "Người tạo"))}
                         </Text>
+                        )}
                       </View>
 
                       <View style={styles.projectInfo}>
@@ -596,7 +466,7 @@ export function ProjectExplorerScreen() {
                         </Text>
 
                         <Text style={styles.metaText}>
-                          {project.creator.displayName}
+                          {(project.creator.fullName || project.creator.nickname || "Người tạo")}
                         </Text>
                       </View>
 
@@ -616,7 +486,7 @@ export function ProjectExplorerScreen() {
                         />
 
                         <Text style={styles.statusText}>
-                          {project.recruitmentStatus}
+                          {RECRUITMENT_STATUS_LABEL[(["Open", "Full", "Closed", "Expired"] as const)[project.recruitmentStatus]]}
                         </Text>
                       </View>
                     </View>
@@ -648,28 +518,17 @@ export function ProjectExplorerScreen() {
                       </View>
                     </View>
 
-                    {/* ROLES */}
-
-                    {project.roles.length > 0 && (
-                      <View style={styles.roleRow}>
-                        {project.roles.slice(0, 3).map((role) => (
-                          <View key={role.id} style={styles.rolePill}>
-                            <Text numberOfLines={1} style={styles.roleText}>
-                              {role.role}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
+                    <Text style={styles.metaText}>{project.projectField}</Text>
+                    <Text style={styles.metaText} numberOfLines={3}>{project.description}</Text>
 
                     {/* TECHNOLOGIES */}
 
-                    {project.technologies.length > 0 && (
+                    {(project.skills ?? []).length > 0 && (
                       <View style={styles.techRow}>
-                        {project.technologies.slice(0, 3).map((tech) => (
-                          <View key={tech} style={styles.techPill}>
+                        {(project.skills ?? []).map((skill) => (
+                          <View key={skill.skillId} style={styles.techPill}>
                             <Text numberOfLines={1} style={styles.techText}>
-                              {tech}
+                              {skill.skillName}
                             </Text>
                           </View>
                         ))}
@@ -691,6 +550,13 @@ export function ProjectExplorerScreen() {
             })
           )}
         </View>
+        {!loading && !error && !unsupportedTab && totalPages > 1 && (
+          <View style={styles.footerRow}>
+            <Button title="Trang trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
+            <Text style={styles.metaText}>Trang {page}/{totalPages}</Text>
+            <Button title="Trang sau" disabled={page >= totalPages} onPress={() => setPage((value) => value + 1)} />
+          </View>
+        )}
       </ScrollView>
 
       {/* =========================
@@ -717,7 +583,7 @@ export function ProjectExplorerScreen() {
                 <Text style={styles.filterTitle}>Bộ lọc dự án</Text>
 
                 <Text style={styles.filterSubtitle}>
-                  Chọn kỹ năng và vai trò bạn quan tâm
+                  Chọn kỹ năng và lĩnh vực bạn quan tâm
                 </Text>
               </View>
 
@@ -737,7 +603,7 @@ export function ProjectExplorerScreen() {
               <TextInput
                 value={filterSearch}
                 onChangeText={setFilterSearch}
-                placeholder="Tìm kỹ năng hoặc vai trò..."
+                placeholder="Tìm kỹ năng hoặc lĩnh vực..."
                 placeholderTextColor={colors.textSecondary}
                 style={styles.filterSearchInput}
               />
@@ -820,28 +686,28 @@ export function ProjectExplorerScreen() {
 
               <View style={styles.filterGroup}>
                 <View style={styles.filterGroupHeader}>
-                  <Text style={styles.filterGroupTitle}>Vai trò</Text>
+                  <Text style={styles.filterGroupTitle}>Lĩnh vực</Text>
 
-                  {draftRoles.length > 0 && (
+                  {draftFields.length > 0 && (
                     <Text style={styles.filterGroupCount}>
-                      {draftRoles.length} đã chọn
+                      {draftFields.length} đã chọn
                     </Text>
                   )}
                 </View>
 
-                {filteredAvailableRoles.length === 0 ? (
+                {filteredAvailableFields.length === 0 ? (
                   <Text style={styles.noOptionText}>
-                    Không tìm thấy vai trò phù hợp.
+                    Không tìm thấy lĩnh vực phù hợp.
                   </Text>
                 ) : (
                   <View style={styles.optionGrid}>
-                    {filteredAvailableRoles.map((role) => {
-                      const selected = draftRoles.includes(role);
+                    {filteredAvailableFields.map((role) => {
+                      const selected = draftFields.includes(role);
 
                       return (
                         <Pressable
                           key={role}
-                          onPress={() => toggleRole(role)}
+                          onPress={() => toggleField(role)}
                           style={[
                             styles.optionChip,
                             selected && styles.optionChipSelected,

@@ -1,4 +1,5 @@
 import { apiRequest } from "@/services/api";
+import { API_URL } from "@/constants/config";
 import type {
   CreateProjectRequest,
   InvitationPayload,
@@ -7,6 +8,9 @@ import type {
   ProjectInvitation,
   ProjectJoinRequest,
   ProjectRecommendation,
+  ProjectListParams,
+  ProjectListResponse,
+  ProjectDetail,
 } from "@/types/project";
 
 const mockProjects: Project[] = [
@@ -79,53 +83,41 @@ const mockProjects: Project[] = [
   },
 ];
 
-const mockRecommendations: ProjectRecommendation[] = [
-  {
-    id: "student-1",
-    fullName: "Lê Minh Khôi",
-    recommendedRole: "Frontend",
-    skills: "React Native, UI/UX, TypeScript",
-    shortBio: "Sinh viên năm 3, từng làm 2 dự án mobile.",
-    reason:
-      "Phù hợp với mục tiêu xây dựng giao diện và trải nghiệm người dùng.",
-  },
-  {
-    id: "student-2",
-    fullName: "Nguyễn Thảo Vy",
-    recommendedRole: "Backend",
-    skills: "Node.js, PostgreSQL, API",
-    shortBio: "Tốt nghiệp thực tập tại startup sản phẩm.",
-    reason: "Đã có kinh nghiệm thiết kế API và xử lý dữ liệu.",
-  },
-  {
-    id: "student-3",
-    fullName: "Trần Quang An",
-    recommendedRole: "UI/UX",
-    skills: "Figma, wireframe, prototyping",
-    shortBio: "Tích cực trong thiết kế trải nghiệm người dùng.",
-    reason:
-      "Phù hợp với nhu cầu tối ưu trải nghiệm và trải nghiệm cuộc sống người dùng.",
-  },
-];
-
 export const projectService = {
-  async listProjects(): Promise<Project[]> {
-    try {
-      return await apiRequest<Project[]>("/api/projects");
-    } catch {
-      return mockProjects;
+  async listProjects(params: ProjectListParams = {}, signal?: AbortSignal): Promise<ProjectListResponse> {
+    const query = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 10) });
+    if (params.keyword?.trim()) query.set("keyword", params.keyword.trim());
+    if (params.field?.trim()) query.set("field", params.field.trim());
+    for (const skill of params.skillnames ?? []) {
+      if (skill.trim()) query.append("skillnames", skill.trim());
     }
+    if (params.recruitmentStatus !== undefined) query.set("recruitmentStatus", String(params.recruitmentStatus));
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectListResponse>(`${path}?${query}`, { method: "GET", signal });
+    if (!response || !Array.isArray(response.projects) || !Number.isInteger(response.page) || !Number.isInteger(response.pageSize) || !Number.isInteger(response.totalItems) || !Number.isInteger(response.totalPages)) {
+      throw new Error("Phản hồi danh sách dự án không hợp lệ.");
+    }
+    return response;
   },
 
-  async getProjectById(projectId: string): Promise<Project> {
-    try {
-      return await apiRequest<Project>(`/api/projects/${projectId}`);
-    } catch {
-      return (
-        mockProjects.find((project) => project.id === projectId) ??
-        mockProjects[0]
-      );
+  async listMyProjects(params: Pick<ProjectListParams, "page" | "pageSize"> = {}, signal?: AbortSignal): Promise<ProjectListResponse> {
+    const query = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 10) });
+    const path = API_URL.endsWith("/api") ? "/projects/me" : "/api/projects/me";
+    const response = await apiRequest<ProjectListResponse>(`${path}?${query}`, { method: "GET", signal });
+    if (!response || !Array.isArray(response.projects) || !Number.isInteger(response.page) || !Number.isInteger(response.pageSize) || !Number.isInteger(response.totalItems) || !Number.isInteger(response.totalPages)) {
+      throw new Error("Phản hồi danh sách dự án của tôi không hợp lệ.");
     }
+    return response;
+  },
+
+  async getProjectById(projectId: string, signal?: AbortSignal): Promise<ProjectDetail> {
+    if (!projectId.trim()) throw new Error("Không tìm thấy mã dự án.");
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectDetail>(`${path}/${encodeURIComponent(projectId)}`, { method: "GET", signal });
+    if (!response || response.id !== projectId || !response.creator || !Array.isArray(response.roleRequirements) || !Array.isArray(response.skills) || !Array.isArray(response.members) || typeof response.isCreator !== "boolean" || typeof response.isMember !== "boolean") {
+      throw new Error("Phản hồi chi tiết dự án không hợp lệ.");
+    }
+    return response;
   },
 
   async createProject(payload: CreateProjectRequest): Promise<Project> {
@@ -215,15 +207,15 @@ export const projectService = {
     }
   },
 
-  async fetchRecommendations(
-    projectId: string,
-  ): Promise<ProjectRecommendation[]> {
-    try {
-      return await apiRequest<ProjectRecommendation[]>(
-        `/api/projects/${projectId}/recommendations`,
-      );
-    } catch {
-      return mockRecommendations;
-    }
+  async fetchRecommendations(projectId: string, signal?: AbortSignal): Promise<ProjectRecommendation[]> {
+    if (!projectId.trim()) throw new Error("Không tìm thấy mã dự án.");
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectRecommendation[]>(`${path}/${encodeURIComponent(projectId)}/recommended-members`, { method: "GET", signal });
+    if (!Array.isArray(response) || response.some((member) =>
+      !member || typeof member.userId !== "string" || typeof member.fullName !== "string" ||
+      !Array.isArray(member.matchedSkills) || !Array.isArray(member.missingSkills) ||
+      ![member.matchScore, member.skillMatch, member.diversityScore, member.collaborationCount, member.finalScore].every((score) => typeof score === "number" && Number.isFinite(score))
+    )) throw new Error("Phản hồi gợi ý thành viên không hợp lệ.");
+    return response;
   },
 };
