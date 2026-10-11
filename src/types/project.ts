@@ -185,13 +185,14 @@ export type InvitationPayload = {
 };
 
 export type ProjectRecommendation = {
-  id: string;
+  userId: string;
   fullName: string;
-  nickname?: string;
-  displayName?: string;
-  avatarUrl?: string;
-  recommendedRole: string;
-  skills: string;
-  shortBio: string;
-  reason?: string;
+  avatarUrl: string | null;
+  matchScore: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  skillMatch: number;
+  diversityScore: number;
+  collaborationCount: number;
+  finalScore: number;
 };

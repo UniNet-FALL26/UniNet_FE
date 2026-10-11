@@ -160,3 +160,38 @@ test('offline invitation starts Sent', async () => {
   const invitation = await offlineService().sendInvitation({ projectId: 'project-1', inviteeId: 'student-1', role: 'Frontend' });
   assert.equal(invitation.status, 'Sent');
 });
+
+function recommendedMember() {
+  return { userId: 'student-real', fullName: 'Nguyen Phuoc Thinh', avatarUrl: null, matchScore: 66.66666666666667, matchedSkills: ['.NET', 'React'], missingSkills: ['Figma'], skillMatch: 66.66666666666667, diversityScore: 100, collaborationCount: 0, finalScore: 73.33333333333334 };
+}
+
+test('recommended members calls correct GET endpoint and preserves score and skill data', async () => {
+  const response = [recommendedMember()];
+  const controller = new AbortController();
+  const service = offlineService(async (url, options) => {
+    assert.equal(url, '/api/projects/project-real/recommended-members');
+    assert.equal(options.method, 'GET');
+    assert.equal(options.signal, controller.signal);
+    return response;
+  });
+  assert.equal(await service.fetchRecommendations('project-real', controller.signal), response);
+});
+
+test('recommended members handles configured api prefix, encoded ids and empty suggestions', async () => {
+  const service = offlineService(async (url) => {
+    assert.equal(url, '/projects/project%2Freal/recommended-members');
+    return [];
+  }, 'https://uninet-be.onrender.com/api');
+  assert.equal((await service.fetchRecommendations('project/real')).length, 0);
+});
+
+test('recommended members propagates failures without mock candidates', async () => {
+  await assert.rejects(offlineService().fetchRecommendations('project-real'), /API unavailable/);
+});
+
+test('recommended members rejects invalid payloads and missing project ids', async () => {
+  await assert.rejects(offlineService().fetchRecommendations(''), /mã dự án/);
+  for (const payload of [{}, [null], [{ ...recommendedMember(), finalScore: '73' }], [{ ...recommendedMember(), matchedSkills: null }]]) {
+    await assert.rejects(offlineService(async () => payload).fetchRecommendations('project-real'), /không hợp lệ/);
+  }
+});
