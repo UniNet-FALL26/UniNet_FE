@@ -1,25 +1,73 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { createElement, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, Tag } from '@/components/company/company-ui';
-import { companyService, type CompanyJobBenefit, type SkillCatalogItem } from '@/services/company.service';
+import { companyService, type CompanyJobBenefit, type SkillCatalogItem, type PartnerVerificationStatus } from '@/services/company.service';
 
-function formatDateInput(value: string | null): string {
+function datePart(value: string | null): string {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function parseDateInput(value: string): string | null {
-  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim());
+function timePart(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatDateLabel(value: string): string {
+  if (!value) return '';
+  const [year, month, day] = value.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function dateValue(value: string, time: string, endOfDay = false): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
-  const [, dayText, monthText, yearText] = match;
-  const day = Number(dayText);
-  const month = Number(monthText);
-  const year = Number(yearText);
-  const date = new Date(Date.UTC(year, month - 1, day, 23, 59, 59));
-  if (date.getUTCDate() !== day || date.getUTCMonth() + 1 !== month || date.getUTCFullYear() !== year) return null;
-  return date.toISOString();
+  const [, y, m, d] = match;
+  const [hour, minute] = endOfDay ? [23, 59] : time.split(':').map(Number);
+  if (!endOfDay && (!/^\d{2}:\d{2}$/.test(time) || hour! > 23 || minute! > 59)) return null;
+  const result = new Date(Number(y), Number(m) - 1, Number(d), hour!, minute!, 0, 0);
+  if (result.getFullYear() !== Number(y) || result.getMonth() !== Number(m) - 1 || result.getDate() !== Number(d)) return null;
+  return result.toISOString();
+}
+
+function formatVnd(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 14);
+  return digits ? new Intl.NumberFormat('vi-VN').format(Number(digits)) : '';
+}
+
+function toSalaryNumber(value: string): number | null {
+  const digits = value.replace(/\D/g, '');
+  return digits ? Number(digits) : null;
+}
+
+function formatMillions(value: number): string {
+  const whole = Math.floor(value / 1_000_000);
+  const remainder = String(value % 1_000_000).padStart(6, '0').replace(/0+$/, '');
+  return `${new Intl.NumberFormat('vi-VN').format(whole)}${remainder ? `,${remainder}` : ''}`;
+}
+
+function DateTimeField({ label, value, mode, onChange, placeholder }: { label: string; value: string; mode: 'date' | 'time'; onChange: (value: string) => void; placeholder: string }) {
+  const [open, setOpen] = useState(false);
+  const initial = mode === 'date' ? new Date(`${value || datePart(new Date().toISOString())}T12:00:00`) : new Date(`2000-01-01T${value || '09:00'}:00`);
+  if (Platform.OS === 'web') {
+    return <View style={s.field}><Text style={s.label}>{label}</Text>{createElement('input', {
+      type: mode, value, onChange: (event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value),
+      'aria-label': label, style: { boxSizing: 'border-box', width: '100%', height: 40, border: `1px solid ${c.line}`, borderRadius: 10, background: '#FFF', padding: '0 10px', color: c.ink, fontSize: 12, fontFamily: 'inherit' },
+    })}<Text style={s.helper}>{value ? mode === 'date' ? formatDateLabel(value) : value : placeholder}</Text></View>;
+  }
+  const onPickerChange = (event: DateTimePickerEvent, selected?: Date) => {
+    setOpen(false);
+    if (event.type !== 'set' || !selected) return;
+    onChange(mode === 'date'
+      ? `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+      : `${String(selected.getHours()).padStart(2, '0')}:${String(selected.getMinutes()).padStart(2, '0')}`);
+  };
+  return <View style={s.field}><Text style={s.label}>{label}</Text><Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={s.dateButton}><Text style={value ? s.dateText : s.datePlaceholder}>{value ? mode === 'date' ? formatDateLabel(value) : value : placeholder}</Text><CompanyIcon name={{ ios: mode === 'date' ? 'calendar' : 'clock', android: mode === 'date' ? 'calendar_month' : 'schedule', web: mode === 'date' ? 'calendar_month' : 'schedule' }} size={16} /></Pressable>{open && <DateTimePicker value={initial} mode={mode} display="default" is24Hour onChange={onPickerChange} />}</View>;
 }
 
 const PillSelect = ({ values, value, onChange }: { values: string[]; value: string; onChange: (value: string) => void }) => <View style={s.pills}>{values.map((item) => <Pressable key={item} onPress={() => onChange(item)} style={[s.pill, value === item && s.pillActive]}><Text style={[s.pillText, value === item && s.pillTextActive]}>{item}</Text></Pressable>)}</View>;
@@ -29,42 +77,77 @@ function Field({ label, value, onChangeText, placeholder, multiline = false }: {
 }
 
 export default function CompanyCreateJob() {
-  const { jobId } = useLocalSearchParams<{ jobId?: string }>();
+  const { jobId, publishError, draftSaved } = useLocalSearchParams<{ jobId?: string; publishError?: string; draftSaved?: string }>();
   const editing = typeof jobId === 'string' && !!jobId;
-  const [title, setTitle] = useState('Thực tập sinh Backend Node.js');
-  const [startAt, setStartAt] = useState('');
-  const [deadline, setDeadline] = useState('30/10/2026');
-  const [workMode, setWorkMode] = useState('Kết hợp');
-  const [location, setLocation] = useState('TP. Hồ Chí Minh');
-  const [salary, setSalary] = useState('4.000.000');
-  const [salaryMax, setSalaryMax] = useState('6.000.000');
-  const [description, setDescription] = useState('Cùng xây dựng hệ thống cho sản phẩm số. Bạn sẽ tham gia vào quá trình phát triển, thiết kế API và phối hợp cùng nhóm Frontend.');
-  const [skills, setSkills] = useState(['Node.js', 'PostgreSQL', 'Git']);
-  const [preferredSkills, setPreferredSkills] = useState(['TypeScript']);
-  const [benefits, setBenefits] = useState<CompanyJobBenefit[]>([
-    { title: 'Mentor đồng hành', description: 'Review code và hướng dẫn kỹ thuật hằng tuần.' },
-    { title: 'Hỗ trợ thực tập', description: '4–6 triệu đồng/tháng, linh hoạt theo lịch học.' },
-  ]);
-  const [responsibilities, setResponsibilities] = useState(['Xây dựng REST API với Node.js và Express.', 'Thiết kế truy vấn PostgreSQL, viết kiểm thử và tài liệu API.', 'Tham gia review code và phối hợp với nhóm Frontend.']);
-  const [qualifications, setQualifications] = useState(['JavaScript và Node.js với nền tảng lập trình vững chắc.', 'Thiết kế REST API và hiểu biết giao thức HTTP cơ bản.', 'Cơ sở dữ liệu quan hệ (PostgreSQL hoặc tương đương).']);
-  const [preferredQualifications, setPreferredQualifications] = useState(['Kiến thức TypeScript cơ bản.', 'Có kinh nghiệm viết kiểm thử hoặc tài liệu API.']);
-  const [projectAreas, setProjectAreas] = useState(['Ứng dụng web', 'Sản phẩm doanh nghiệp']);
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [deadline, setDeadline] = useState('');
+  const [workMode, setWorkMode] = useState('');
+  const [location, setLocation] = useState('');
+  const [salary, setSalary] = useState('');
+  const [salaryMax, setSalaryMax] = useState('');
+  const [description, setDescription] = useState('');
+  const [skills, setSkills] = useState<{ id: string; name: string; requirementType: 0 | 1 }[]>([]);
+  const [benefits, setBenefits] = useState<CompanyJobBenefit[]>([]);
+  const [benefitTitle, setBenefitTitle] = useState('');
+  const [benefitDescription, setBenefitDescription] = useState('');
+  const [responsibilities, setResponsibilities] = useState<string[]>([]);
+  const [responsibilityDraft, setResponsibilityDraft] = useState('');
+  const [qualifications, setQualifications] = useState<string[]>([]);
+  const [preferredQualifications, setPreferredQualifications] = useState<string[]>([]);
+  const [requirementDraft, setRequirementDraft] = useState('');
+  const [requirementType, setRequirementType] = useState<0 | 1>(0);
+  const [skillQuery, setSkillQuery] = useState('');
+  const [skillType, setSkillType] = useState<0 | 1>(0);
+  const [projectAreas, setProjectAreas] = useState<string[]>([]);
   const [skillCatalog, setSkillCatalog] = useState<SkillCatalogItem[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
+  const [verification, setVerification] = useState<PartnerVerificationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [extraSkill, setExtraSkill] = useState('');
+  const [shownPublishError, setShownPublishError] = useState('');
+  const [shownDraftSaved, setShownDraftSaved] = useState('');
+  const [jobStatus, setJobStatus] = useState<0 | 1 | 2 | 3 | null>(null);
+  const suggestedSkills = useMemo(() => {
+    const query = skillQuery.trim().toLocaleLowerCase();
+    if (!query) return [];
+    return skillCatalog.filter(item => item.name.toLocaleLowerCase().includes(query) && !skills.some(skill => skill.id === item.id)).slice(0, 3);
+  }, [skillCatalog, skillQuery, skills]);
 
-  const addSkill = () => {
-    const next = extraSkill.trim();
-    if (!next) return;
-    const match = skillCatalog.find(skill => skill.name.toLocaleLowerCase() === next.toLocaleLowerCase());
-    if (!match) { Alert.alert('Không tìm thấy kỹ năng', 'Chọn tên kỹ năng có trong danh mục UniNet.'); return; }
-    if (skills.some(skill => skill.toLocaleLowerCase() === match.name.toLocaleLowerCase())) return;
-    setSkills((current) => [...current, match.name]);
-    setExtraSkill('');
+  const addCatalogSkill = (item: SkillCatalogItem, type: 0 | 1) => {
+    setSkills(current => current.some(skill => skill.id === item.id)
+      ? current.map(skill => skill.id === item.id ? { ...skill, requirementType: type } : skill)
+      : [...current, { id: item.id, name: item.name, requirementType: type }]);
+    setSkillQuery('');
+  };
+
+  const addRequirement = () => {
+    const value = requirementDraft.trim();
+    if (!value) return;
+    const setter = requirementType === 0 ? setQualifications : setPreferredQualifications;
+    setter(current => [...current, value]);
+    skillCatalog.filter(item => value.toLocaleLowerCase().includes(item.name.toLocaleLowerCase()))
+      .forEach(item => addCatalogSkill(item, requirementType));
+    setRequirementDraft('');
+  };
+
+  const addResponsibility = () => {
+    if (!responsibilityDraft.trim()) return;
+    setResponsibilities(current => [...current, responsibilityDraft.trim()]);
+    setResponsibilityDraft('');
+  };
+
+  const addBenefit = () => {
+    if (!benefitTitle.trim() || !benefitDescription.trim()) {
+      Alert.alert('Thiếu thông tin quyền lợi', 'Nhập cả tiêu đề và mô tả quyền lợi.');
+      return;
+    }
+    setBenefits(current => [...current, { title: benefitTitle.trim(), description: benefitDescription.trim() }]);
+    setBenefitTitle('');
+    setBenefitDescription('');
   };
   useEffect(() => {
     const controller = new AbortController();
@@ -72,30 +155,36 @@ export default function CompanyCreateJob() {
       setLoading(true);
       setLoadError('');
       try {
-        const [catalog, profile, job] = await Promise.all([
+        const [catalog, profile, job, verificationStatus] = await Promise.all([
           companyService.getSkills(controller.signal),
           companyService.getProfile(controller.signal),
           editing ? companyService.getJob(jobId!, controller.signal) : Promise.resolve(null),
+          companyService.getVerificationStatus(controller.signal),
         ]);
         setSkillCatalog(catalog);
         setCompanyName(profile.companyName);
         setCompanyAddress(profile.address ?? '');
+        setVerification(verificationStatus);
         if (job) {
+          setJobStatus(job.status);
           setTitle(job.title);
           setWorkMode(['Tại văn phòng', 'Kết hợp', 'Từ xa'][job.workType] ?? 'Tại văn phòng');
           setLocation(job.location ?? '');
-          setStartAt(formatDateInput(job.startAt));
-          setDeadline(formatDateInput(job.deadline));
-          setSalary(job.minSalaryVnd == null ? '' : String(job.minSalaryVnd));
-          setSalaryMax(job.maxSalaryVnd == null ? '' : String(job.maxSalaryVnd));
+          setStartDate(datePart(job.startAt));
+          setStartTime(timePart(job.startAt));
+          setDeadline(datePart(job.deadline));
+          setSalary(job.minSalaryVnd == null ? '' : formatVnd(String(job.minSalaryVnd)));
+          setSalaryMax(job.maxSalaryVnd == null ? '' : formatVnd(String(job.maxSalaryVnd)));
           setDescription(job.description ?? '');
           setResponsibilities(job.responsibilities);
           setQualifications(job.requiredQualifications);
           setPreferredQualifications(job.preferredQualifications);
           setProjectAreas(job.projectAreas);
-          setPreferredSkills(job.skills.filter(skill => skill.requirementType === 1).map(skill => skill.name));
-          setSkills(job.skills.filter(skill => skill.requirementType === 0).map(skill => skill.name));
+          setSkills(job.skills.map(skill => ({ id: skill.skillId, name: skill.name, requirementType: skill.requirementType })));
           setBenefits(job.benefits);
+        } else {
+          setJobStatus(null);
+          setLocation(profile.address ?? '');
         }
       } catch (cause) {
         if (!controller.signal.aborted) setLoadError(cause instanceof Error ? cause.message : 'Không tải được dữ liệu bài tuyển dụng.');
@@ -107,29 +196,44 @@ export default function CompanyCreateJob() {
     return () => controller.abort();
   }, [editing, jobId]);
 
+  useEffect(() => {
+    if (typeof publishError === 'string' && publishError && publishError !== shownPublishError) {
+      setShownPublishError(publishError);
+      Alert.alert('Đăng bài thất bại', `${publishError}\n\nNội dung đã được lưu thành bản nháp để bạn tiếp tục chỉnh sửa.`);
+    }
+  }, [publishError, shownPublishError]);
+
+  useEffect(() => {
+    if (typeof draftSaved === 'string' && draftSaved && draftSaved !== shownDraftSaved) {
+      setShownDraftSaved(draftSaved);
+      Alert.alert('Đã lưu bản nháp', 'Bài tuyển dụng đã được lưu. Bạn có thể tiếp tục chỉnh sửa tại đây.');
+    }
+  }, [draftSaved, shownDraftSaved]);
+
   const saveJob = async (status: 0 | 1) => {
-    if (!title.trim() || !location.trim() || !description.trim()) { Alert.alert('Thiếu thông tin', 'Nhập tiêu đề, địa điểm và mô tả công việc trước khi lưu.'); return; }
-    const parsedDeadline = parseDateInput(deadline);
-    if (!parsedDeadline) { Alert.alert('Ngày chưa hợp lệ', 'Nhập hạn ứng tuyển theo dạng dd/mm/yyyy.'); return; }
-    const parsedStartAt = startAt.trim() ? parseDateInput(startAt) : null;
-    if (startAt.trim() && !parsedStartAt) { Alert.alert('Ngày chưa hợp lệ', 'Nhập ngày bắt đầu nhận hồ sơ theo dạng dd/mm/yyyy.'); return; }
-    if (parsedStartAt && new Date(parsedStartAt) > new Date(parsedDeadline)) { Alert.alert('Khoảng ngày chưa hợp lệ', 'Ngày bắt đầu nhận hồ sơ phải trước hạn ứng tuyển.'); return; }
+    if (!title.trim() || !location.trim() || !description.trim() || !workMode) { Alert.alert('Thiếu thông tin', 'Nhập tiêu đề, địa điểm, mô tả và hình thức làm việc trước khi lưu.'); return; }
+    const parsedDeadline = dateValue(deadline, '', true);
+    if (!parsedDeadline) { Alert.alert('Ngày chưa hợp lệ', 'Chọn hạn ứng tuyển theo dạng dd/mm/yyyy.'); return; }
+    const parsedStartAt = startDate ? dateValue(startDate, startTime) : null;
+    if (startDate && !parsedStartAt) { Alert.alert('Thiếu ngày hoặc giờ', 'Chọn cả ngày và giờ bắt đầu nhận hồ sơ.'); return; }
+    if (parsedStartAt && new Date(parsedStartAt) > new Date(parsedDeadline)) { Alert.alert('Khoảng ngày chưa hợp lệ', 'Thời điểm bắt đầu nhận hồ sơ phải trước hạn ứng tuyển.'); return; }
     const parseSalary = (value: string) => {
       if (!value.trim()) return null;
-      const digits = value.trim().replace(/[.,\s]/g, '');
+      const digits = value.replace(/\D/g, '');
       return /^\d+$/.test(digits) ? Number(digits) : Number.NaN;
     };
     const minimum = parseSalary(salary);
     const maximum = parseSalary(salaryMax);
-    if (Number.isNaN(minimum) || Number.isNaN(maximum)) { Alert.alert('Lương chưa hợp lệ', 'Nhập mức lương bằng số VND nguyên dương.'); return; }
+    if (Number.isNaN(minimum) || Number.isNaN(maximum)) { Alert.alert('Lương chưa hợp lệ', 'Lương phải là số nguyên VND.'); return; }
+    if ((minimum != null && minimum < 1_000_000) || (maximum != null && maximum < 1_000_000)) {
+      Alert.alert('Lương thấp hơn mức tối thiểu', 'Mỗi mức lương đã nhập phải từ 1.000.000 VND/tháng trở lên.');
+      return;
+    }
     if (minimum != null && maximum != null && minimum > maximum) { Alert.alert('Khoảng lương chưa hợp lệ', 'Lương tối thiểu không được lớn hơn lương tối đa.'); return; }
 
-    const selectedSkills = [...skills.map(name => ({ name, requirementType: 0 as const })), ...preferredSkills.map(name => ({ name, requirementType: 1 as const }))];
-    const missingSkills = selectedSkills.filter(item => !skillCatalog.some(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase()));
-    if (missingSkills.length) { Alert.alert('Thiếu kỹ năng trong danh mục', `Không tìm thấy: ${missingSkills.map(item => item.name).join(', ')}. Hãy tải lại danh mục kỹ năng.`); return; }
     const input = {
       title: title.trim(),
-      workType: (['Tại văn phòng', 'Kết hợp', 'Từ xa'].indexOf(workMode) || 0) as 0 | 1 | 2,
+      workType: ['Tại văn phòng', 'Kết hợp', 'Từ xa'].indexOf(workMode) as 0 | 1 | 2,
       minSalaryVnd: minimum,
       maxSalaryVnd: maximum,
       location: location.trim(),
@@ -141,37 +245,110 @@ export default function CompanyCreateJob() {
       requiredQualifications: qualifications,
       preferredQualifications,
       projectAreas,
-      skills: selectedSkills.map(item => ({
-        skillId: skillCatalog.find(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase())!.id,
-        requirementType: item.requirementType,
-      })),
+      skills: skills.map(({ id, requirementType }) => ({ skillId: id, requirementType })),
       benefits,
     };
+    const saveAsDraft = () => editing
+      ? companyService.updateJob(jobId!, { ...input, status: 0 })
+      : companyService.createJob({ ...input, status: 0 });
+    const openSavedDraftWithError = (draftId: string, message: string) => {
+      setShownPublishError('');
+      router.replace({ pathname: '/(company)/create', params: { jobId: draftId, publishError: message } });
+    };
+
+    if (status === 1 && verification?.status !== 1) {
+      setSaving(true);
+      try {
+        const draft = await saveAsDraft();
+        openSavedDraftWithError(draft.id, 'Tài khoản đối tác chưa được admin xác minh nên chưa thể đăng tuyển công khai.');
+      } catch (cause) {
+        Alert.alert('Chưa lưu được bản nháp', cause instanceof Error ? cause.message : 'Vui lòng thử lại. Nội dung vẫn còn trên màn hình.');
+      } finally { setSaving(false); }
+      return;
+    }
+
     setSaving(true);
     try {
-      if (editing) await companyService.updateJob(jobId!, input);
-      else await companyService.createJob(input);
-      router.replace('/(company)/jobs');
+      if (status === 0) {
+        const draft = editing ? await companyService.updateJob(jobId!, input) : await companyService.createJob(input);
+        setShownDraftSaved('');
+        router.replace({ pathname: '/(company)/create', params: { jobId: draft.id, draftSaved: String(Date.now()) } });
+      } else {
+        if (editing) await companyService.updateJob(jobId!, input);
+        else await companyService.createJob(input);
+        Alert.alert('Đăng bài thành công', 'Bài tuyển dụng đã được đăng công khai.');
+        router.replace('/(company)/jobs');
+      }
     } catch (cause) {
-      Alert.alert('Không lưu được bài tuyển dụng', cause instanceof Error ? cause.message : 'Vui lòng thử lại.');
+      const reason = cause instanceof Error ? cause.message : 'Vui lòng thử lại.';
+      if (status === 1) {
+        try {
+          const draft = await saveAsDraft();
+          openSavedDraftWithError(draft.id, reason);
+        } catch (draftCause) {
+          Alert.alert('Đăng bài thất bại', `${reason}\n\nKhông lưu được bản nháp tự động: ${draftCause instanceof Error ? draftCause.message : 'Vui lòng thử lại.'} Nội dung vẫn còn trên màn hình.`);
+        }
+      } else Alert.alert('Không lưu được bản nháp', `${reason}\nNội dung vẫn còn trên màn hình.`);
     } finally {
       setSaving(false);
     }
   };
 
   return <CompanyPage><PageScroll>
-    <View style={s.nav}><Pressable onPress={() => router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={{ flex: 1 }}><Text style={s.navTitle}>{editing ? 'Chỉnh sửa bài tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.navSub}>{companyName || 'Công ty của bạn'}</Text></View><View style={s.avatar}><Text style={s.avatarText}>{companyName.trim().charAt(0).toUpperCase() || 'C'}</Text></View></View>
+    <View style={s.nav}><Pressable onPress={() => router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={{ flex: 1 }}><Text style={s.navTitle}>{editing ? 'Chỉnh sửa bài tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.navSub}>{companyName || 'Tổ chức của bạn'}</Text></View><View style={s.avatar}><Text style={s.avatarText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View></View>
     {!!loadError && <Card><Text style={s.error}>{loadError}</Text><ActionButton title="Quay lại" onPress={() => router.back()} variant="outline" /></Card>}
     {loading ? <Card><ActivityIndicator color={c.purple} /><Text style={s.helper}>Đang tải dữ liệu bài tuyển dụng…</Text></Card> : null}
-    <Card style={s.jobPreview}><View style={s.previewTop}><View style={s.logo}><Text style={s.logoText}>{companyName.trim().charAt(0).toUpperCase() || 'C'}</Text></View><View style={{ flex: 1 }}><Text style={s.company}>{companyName || 'Công ty của bạn'}</Text><Text style={s.helper}>{companyAddress || location}</Text></View></View><Text style={s.previewTitle}>{title || 'Tiêu đề vị trí'}</Text><View style={s.pills}><Tag tone="purple">{workMode}</Tag><Tag tone="purple">Ứng dụng web</Tag></View><View style={s.separator} /><View style={s.previewDetail}><CompanyIcon name={{ ios: 'banknote', android: 'payments', web: 'payments' }} size={14} /><Text style={s.helper}>{salary || salaryMax ? `${salary || 'Thỏa thuận'}–${salaryMax || 'Thỏa thuận'} đ/tháng` : 'Thỏa thuận'}</Text></View><View style={s.previewDetail}><CompanyIcon name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={14} /><Text style={s.helper}>Ứng tuyển đến {deadline}</Text></View><View style={s.pills}>{skills.map(skill => <Tag key={skill} tone="gray">{skill}</Tag>)}</View><Text style={s.helper}>Mentor đồng hành · Hỗ trợ thực tập</Text></Card>
-    <Card><Text style={s.sectionTitle}>Thông tin công việc</Text><Text style={s.sectionSub}>Dấu * là thông tin bắt buộc</Text><Field label="Tiêu đề bài đăng *" value={title} onChangeText={setTitle} placeholder="Ví dụ: Thực tập sinh Backend" /><Field label="Hạn ứng tuyển *" value={deadline} onChangeText={setDeadline} placeholder="dd/mm/yyyy" /><Field label="Bắt đầu nhận hồ sơ · tùy chọn" value={startAt} onChangeText={setStartAt} placeholder="dd/mm/yyyy" /><Text style={s.label}>Hình thức làm việc *</Text><PillSelect values={['Tại văn phòng', 'Kết hợp', 'Từ xa']} value={workMode} onChange={setWorkMode} /><Field label="Địa điểm *" value={location} onChangeText={setLocation} placeholder="TP. Hồ Chí Minh" /><Text style={s.helper}>{companyAddress || `Địa điểm làm việc tại ${companyName || 'công ty'}.`}</Text><View style={s.salaryRow}><View style={{ flex: 1 }}><Field label="Lương tối thiểu · VND/tháng" value={salary} onChangeText={setSalary} placeholder="4.000.000" /></View><View style={{ flex: 1 }}><Field label="Lương tối đa · VND/tháng" value={salaryMax} onChangeText={setSalaryMax} placeholder="6.000.000" /></View></View><Text style={s.helper}>Lương thỏa thuận · Có thể để trống cả hai mức lương.</Text></Card>
-    <Card><Text style={s.sectionTitle}>Mô tả công việc</Text><Text style={s.label}>Nội dung *</Text><Field label="" value={description} onChangeText={setDescription} multiline placeholder="Mô tả trách nhiệm, môi trường làm việc và quyền lợi..." /><Text style={s.helper}>Mô tả rõ vai trò, hướng dẫn và sản phẩm giúp ứng viên hiểu cơ hội.</Text></Card>
-    <Card><Text style={s.sectionTitle}>Yêu cầu</Text><Text style={s.label}>Kỹ năng bắt buộc</Text>{qualifications.map((item) => <Text style={s.bullet} key={item}>•  {item}</Text>)}<View style={s.addSkillRow}><TextInput style={[s.input, { flex: 1 }]} value={extraSkill} onChangeText={setExtraSkill} placeholder="Thêm kỹ năng bắt buộc" placeholderTextColor={c.muted} /><Pressable onPress={addSkill}><Text style={s.purpleText}>+ Thêm</Text></Pressable></View><Text style={[s.label, { marginTop: 14 }]}>Yêu cầu cộng thêm</Text>{preferredQualifications.map((item) => <Text style={s.bullet} key={item}>•  {item}</Text>)}</Card>
-    <Card><Text style={s.sectionTitle}>Kỹ năng cần có</Text><Text style={s.label}>Bắt buộc</Text><Text style={s.helper}>Nền tảng cần thiết để bắt đầu công việc</Text><View style={s.pills}>{skills.map((skill) => <Pressable key={skill} onPress={() => setSkills((current) => current.filter((item) => item !== skill))}><Tag tone="purple">{skill} ×</Tag></Pressable>)}</View><TextInput style={s.input} value={extraSkill} onChangeText={setExtraSkill} placeholder="⌕  Tìm trong danh mục kỹ năng..." placeholderTextColor={c.muted} onSubmitEditing={addSkill} /><Text style={[s.label, { marginTop: 14 }]}>Ưu tiên</Text><Text style={s.helper}>Có thêm sẽ giúp bạn làm việc thuận lợi hơn</Text><View style={s.pills}>{preferredSkills.map(skill => <Pressable key={skill} onPress={() => setPreferredSkills(current => current.filter(item => item !== skill))}><Tag tone="purple">{skill} ×</Tag></Pressable>)}</View></Card>
-    <Card><Text style={s.sectionTitle}>Quyền lợi</Text>{benefits.map((item) => <View key={item.title} style={s.benefit}><View style={s.benefitIcon}><CompanyIcon name={{ ios: 'graduationcap', android: 'school', web: 'school' }} size={15} /></View><View style={{ flex: 1 }}><Text style={s.label}>{item.title}</Text><Text style={s.helper}>{item.description}</Text></View><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={14} color={c.muted} /></View>)}<ActionButton title="Thêm quyền lợi" onPress={() => Alert.alert('Thêm quyền lợi', 'Trường nhập quyền lợi sẽ được bổ sung sau.')} variant="soft" icon={{ ios: 'plus', android: 'add', web: 'add' }} /></Card>
-    <Card><Text style={s.sectionTitle}>Lĩnh vực dự án phù hợp</Text><View style={s.pills}>{projectAreas.map(area => <Tag key={area} tone="purple">{area} ×</Tag>)}</View><ActionButton title="Thêm lĩnh vực" onPress={() => Alert.alert('Lĩnh vực', 'Danh mục lĩnh vực sẽ được bổ sung sau.')} variant="outline" icon={{ ios: 'plus', android: 'add', web: 'add' }} /><Text style={s.helper}>Đề xuất mở rộng · Thể lĩnh vực có thể cấu hình, bổ sung cho từng ngành nghề.</Text></Card>
-    <View style={s.submitRow}><ActionButton title={saving ? 'Đang lưu…' : 'Lưu bản nháp'} onPress={() => { if (!saving && !loading) void saveJob(0); }} variant="outline" icon={{ ios: 'tray.and.arrow.down', android: 'save', web: 'save' }} /><ActionButton title={saving ? 'Đang lưu…' : editing ? 'Lưu thay đổi' : 'Đăng bài tuyển dụng'} onPress={() => { if (!saving && !loading) void saveJob(1); }} icon={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} /></View>
+    <Card style={s.jobPreview}>
+      <View style={s.previewTop}><View style={s.logo}><Text style={s.logoText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View><View style={{ flex: 1 }}><Text style={s.company}>{companyName || 'Tổ chức của bạn'}</Text><Text style={s.helper}>{location || 'Địa điểm làm việc'}</Text></View></View>
+      <Text style={s.previewTitle}>{title || 'Bản xem trước bài tuyển dụng'}</Text>
+      {!!workMode && <Tag tone="purple">{workMode}</Tag>}
+      <View style={s.pills}>{(() => {
+        const minimum = toSalaryNumber(salary);
+        const maximum = toSalaryNumber(salaryMax);
+        if (minimum != null && maximum != null) return <Tag tone="green">💰 {formatMillions(minimum)}-{formatMillions(maximum)} triệu VND/tháng</Tag>;
+        if (minimum != null) return <Tag tone="green">💰 Từ {formatMillions(minimum)} triệu VND/tháng</Tag>;
+        if (maximum != null) return <Tag tone="green">💰 Tới {formatMillions(maximum)} triệu VND/tháng</Tag>;
+        return null;
+      })()}{!!deadline && <Tag tone="amber">🗓 Hạn nộp: {formatDateLabel(deadline)}</Tag>}</View>
+      <View style={s.pills}>{skills.map(skill => <Tag key={skill.id} tone="gray">{skill.name}</Tag>)}</View>
+    </Card>
+    <Card>
+      <Text style={s.sectionTitle}>Thông tin công việc</Text><Text style={s.sectionSub}>Dấu * là thông tin bắt buộc.</Text>
+      <Field label="Tiêu đề bài đăng *" value={title} onChangeText={setTitle} placeholder="Ví dụ: Thực tập sinh Backend" />
+      <DateTimeField label="Hạn ứng tuyển *" value={deadline} mode="date" onChange={setDeadline} placeholder="Chọn ngày (dd/mm/yyyy)" />
+      <View style={s.dateRow}><View style={{ flex: 1 }}><DateTimeField label="Bắt đầu nhận hồ sơ · tùy chọn" value={startDate} mode="date" onChange={setStartDate} placeholder="Chọn ngày" /></View>{!!startDate && <View style={{ flex: 0.7 }}><DateTimeField label="Giờ bắt đầu *" value={startTime} mode="time" onChange={setStartTime} placeholder="Chọn giờ" /></View>}</View>
+      <Text style={s.label}>Hình thức làm việc *</Text><PillSelect values={['Tại văn phòng', 'Kết hợp', 'Từ xa']} value={workMode} onChange={setWorkMode} />
+      <Field label="Địa điểm *" value={location} onChangeText={setLocation} placeholder="Nhập địa chỉ làm việc" />
+      {!!companyAddress && <Text style={s.helper}>Địa chỉ hồ sơ: {companyAddress}. Bạn có thể sửa cho chi nhánh tuyển dụng.</Text>}
+      <View style={s.salaryRow}><View style={{ flex: 1 }}><Field label="Lương tối thiểu · VND/tháng" value={salary} onChangeText={value => setSalary(formatVnd(value))} placeholder="Ví dụ: 4.000.000" /></View><View style={{ flex: 1 }}><Field label="Lương tối đa · VND/tháng" value={salaryMax} onChangeText={value => setSalaryMax(formatVnd(value))} placeholder="Ví dụ: 6.000.000" /></View></View>
+      <Text style={s.helper}>Chỉ nhập số nguyên dương; dấu phân cách được định dạng tự động. Có thể để trống cả hai mức nếu thỏa thuận.</Text>
+    </Card>
+    <Card><Text style={s.sectionTitle}>Mô tả công việc</Text><Field label="Nội dung *" value={description} onChangeText={setDescription} multiline placeholder="Mô tả trách nhiệm, môi trường làm việc và quyền lợi..." /><Text style={s.helper}>Mô tả rõ vai trò, hướng dẫn và sản phẩm giúp ứng viên hiểu cơ hội.</Text>
+      <Text style={[s.label, { marginTop: 12 }]}>Trách nhiệm công việc</Text>{responsibilities.map((item, index) => <View style={s.editableRow} key={`resp-${index}`}><TextInput style={[s.input, s.rowInput]} value={item} onChangeText={value => setResponsibilities(current => current.map((entry, i) => i === index ? value : entry))} /><Pressable accessibilityLabel="Xóa trách nhiệm" onPress={() => setResponsibilities(current => current.filter((_, i) => i !== index))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View>)}
+      <View style={s.addRow}><TextInput style={[s.input, s.rowInput]} value={responsibilityDraft} onChangeText={setResponsibilityDraft} placeholder="Thêm trách nhiệm công việc" placeholderTextColor={c.muted} /><Pressable onPress={addResponsibility}><Text style={s.purpleText}>+ Thêm</Text></Pressable></View>
+    </Card>
+    <Card><Text style={s.sectionTitle}>Yêu cầu</Text><Text style={s.helper}>Thêm mô tả yêu cầu. Nếu nội dung có tên kỹ năng trong danh mục UniNet, kỹ năng sẽ tự được gắn vào đúng nhóm.</Text>
+      <PillSelect values={['Bắt buộc', 'Ưu tiên']} value={requirementType === 0 ? 'Bắt buộc' : 'Ưu tiên'} onChange={value => setRequirementType(value === 'Bắt buộc' ? 0 : 1)} />
+      {(requirementType === 0 ? qualifications : preferredQualifications).map((item, index) => <View style={s.editableRow} key={`${requirementType}-${index}`}><TextInput style={[s.input, s.rowInput]} value={item} onChangeText={value => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.map((entry, i) => i === index ? value : entry))} /><Pressable accessibilityLabel="Xóa yêu cầu" onPress={() => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.filter((_, i) => i !== index))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View>)}
+      <View style={s.addRow}><TextInput style={[s.input, s.rowInput, s.textarea]} value={requirementDraft} onChangeText={setRequirementDraft} multiline placeholder="Ví dụ: Có kinh nghiệm JavaScript và Node.js" placeholderTextColor={c.muted} /><Pressable onPress={addRequirement}><Text style={s.purpleText}>+ Thêm</Text></Pressable></View>
+    </Card>
+    <Card><Text style={s.sectionTitle}>Kỹ năng cần có</Text><Text style={s.helper}>Chỉ kỹ năng trong danh mục UniNet mới được lưu vào tin tuyển dụng.</Text>
+      <PillSelect values={['Bắt buộc', 'Ưu tiên']} value={skillType === 0 ? 'Bắt buộc' : 'Ưu tiên'} onChange={value => setSkillType(value === 'Bắt buộc' ? 0 : 1)} />
+      <TextInput style={s.input} value={skillQuery} onChangeText={setSkillQuery} placeholder="Tìm kỹ năng trong danh mục..." placeholderTextColor={c.muted} />
+      {!!skillQuery.trim() && (suggestedSkills.length ? <View style={s.suggestions}>{suggestedSkills.map(item => <Pressable key={item.id} onPress={() => addCatalogSkill(item, skillType)} style={s.suggestion}><Text style={s.suggestionText}>{item.name}</Text><Text style={s.purpleText}>+ Thêm</Text></Pressable>)}</View> : <Text style={s.helper}>Không tìm thấy kỹ năng phù hợp trong danh mục.</Text>)}
+      {!!skills.length && <View style={s.skillList}>{skills.map(skill => <View key={skill.id} style={s.skillRow}><View style={{ flex: 1 }}><Tag tone={skill.requirementType === 0 ? 'purple' : 'green'}>{skill.name}</Tag></View><PillSelect values={['Bắt buộc', 'Ưu tiên']} value={skill.requirementType === 0 ? 'Bắt buộc' : 'Ưu tiên'} onChange={value => setSkills(current => current.map(item => item.id === skill.id ? { ...item, requirementType: value === 'Bắt buộc' ? 0 : 1 } : item))} /><Pressable accessibilityLabel={`Xóa ${skill.name}`} onPress={() => setSkills(current => current.filter(item => item.id !== skill.id))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View>)}</View>}
+    </Card>
+    <Card><Text style={s.sectionTitle}>Quyền lợi</Text>{benefits.map((item, index) => <View key={`benefit-${index}`} style={s.benefitEdit}><View style={s.editableRow}><TextInput style={[s.input, s.rowInput]} value={item.title} onChangeText={value => setBenefits(current => current.map((entry, i) => i === index ? { ...entry, title: value } : entry))} placeholder="Tiêu đề quyền lợi" placeholderTextColor={c.muted} /><Pressable accessibilityLabel="Xóa quyền lợi" onPress={() => setBenefits(current => current.filter((_, i) => i !== index))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View><TextInput style={[s.input, s.textarea]} value={item.description} onChangeText={value => setBenefits(current => current.map((entry, i) => i === index ? { ...entry, description: value } : entry))} multiline placeholder="Mô tả quyền lợi" placeholderTextColor={c.muted} /></View>)}
+      <Field label="Tiêu đề quyền lợi mới" value={benefitTitle} onChangeText={setBenefitTitle} placeholder="Ví dụ: Mentor đồng hành" /><Field label="Mô tả quyền lợi mới" value={benefitDescription} onChangeText={setBenefitDescription} placeholder="Mô tả quyền lợi" multiline /><ActionButton title="Thêm quyền lợi" onPress={addBenefit} variant="soft" icon={{ ios: 'plus', android: 'add', web: 'add' }} />
+    </Card>
+    <View style={s.submitRow}><ActionButton title={saving ? 'Đang lưu…' : 'Lưu bản nháp'} onPress={() => { if (!saving && !loading) void saveJob(0); }} variant="outline" icon={{ ios: 'tray.and.arrow.down', android: 'save', web: 'save' }} /><ActionButton title={saving ? 'Đang lưu…' : editing && jobStatus === 1 ? 'Lưu thay đổi' : 'Đăng bài tuyển dụng'} onPress={() => { if (!saving && !loading) void saveJob(1); }} icon={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} /></View>
   </PageScroll></CompanyPage>;
 }
 
-const s = StyleSheet.create({ nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 }, jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontWeight: '900' }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }, separator: { height: 1, backgroundColor: c.line }, previewDetail: { flexDirection: 'row', gap: 7, alignItems: 'center' }, sectionTitle: { color: c.ink, fontSize: 14, fontWeight: '900', marginBottom: 4 }, sectionSub: { color: c.muted, fontSize: 9, marginBottom: 5 }, field: { marginTop: 8, gap: 5 }, label: { color: c.ink, fontSize: 10, fontWeight: '700' }, input: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, color: c.ink, fontSize: 10 }, textarea: { minHeight: 110, paddingTop: 10, lineHeight: 16 }, salaryRow: { flexDirection: 'row', gap: 8 }, bullet: { color: c.ink, fontSize: 10, lineHeight: 16, marginTop: 7 }, addSkillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, purpleText: { color: c.purple, fontSize: 10, fontWeight: '800' }, benefit: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line }, benefitIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft }, submitRow: { flexDirection: 'row', gap: 8 }, error: { color: c.rose, fontSize: 11 }, pill: { borderWidth: 1, borderColor: c.line, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#FFF' }, pillActive: { backgroundColor: c.purple, borderColor: c.purple }, pillText: { color: c.muted, fontSize: 9, fontWeight: '700' }, pillTextActive: { color: '#FFF' } });
+const s = StyleSheet.create({
+  nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 },
+  jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontWeight: '900' }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  sectionTitle: { color: c.ink, fontSize: 14, fontWeight: '900', marginBottom: 4 }, sectionSub: { color: c.muted, fontSize: 9, marginBottom: 5 }, field: { marginTop: 8, gap: 5 }, label: { color: c.ink, fontSize: 10, fontWeight: '700' }, input: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, color: c.ink, fontSize: 10 }, textarea: { minHeight: 72, paddingTop: 10, lineHeight: 16 }, salaryRow: { flexDirection: 'row', gap: 8 }, dateRow: { flexDirection: 'row', gap: 8 }, dateButton: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, dateText: { color: c.ink, fontSize: 11 }, datePlaceholder: { color: c.muted, fontSize: 11 },
+  editableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, rowInput: { flex: 1 }, addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, purpleText: { color: c.purple, fontSize: 10, fontWeight: '800' }, suggestions: { borderWidth: 1, borderColor: c.line, borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden' }, suggestion: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, suggestionText: { color: c.ink, fontSize: 11, fontWeight: '600' }, skillList: { gap: 8, marginTop: 12 }, skillRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  benefitEdit: { paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line }, submitRow: { flexDirection: 'row', gap: 8 }, error: { color: c.rose, fontSize: 11 }, pill: { borderWidth: 1, borderColor: c.line, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#FFF' }, pillActive: { backgroundColor: c.purple, borderColor: c.purple }, pillText: { color: c.muted, fontSize: 9, fontWeight: '700' }, pillTextActive: { color: '#FFF' },
+});

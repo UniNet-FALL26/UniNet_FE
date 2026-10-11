@@ -71,7 +71,7 @@ const tabs = [
   { label: 'Tổng quan', route: '/(company)', icon: { ios: 'square.grid.2x2', android: 'dashboard', web: 'dashboard' }, active: { ios: 'square.grid.2x2.fill', android: 'dashboard', web: 'dashboard' } },
   { label: 'Bài đăng', route: '/(company)/jobs', icon: { ios: 'briefcase', android: 'work_outline', web: 'work_outline' }, active: { ios: 'briefcase.fill', android: 'work', web: 'work' } },
   { label: 'Ứng viên', route: '/(company)/applicants', icon: { ios: 'person.2', android: 'groups', web: 'groups' }, active: { ios: 'person.2.fill', android: 'groups', web: 'groups' } },
-  { label: 'Công ty', route: '/(company)/profile', icon: { ios: 'building.2', android: 'business', web: 'business' }, active: { ios: 'building.2.fill', android: 'business', web: 'business' } },
+  { label: 'Đối tác', route: '/(company)/profile', icon: { ios: 'building.2', android: 'business', web: 'business' }, active: { ios: 'building.2.fill', android: 'business', web: 'business' } },
 ] as const;
 
 export function CompanyTabBar() {
