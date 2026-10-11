@@ -5,6 +5,57 @@ export type ProjectStatus =
   | "Completed"
   | "Archived";
 export type RecruitmentStatus = "Open" | "Full" | "Closed" | "Expired";
+export enum ApiProjectStatus { Pending = 0, Active = 1, Completed = 2, Rejected = 3 }
+export enum ApiRecruitmentStatus { Open = 0, Full = 1, Closed = 2, Expired = 3 }
+export enum ProjectVisibility { Private = 0, Public = 1 }
+export type ProjectListItem = {
+  id: string;
+  title: string;
+  projectField: string;
+  description: string;
+  memberTarget: number;
+  currentMemberCount: number;
+  recruitmentDeadline: string;
+  visibility: ProjectVisibility;
+  recruitmentStatus: ApiRecruitmentStatus;
+  status?: ApiProjectStatus;
+  createdAt: string;
+  creator: { id: string; fullName: string; nickname: string | null; avatarUrl: string | null };
+  skills?: { skillId: string; skillName: string; category: string; iconUrl: string | null; minLevel: number | null }[];
+};
+export type ProjectListParams = {
+  page?: number;
+  pageSize?: number;
+  keyword?: string;
+  field?: string;
+  skillnames?: string[];
+  recruitmentStatus?: ApiRecruitmentStatus;
+};
+export type ProjectDetail = ProjectListItem & {
+  status: ApiProjectStatus;
+  updatedAt: string | null;
+  expectedOutput: string | null;
+  roleRequirements: { id: string; roleName: string; quantity: number; requirements: string }[];
+  skills: NonNullable<ProjectListItem["skills"]>;
+  isCreator: boolean;
+  isMember: boolean;
+  members: {
+    userId: string;
+    fullName: string;
+    nickname: string | null;
+    avatarUrl: string | null;
+    role: string;
+    status: number;
+    joinedAt: string | null;
+  }[];
+};
+export type ProjectListResponse = {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  projects: ProjectListItem[];
+};
 export type ProjectJoinRequestStatus =
   | "Pending"
   | "Accepted"

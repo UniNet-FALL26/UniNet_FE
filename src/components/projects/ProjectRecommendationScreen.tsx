@@ -3,14 +3,14 @@ import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
 import { getDisplayName } from "@/utils/display-name";
-import type { Project, ProjectRecommendation } from "@/types/project";
+import type { ProjectDetail, ProjectRecommendation } from "@/types/project";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export function ProjectRecommendationScreen() {
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [recommendations, setRecommendations] = useState<
     ProjectRecommendation[]
   >([]);
@@ -79,9 +79,9 @@ export function ProjectRecommendationScreen() {
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Các vai trò đang tuyển</Text>
-        {project?.roles.map((role) => (
+        {project?.roleRequirements.map((role) => (
           <View key={role.id} style={styles.roleRow}>
-            <Text style={styles.roleName}>{role.role}</Text>
+            <Text style={styles.roleName}>{role.roleName}</Text>
             <Text style={styles.roleMeta}>Còn {role.quantity} chỗ</Text>
           </View>
         ))}
