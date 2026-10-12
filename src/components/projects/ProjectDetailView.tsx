@@ -4,12 +4,14 @@ import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
 import {
+  API_PROJECT_STATUS_LABEL,
   ApiProjectStatus,
   ApiRecruitmentStatus,
   ProjectVisibility,
   type ProjectDetail,
   type ProjectRecommendation,
 } from "@/types/project";
+import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
 import { RecommendedMemberCard } from "@/components/projects/RecommendedMemberCard";
 import { useAuthStore } from "@/store/auth.store";
 import { router, useLocalSearchParams } from "expo-router";
@@ -37,10 +39,11 @@ export function ProjectDetailScreen() {
   const [joinMessage, setJoinMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { account } = useAuthStore();
-  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; preview?: boolean } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; preview?: boolean; deleted?: boolean } | null>(null);
   const [acting, setActing] = useState(false);
   const actingRef = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -111,7 +114,8 @@ export function ProjectDetailScreen() {
       await confirmation.operation();
       setConfirmation(null);
       setNotice(confirmation.preview ? "Chức năng gửi xác thực chưa kết nối API. Chưa có yêu cầu nào được gửi." : "Thao tác thành công.");
-      if (!confirmation.preview) setRetry((value) => value + 1);
+      if (confirmation.deleted) router.replace("/(tabs)/groups" as never);
+      else if (!confirmation.preview) setRetry((value) => value + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không thể thực hiện thao tác. Vui lòng thử lại.");
     } finally {
@@ -145,12 +149,12 @@ export function ProjectDetailScreen() {
         <Button
           title="Quay lại"
           variant="outline"
-          onPress={() => router.back()}
+          onPress={() => router.dismissTo("/(tabs)/groups" as never)}
         />
       </View>
     );
 
-  const isRecruiting = project.recruitmentStatus === ApiRecruitmentStatus.Open;
+  const isRecruiting = isActive && project.recruitmentStatus === ApiRecruitmentStatus.Open;
   const isPublic = project.visibility === ProjectVisibility.Public;
 
   return (
@@ -158,11 +162,16 @@ export function ProjectDetailScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       {/* HEADER WITH SYNCED BACK BUTTON */}
       <View style={styles.headerRow}>
         <Pressable
-          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại danh sách dự án"
+          hitSlop={12}
+          onPress={() => router.dismissTo("/(tabs)/groups" as never)}
           style={({ pressed }) => [
             styles.backButton,
             pressed && styles.backButtonPressed,
@@ -179,7 +188,7 @@ export function ProjectDetailScreen() {
         </View>
       </View>
 
-      <Text style={styles.descriptionText}>{["Chờ duyệt", "Đang hoạt động", "Hoàn thành", "Bị từ chối"][project.status] ?? "Chưa cập nhật trạng thái"}</Text>
+      <Text style={styles.descriptionText}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật trạng thái"}</Text>
 
       {/* STATUS BADGES & CREATOR BAR */}
       <View style={styles.creatorBanner}>
@@ -219,7 +228,7 @@ export function ProjectDetailScreen() {
             >
               ●{" "}
               {
-                (
+                project.status !== ApiProjectStatus.Active ? API_PROJECT_STATUS_LABEL[project.status] : (
                   [
                     "Đang tuyển",
                     "Đã đủ thành viên",
@@ -529,6 +538,14 @@ export function ProjectDetailScreen() {
           </View>)}
         </View>
       </>}
+
+      {isCreator && project.status === ApiProjectStatus.Rejected && <View style={styles.actionCard}>
+        <Text style={styles.actionCardTitle}>Dự án bị từ chối</Text>
+        <Text style={styles.descriptionText}>Bạn có thể chỉnh sửa thông tin dự án hoặc xóa dự án.</Text>
+        <Button title="Chỉnh sửa dự án" disabled={acting} onPress={() => setEditing(true)} />
+        <Button title="Xóa dự án" variant="outline" disabled={acting} onPress={() => setConfirmation({ title: "Xóa dự án", message: `Bạn muốn xóa dự án “${project.title}”? Thao tác này không thể hoàn tác.`, operation: () => projectService.deleteProject(project.id), deleted: true })} />
+      </View>}
+      {editing && <ProjectEditForm project={project} onClose={() => setEditing(false)} onSaved={(updated) => { setProject(updated); setEditing(false); setError(null); setNotice("Đã cập nhật dự án."); }} />}
 
       {isCreator && project.status === ApiProjectStatus.Completed && <View style={styles.actionCard}>
         <Text style={styles.actionCardTitle}>Xác thực dự án hoàn thành</Text>

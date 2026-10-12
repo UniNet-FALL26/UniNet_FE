@@ -53,7 +53,9 @@ export function ProjectCreateScreen() {
   const [availableTechnologies, setAvailableTechnologies] = useState<string[]>(
     [],
   );
-  const [skillCatalog, setSkillCatalog] = useState<NonNullable<PortfolioResponse["skillCatalog"]>>([]);
+  const [skillCatalog, setSkillCatalog] = useState<
+    NonNullable<PortfolioResponse["skillCatalog"]>
+  >([]);
   const [catalogRetry, setCatalogRetry] = useState(0);
   const [technologies, setTechnologies] = useState<string[]>([]);
   const [customTechInput, setCustomTechInput] = useState("");
@@ -83,14 +85,22 @@ export function ProjectCreateScreen() {
   useEffect(() => {
     const controller = new AbortController();
     setSubmitError(null);
-    portfolioService.getMine(controller.signal).then((data) => {
-      if (controller.signal.aborted) return;
-      const catalog = data.skillCatalog ?? [];
-      setSkillCatalog(catalog);
-      setAvailableTechnologies(catalog.map((skill) => skill.name));
-    }).catch((cause) => {
-      if (!controller.signal.aborted) setSubmitError(cause instanceof Error ? cause.message : "Không thể tải danh mục kỹ năng.");
-    });
+    portfolioService
+      .getMine(controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        const catalog = data.skillCatalog ?? [];
+        setSkillCatalog(catalog);
+        setAvailableTechnologies(catalog.map((skill) => skill.name));
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted)
+          setSubmitError(
+            cause instanceof Error
+              ? cause.message
+              : "Không thể tải danh mục kỹ năng.",
+          );
+      });
     return () => controller.abort();
   }, [catalogRetry]);
 
@@ -111,12 +121,15 @@ export function ProjectCreateScreen() {
     const trimmed = customTechInput.trim();
     if (!trimmed) return;
 
-    const skill = skillCatalog.find((item) => item.name.toLowerCase() === trimmed.toLowerCase());
+    const skill = skillCatalog.find(
+      (item) => item.name.toLowerCase() === trimmed.toLowerCase(),
+    );
     if (!skill) {
       setSubmitError("Vui lòng chọn công nghệ trong danh mục kỹ năng.");
       return;
     }
-    if (!technologies.includes(skill.name)) setTechnologies((prev) => [...prev, skill.name]);
+    if (!technologies.includes(skill.name))
+      setTechnologies((prev) => [...prev, skill.name]);
     setSubmitError(null);
     setCustomTechInput("");
   };
@@ -301,8 +314,12 @@ export function ProjectCreateScreen() {
 
     if (!expectedOutputDate) {
       nextErrors.expectedOutput = "Ngày dự kiến hoàn thành là bắt buộc.";
-    } else if (recruitmentDeadline && expectedOutputDate.getTime() <= recruitmentDeadline.getTime()) {
-      nextErrors.expectedOutput = "Ngày hoàn thành phải sau hạn tuyển thành viên.";
+    } else if (
+      recruitmentDeadline &&
+      expectedOutputDate.getTime() <= recruitmentDeadline.getTime()
+    ) {
+      nextErrors.expectedOutput =
+        "Ngày hoàn thành phải sau hạn tuyển thành viên.";
     }
 
     return nextErrors;
@@ -324,7 +341,9 @@ export function ProjectCreateScreen() {
       title: title.trim(),
       projectField: finalProjectField,
       description: description.trim(),
-      skillIds: skillCatalog.filter((skill) => technologies.includes(skill.name)).map((skill) => skill.id),
+      skillIds: skillCatalog
+        .filter((skill) => technologies.includes(skill.name))
+        .map((skill) => skill.id),
       memberTarget: Number(memberTarget),
       roleRequirements: roles.map((role) => ({
         role: role.role.trim(),
@@ -333,7 +352,9 @@ export function ProjectCreateScreen() {
       })),
       recruitmentDeadline: recruitmentDeadline!.toISOString(),
       expectedOutput: expectedOutputDate!.toISOString(),
-      visibility: isPrivate ? ProjectVisibility.Private : ProjectVisibility.Public,
+      visibility: isPrivate
+        ? ProjectVisibility.Private
+        : ProjectVisibility.Public,
     };
 
     try {
@@ -344,9 +365,7 @@ export function ProjectCreateScreen() {
         },
       } as never);
     } catch {
-      setSubmitError(
-        "Không thể chuyển sang bước xác nhận. Vui lòng thử lại.",
-      );
+      setSubmitError("Không thể chuyển sang bước xác nhận. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
@@ -417,7 +436,10 @@ export function ProjectCreateScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại danh sách dự án"
+            hitSlop={12}
+            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
             style={({ pressed }) => [
               styles.backButton,
               pressed && styles.backButtonPressed,
@@ -577,7 +599,13 @@ export function ProjectCreateScreen() {
                 </Pressable>
               </View>
 
-              {!availableTechnologies.length && <Button title="Tải lại danh mục kỹ năng" variant="outline" onPress={() => setCatalogRetry((value) => value + 1)} />}
+              {!availableTechnologies.length && (
+                <Button
+                  title="Tải lại danh mục kỹ năng"
+                  variant="outline"
+                  onPress={() => setCatalogRetry((value) => value + 1)}
+                />
+              )}
               <View style={styles.tagsWrap}>
                 {availableTechnologies.map((tech) => {
                   const selected = technologies.includes(tech);
@@ -809,7 +837,9 @@ export function ProjectCreateScreen() {
           </View>
         </View>
 
-        {errors.expectedOutput ? <Text style={{ color: colors.error }}>{errors.expectedOutput}</Text> : null}
+        {errors.expectedOutput ? (
+          <Text style={{ color: colors.error }}>{errors.expectedOutput}</Text>
+        ) : null}
 
         {/* PRIVATE PROJECT */}
         <View style={styles.privateCard}>
@@ -818,7 +848,9 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.privateContent}>
-            <Text style={styles.privateTitle}>Dự án riêng tư</Text>
+            <Text style={styles.privateTitle}>
+              {isPrivate ? "Dự án riêng tư" : "Dự án công khai"}
+            </Text>
             <Text style={styles.privateDescription}>
               {isPrivate
                 ? "Dự án chỉ dành cho những người được mời."
@@ -850,7 +882,7 @@ export function ProjectCreateScreen() {
           <Button
             title="Hủy bỏ"
             variant="outline"
-            onPress={() => router.back()}
+            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
             style={styles.cancelButton}
           />
 

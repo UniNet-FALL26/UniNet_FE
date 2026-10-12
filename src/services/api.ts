@@ -22,7 +22,10 @@ async function responseError(response: Response, path: string) {
   const message = body && typeof body === 'object' && 'message' in body && typeof body.message === 'string'
     ? body.message
     : response.status === 401 ? path.split('?')[0] === '/auth/login' ? 'Email hoặc mật khẩu không chính xác.' : expired().message : 'Có lỗi xảy ra. Vui lòng thử lại.';
-  return new ApiError(message, response.status);
+  const localizedMessage = /\/projects\/[^/]+\/join-requests(?:\?|$)/.test(path) && /^you already have a pending request[.!]?$/i.test(message.trim())
+    ? 'Bạn đang có một yêu cầu tham gia chưa được xử lí'
+    : message;
+  return new ApiError(localizedMessage, response.status);
 }
 
 export async function refreshSession(expected?: AuthSession): Promise<LoginResponse> {

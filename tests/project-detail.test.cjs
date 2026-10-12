@@ -23,7 +23,7 @@ function harness(project, operations = {}) {
   vm.runInNewContext(source, { exports, Error, require(name) {
     if (name === 'react') return { ...React, useState: (initial) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; }, useEffect: () => {}, useMemo: fn => fn(), useRef: () => ref };
     if (name === 'react-native') return { ...native, Modal: ({ visible, children }) => visible ? React.createElement('div', null, children) : null };
-    if (name === 'expo-router') return { router: { back() {} }, useLocalSearchParams: () => ({ id: 'project' }) };
+    if (name === 'expo-router') return { router: { back() {}, replace() {} }, useLocalSearchParams: () => ({ id: 'project' }) };
     if (name === '@/store/auth.store') return { useAuthStore: () => ({ account: { id: 'viewer' } }) };
     if (name === '@/services/project.service') return { projectService: service };
     if (name === '@/types/project') return types;
@@ -31,6 +31,7 @@ function harness(project, operations = {}) {
     if (name === '@/components/ui/Button') return { Button: props => { buttons.push(props); return React.createElement('button', { disabled: props.disabled || props.loading }, props.title); } };
     if (name === '@/components/ui/Input') return { Input: () => React.createElement('input') };
     if (name === '@/components/ui/Loading') return { Loading: () => React.createElement('span', null, 'Loading') };
+    if (name === '@/components/projects/ProjectEditForm') return { ProjectEditForm: () => React.createElement('div', null, 'Edit form') };
     if (name === '@/components/projects/RecommendedMemberCard') return { RecommendedMemberCard: () => React.createElement('div', null, 'Recommendation') };
     return require(name);
   } });
@@ -113,4 +114,27 @@ test('verification preview confirms without any API call or false success', asyn
   h.render(); h.click('Gửi xác thực'); h.render(); await h.click('Xác nhận');
   assert.equal(h.calls.length, 0);
   assert.ok(h.render().includes('Chưa có yêu cầu nào được gửi'));
+});
+
+test('pending projects show information and members without recruitment controls', () => {
+  for (const isCreator of [true, false]) {
+    const html = harness(detail({ status: 0, isCreator })).render();
+    assert.ok(html.includes('Chờ duyệt'));
+    assert.ok(html.includes('CloudOps') && html.includes('Thành viên trong nhóm'));
+    assert.ok(!html.includes('Đang tuyển'));
+    assert.ok(!html.includes('Chỉnh sửa dự án'));
+  }
+});
+test('rejected projects show rejected badge and editing/deletion only for creator', async () => {
+  const guest = harness(detail({ status: 3 })).render();
+  assert.ok(guest.includes('Bị từ chối'));
+  assert.ok(!guest.includes('Đang tuyển'));
+  assert.ok(!guest.includes('Xóa dự án') && !guest.includes('Chỉnh sửa dự án'));
+  const h = harness(detail({ status: 3, isCreator: true }));
+  h.render(); h.click('Chỉnh sửa dự án'); assert.ok(h.render().includes('Edit form'));
+  h.click('Xóa dự án'); h.render(); assert.equal(h.calls.length, 0);
+  h.click('Quay lại'); h.render(); assert.equal(h.calls.length, 0);
+  h.click('Xóa dự án'); h.render(); await h.click('Xác nhận');
+  assert.equal(h.calls[0][0], 'deleteProject');
+  assert.equal(h.calls[0][1][0], 'project');
 });
