@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import { ApiRecruitmentStatus, RECRUITMENT_STATUS_LABEL, type ProjectListItem } from "@/types/project";
+import { ApiProjectStatus, ApiRecruitmentStatus, RECRUITMENT_STATUS_LABEL, type ProjectListItem } from "@/types/project";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -19,10 +19,9 @@ import {
 const tabs = [
   "Đang tuyển",
   "Dự án của tôi",
-  "Yêu cầu tham gia",
-  "Lời mời đã gửi",
-  "Lời mời nhận được",
-  "Đã đóng tuyển",
+  "Dự án chờ duyệt",
+  "Dự án hoàn thành",
+  "Dự án bị từ chối",
 ] as const;
 
 type Tab = (typeof tabs)[number];
@@ -70,12 +69,16 @@ export function ProjectExplorerScreen() {
     const timer = setTimeout(() => { setKeyword(searchQuery.trim()); setPage(1); }, 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-  const unsupportedTab = ["Yêu cầu tham gia", "Lời mời đã gửi", "Lời mời nhận được"].includes(activeTab);
+  const statusTab = activeTab === "Dự án hoàn thành" ? ApiProjectStatus.Completed
+    : activeTab === "Dự án chờ duyệt" ? ApiProjectStatus.Pending
+    : activeTab === "Dự án bị từ chối" ? ApiProjectStatus.Rejected : undefined;
+  const personalTab = activeTab !== "Đang tuyển";
   useEffect(() => {
     const controller = new AbortController();
-    if (unsupportedTab) { setProjects([]); setLoading(false); setError(null); return () => controller.abort(); }
     setLoading(true); setError(null); setProjects([]);
-    const request = activeTab === "Dự án của tôi"
+    const request = statusTab !== undefined
+      ? projectService.listProjectsByStatus(statusTab, page, 10, controller.signal)
+      : personalTab
       ? projectService.listMyProjects({ page, pageSize: 10 }, controller.signal)
       : projectService.listProjects({ page, pageSize: 10, keyword, field: selectedFields[0], skillnames: selectedSkills,
       recruitmentStatus: activeTab === "Đang tuyển" ? ApiRecruitmentStatus.Open : undefined,
@@ -89,7 +92,7 @@ export function ProjectExplorerScreen() {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Không thể tải danh sách dự án.");
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, unsupportedTab]);
+  }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, statusTab, personalTab]);
   const availableSkills = knownSkills;
   const availableFields = knownFields;
 
@@ -191,7 +194,6 @@ export function ProjectExplorerScreen() {
   // =========================
 
   const filteredProjects = projects.filter((project) => {
-    if (activeTab === "Đã đóng tuyển") return project.recruitmentStatus !== ApiRecruitmentStatus.Open;
     return true;
   });
 
@@ -233,7 +235,7 @@ export function ProjectExplorerScreen() {
             SEARCH + FILTER
         ========================= */}
 
-        {activeTab !== "Dự án của tôi" && <View style={styles.searchSection}>
+        {!personalTab && <View style={styles.searchSection}>
           <View style={styles.searchRow}>
             <View style={styles.searchContainer}>
               <Text style={styles.searchIcon}>🔍</Text>
@@ -374,9 +376,7 @@ export function ProjectExplorerScreen() {
         ========================= */}
 
         <View style={styles.content}>
-          {loading ? <Loading /> : error ? null : unsupportedTab ? (
-            <View style={styles.messageCard}><Text style={styles.messageText}>Danh sách yêu cầu và lời mời cần API riêng để hiển thị.</Text></View>
-          ) : filteredProjects.length === 0 ? (
+          {loading ? <Loading /> : error ? null : filteredProjects.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyBadge}>
                 <View style={styles.emptyBadgeDot} />
@@ -385,7 +385,7 @@ export function ProjectExplorerScreen() {
               <Text style={styles.emptyTitle}>Chưa có dự án nào phù hợp</Text>
 
               <Text style={styles.emptyText}>
-                {activeTab === "Dự án của tôi" ? "Bạn chưa có dự án nào. Hãy tạo dự án mới để bắt đầu." : "Thử thay đổi từ khóa hoặc bộ lọc để tìm dự án phù hợp hơn."}
+                {personalTab ? "Bạn chưa có dự án nào. Hãy tạo dự án mới để bắt đầu." : "Thử thay đổi từ khóa hoặc bộ lọc để tìm dự án phù hợp hơn."}
               </Text>
 
               {activeTab !== "Dự án của tôi" && (searchQuery.length > 0 || activeFilterCount > 0) && (
@@ -486,7 +486,7 @@ export function ProjectExplorerScreen() {
                         />
 
                         <Text style={styles.statusText}>
-                          {RECRUITMENT_STATUS_LABEL[(["Open", "Full", "Closed", "Expired"] as const)[project.recruitmentStatus]]}
+                          {RECRUITMENT_STATUS_LABEL[(["Open", "Full", "Closed", "Cancelled", "Expired"] as const)[project.recruitmentStatus]]}
                         </Text>
                       </View>
                     </View>
@@ -527,9 +527,14 @@ export function ProjectExplorerScreen() {
                       <View style={styles.techRow}>
                         {(project.skills ?? []).map((skill) => (
                           <View key={skill.skillId} style={styles.techPill}>
-                            <Text numberOfLines={1} style={styles.techText}>
-                              {skill.skillName}
-                            </Text>
+                            {skill.iconUrl ? (
+                              <Image source={{ uri: skill.iconUrl }} style={styles.skillIcon} accessibilityLabel={skill.skillName} />
+                            ) : null}
+                            <View style={styles.skillInfo}>
+                              <Text style={styles.techText}>{skill.skillName}</Text>
+                              {skill.category ? <Text style={styles.skillMeta}>{skill.category === "ToolsAndOther" ? "Công cụ và khác" : skill.category}</Text> : null}
+                              {skill.minLevel != null ? <Text style={styles.skillMeta}>Cấp độ tối thiểu: {skill.minLevel}</Text> : null}
+                            </View>
                           </View>
                         ))}
                       </View>
@@ -550,7 +555,7 @@ export function ProjectExplorerScreen() {
             })
           )}
         </View>
-        {!loading && !error && !unsupportedTab && totalPages > 1 && (
+        {!loading && !error && totalPages > 1 && (
           <View style={styles.footerRow}>
             <Button title="Trang trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
             <Text style={styles.metaText}>Trang {page}/{totalPages}</Text>
@@ -1264,7 +1269,10 @@ const styles = StyleSheet.create({
 
   techPill: {
     maxWidth: "100%",
-    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
     backgroundColor: "#FBFCFE",
     borderWidth: 1,
     borderColor: "#DCE4F0",
@@ -1278,6 +1286,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 15,
   },
+  skillIcon: { width: 24, height: 24, borderRadius: 4 },
+  skillInfo: { flexShrink: 1, gap: 2 },
+  skillMeta: { color: colors.textSecondary, fontSize: 10, lineHeight: 14 },
 
   // =========================
   // CARD FOOTER

@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { colors } from "@/constants/colors";
-import { projectService } from "@/services/project.service";
-import type { CreateProjectRequest } from "@/types/project";
+import { portfolioService } from "@/services/portfolio.service";
+import type { PortfolioResponse } from "@/types/portfolio";
+import { ProjectVisibility, type CreateProjectRequest } from "@/types/project";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,19 +19,6 @@ import {
   Text,
   View,
 } from "react-native";
-
-const defaultTechnologyOptions = [
-  "React Native",
-  "TypeScript",
-  "Node.js",
-  "Firebase",
-  "AI / LLM",
-  "Python",
-  "PostgreSQL",
-  "Docker",
-  "Next.js",
-  "Flutter",
-];
 
 // Danh sách các domain/nghiệp vụ cụ thể trong ngành IT
 const projectFields = [
@@ -63,8 +51,10 @@ export function ProjectCreateScreen() {
   const [description, setDescription] = useState("");
 
   const [availableTechnologies, setAvailableTechnologies] = useState<string[]>(
-    defaultTechnologyOptions,
+    [],
   );
+  const [skillCatalog, setSkillCatalog] = useState<NonNullable<PortfolioResponse["skillCatalog"]>>([]);
+  const [catalogRetry, setCatalogRetry] = useState(0);
   const [technologies, setTechnologies] = useState<string[]>([]);
   const [customTechInput, setCustomTechInput] = useState("");
 
@@ -90,6 +80,20 @@ export function ProjectCreateScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setSubmitError(null);
+    portfolioService.getMine(controller.signal).then((data) => {
+      if (controller.signal.aborted) return;
+      const catalog = data.skillCatalog ?? [];
+      setSkillCatalog(catalog);
+      setAvailableTechnologies(catalog.map((skill) => skill.name));
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setSubmitError(cause instanceof Error ? cause.message : "Không thể tải danh mục kỹ năng.");
+    });
+    return () => controller.abort();
+  }, [catalogRetry]);
+
   const totalRoleQuantity = useMemo(
     () => roles.reduce((sum, role) => sum + Number(role.quantity || 0), 0),
     [roles],
@@ -107,12 +111,13 @@ export function ProjectCreateScreen() {
     const trimmed = customTechInput.trim();
     if (!trimmed) return;
 
-    if (!availableTechnologies.includes(trimmed)) {
-      setAvailableTechnologies((prev) => [...prev, trimmed]);
+    const skill = skillCatalog.find((item) => item.name.toLowerCase() === trimmed.toLowerCase());
+    if (!skill) {
+      setSubmitError("Vui lòng chọn công nghệ trong danh mục kỹ năng.");
+      return;
     }
-    if (!technologies.includes(trimmed)) {
-      setTechnologies((prev) => [...prev, trimmed]);
-    }
+    if (!technologies.includes(skill.name)) setTechnologies((prev) => [...prev, skill.name]);
+    setSubmitError(null);
     setCustomTechInput("");
   };
 
@@ -160,24 +165,6 @@ export function ProjectCreateScreen() {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
-  };
-
-  const formatDateTimeForApi = (date: Date | null) => {
-    if (!date) return undefined;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}:00`;
-  };
-
-  const formatDateForApi = (date: Date | null) => {
-    if (!date) return undefined;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
   };
 
   const openDeadlinePicker = () => {
@@ -312,6 +299,12 @@ export function ProjectCreateScreen() {
       nextErrors.recruitmentDeadline = "Hạn chót phải nằm trong tương lai.";
     }
 
+    if (!expectedOutputDate) {
+      nextErrors.expectedOutput = "Ngày dự kiến hoàn thành là bắt buộc.";
+    } else if (recruitmentDeadline && expectedOutputDate.getTime() <= recruitmentDeadline.getTime()) {
+      nextErrors.expectedOutput = "Ngày hoàn thành phải sau hạn tuyển thành viên.";
+    }
+
     return nextErrors;
   };
 
@@ -331,31 +324,28 @@ export function ProjectCreateScreen() {
       title: title.trim(),
       projectField: finalProjectField,
       description: description.trim(),
-      technologies,
+      skillIds: skillCatalog.filter((skill) => technologies.includes(skill.name)).map((skill) => skill.id),
       memberTarget: Number(memberTarget),
-      roles: roles.map((role) => ({
-        id: role.id,
+      roleRequirements: roles.map((role) => ({
         role: role.role.trim(),
         quantity: Number(role.quantity),
         requirements: role.requirements.trim(),
       })),
-      recruitmentDeadline: formatDateTimeForApi(recruitmentDeadline)!,
-      expectedOutput: formatDateForApi(expectedOutputDate),
-      status: isPrivate ? "Private" : "Public",
-      recruitmentStatus: "Open",
+      recruitmentDeadline: recruitmentDeadline!.toISOString(),
+      expectedOutput: expectedOutputDate!.toISOString(),
+      visibility: isPrivate ? ProjectVisibility.Private : ProjectVisibility.Public,
     };
 
     try {
-      const createdProject = await projectService.createProject(payload);
       router.push({
         pathname: "/group/recommendations" as never,
         params: {
-          projectId: createdProject.id,
+          draft: JSON.stringify(payload),
         },
       } as never);
     } catch {
       setSubmitError(
-        "Không thể tạo dự án. Vui lòng kiểm tra dữ liệu và thử lại.",
+        "Không thể chuyển sang bước xác nhận. Vui lòng thử lại.",
       );
     } finally {
       setSubmitting(false);
@@ -587,6 +577,7 @@ export function ProjectCreateScreen() {
                 </Pressable>
               </View>
 
+              {!availableTechnologies.length && <Button title="Tải lại danh mục kỹ năng" variant="outline" onPress={() => setCatalogRetry((value) => value + 1)} />}
               <View style={styles.tagsWrap}>
                 {availableTechnologies.map((tech) => {
                   const selected = technologies.includes(tech);
@@ -788,7 +779,7 @@ export function ProjectCreateScreen() {
             {/* EXPECTED OUTPUT DATE (CHỈ CHỌN NGÀY THÁNG NĂM) */}
             <View style={styles.fieldContainer}>
               <Text style={styles.inputLabel}>
-                Ngày dự kiến bàn giao sản phẩm
+                Ngày dự kiến bàn giao sản phẩm *
               </Text>
               <Pressable
                 onPress={openExpectedOutputDatePicker}
@@ -817,6 +808,8 @@ export function ProjectCreateScreen() {
             </View>
           </View>
         </View>
+
+        {errors.expectedOutput ? <Text style={{ color: colors.error }}>{errors.expectedOutput}</Text> : null}
 
         {/* PRIVATE PROJECT */}
         <View style={styles.privateCard}>
