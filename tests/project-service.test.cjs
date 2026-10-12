@@ -267,3 +267,31 @@ test('recommended members rejects invalid payloads and missing project ids', asy
     await assert.rejects(offlineService(async () => payload).fetchRecommendations('project-real'), /không hợp lệ/);
   }
 });
+
+test('update project uses PUT with exactly the supplied fields and preserves pending response', async () => {
+  const payload = { title: 'CampusHome', projectField: 'Edtech', description: 'Housing', recruitmentDeadline: '2026-10-19T12:00:00.000Z', expectedOutput: '2026-12-19T12:00:00.000Z' };
+  const response = projectDetail({ status: 0 });
+  for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
+    const service = offlineService(async (url, options) => {
+      assert.equal(url, `${apiUrl.endsWith('/api') ? '' : '/api'}/projects/real-project`);
+      assert.equal(options.method, 'PUT');
+      assert.deepEqual(JSON.parse(options.body), payload);
+      return response;
+    }, apiUrl);
+    assert.equal(await service.updateProject('real-project', payload), response);
+  }
+  await assert.rejects(offlineService().updateProject('real-project', payload), /API unavailable/);
+  await assert.rejects(offlineService(async () => ({})).updateProject('real-project', payload), /không hợp lệ/);
+});
+test('delete project accepts empty 204 response, uses encoded id and propagates errors', async () => {
+  for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
+    const service = offlineService(async (url, options) => {
+      assert.equal(url, `${apiUrl.endsWith('/api') ? '' : '/api'}/projects/project%2Fid`);
+      assert.equal(options.method, 'DELETE');
+      assert.equal(options.body, undefined);
+      return undefined;
+    }, apiUrl);
+    assert.equal(await service.deleteProject('project/id'), undefined);
+  }
+  await assert.rejects(offlineService().deleteProject('project'), /API unavailable/);
+});

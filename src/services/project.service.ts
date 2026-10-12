@@ -2,6 +2,7 @@ import { apiRequest } from "@/services/api";
 import { API_URL } from "@/constants/config";
 import type {
   CreateProjectRequest,
+  UpdateProjectRequest,
   InvitationPayload,
   JoinRequestPayload,
   ProjectMemberResponse,
@@ -26,6 +27,16 @@ async function projectMutation<T extends { id: string; status: number }>(path: s
 }
 
 export const projectService = {
+  async updateProject(projectId: string, payload: UpdateProjectRequest): Promise<ProjectDetail> {
+    const response = await apiRequest<ProjectDetail>(`${projectsPath()}/${requiredId(projectId)}`, { method: "PUT", body: JSON.stringify(payload) });
+    if (!response || response.id !== projectId || !response.creator || !Array.isArray(response.roleRequirements) || !Array.isArray(response.skills) || !Array.isArray(response.members) || typeof response.isCreator !== "boolean" || typeof response.isMember !== "boolean") {
+      throw new Error("Phản hồi cập nhật dự án không hợp lệ.");
+    }
+    return response;
+  },
+  async deleteProject(projectId: string): Promise<void> {
+    await apiRequest<void>(`${projectsPath()}/${requiredId(projectId)}`, { method: "DELETE" });
+  },
   async listProjects(params: ProjectListParams = {}, signal?: AbortSignal): Promise<ProjectListResponse> {
     const query = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 10) });
     if (params.keyword?.trim()) query.set("keyword", params.keyword.trim());

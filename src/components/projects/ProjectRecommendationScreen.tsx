@@ -92,7 +92,7 @@ export function ProjectRecommendationScreen() {
 
   if (draft && !effectiveId) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>UNINET</Text>
         <Text style={styles.title}>Xác nhận tạo dự án</Text>
         <View style={styles.summaryCard}>
@@ -111,7 +111,7 @@ export function ProjectRecommendationScreen() {
         <Text style={styles.subtitle}>Đề xuất thành viên sẽ được tải sau khi dự án được tạo.</Text>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <Button title="Tạo dự án" loading={creating} disabled={creating} onPress={handleCreate} />
-        <Button title="Quay lại chỉnh sửa" variant="outline" disabled={creating} onPress={() => router.back()} />
+        <Button title="Quay lại chỉnh sửa" variant="outline" disabled={creating} onPress={() => router.canGoBack() ? router.back() : router.replace("/group/create" as never)} />
       </ScrollView>
     );
   }
@@ -162,7 +162,7 @@ export function ProjectRecommendationScreen() {
       <Button
         title="Bỏ qua"
         variant="outline"
-        onPress={() => router.push("/(tabs)/groups" as never)}
+        onPress={() => router.dismissTo("/(tabs)/groups" as never)}
         style={styles.skipButton}
       />
     </ScrollView>

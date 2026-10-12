@@ -29,6 +29,19 @@ export type ProjectSkill = {
   iconUrl: string | null;
   minLevel: number | null;
 };
+export const API_PROJECT_STATUS_LABEL: Record<ApiProjectStatus, string> = {
+  [ApiProjectStatus.Pending]: "Chờ duyệt",
+  [ApiProjectStatus.Active]: "Đang hoạt động",
+  [ApiProjectStatus.Completed]: "Hoàn thành",
+  [ApiProjectStatus.Rejected]: "Bị từ chối",
+};
+export type UpdateProjectRequest = {
+  title: string;
+  projectField: string;
+  description: string;
+  recruitmentDeadline: string;
+  expectedOutput: string;
+};
 export type ProjectListItem = {
   id: string;
   title: string;

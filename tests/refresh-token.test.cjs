@@ -53,3 +53,8 @@ test('late account response during restore cannot overwrite a new login',async()
 test('updated profile identity stays synchronized in cached session during an offline restore',async()=>{
  const env=setup(async()=>new Response(null,{status:503}));await env.authStore.setAuth(login());const snapshot=await env.storage.getSession();env.authStore.updateAccount({...login().account,profileComplete:false});assert.equal(await env.storage.getSession(),snapshot);await env.authStore.restoreSession();assert.equal(env.useAuthStore().account.profileComplete,false);assert.equal((await env.storage.getSession()).account.profileComplete,false);
 });
+
+test('pending join request error is localized while preserving API status', async () => {
+  const env = setup(async () => Response.json({ message: 'You already have a pending request' }, { status: 409 }));
+  await assert.rejects(env.api.apiRequest('/api/projects/project-id/join-requests', { method: 'POST' }), error => error.message === 'Bạn đang có một yêu cầu tham gia chưa được xử lí' && error.status === 409);
+});
