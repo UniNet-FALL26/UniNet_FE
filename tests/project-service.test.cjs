@@ -88,6 +88,18 @@ test('my projects supports configured api prefix and default pagination', async 
   assert.equal((await service.listMyProjects()).totalItems, 0);
 });
 
+test('my projects preserves every skill and its metadata, including null values', async () => {
+  const skills = [
+    { skillId: '27c99ad0-7d7d-42ff-a447-f8bb1e2f1b6e', skillName: 'ASP.NET Core', category: 'Backend', iconUrl: null, minLevel: null },
+    { skillId: '5101ac85-1e80-4feb-8781-48c089c5a3ae', skillName: 'Git', category: 'ToolsAndOther', iconUrl: null, minLevel: null },
+    { skillId: '69b6509a-a4f8-46e0-a714-c2a8404b5ac8', skillName: 'React Native', category: 'Frontend', iconUrl: null, minLevel: null },
+    { skillId: 'f2373d51-4c55-4241-9bb9-5aa7387cdcef', skillName: 'SonarQube', category: 'ToolsAndOther', iconUrl: 'https://example.com/icon.png', minLevel: 0 },
+  ];
+  const response = { page: 1, pageSize: 10, totalItems: 1, totalPages: 1, projects: [{ id: 'my-project', skills }] };
+  const result = await offlineService(async () => response).listMyProjects();
+  assert.deepEqual(result.projects[0].skills, skills);
+});
+
 test('my projects propagates authentication failures without returning mock data', async () => {
   const error = Object.assign(new Error('Unauthorized'), { status: 401 });
   await assert.rejects(offlineService(async () => { throw error; }).listMyProjects(), (cause) => cause === error);
@@ -140,25 +152,85 @@ test('project detail rejects missing ids, mismatched projects and malformed resp
   await assert.rejects(offlineService(async () => projectDetail({ members: null })).getProjectById('real-project'), /không hợp lệ/);
 });
 
-test('offline project creation uses defaults and preserves explicit statuses', async () => {
-  const service = offlineService();
-  const payload = { title: 'Test', projectField: 'IT', description: 'Test', technologies: [], memberTarget: 2, roles: [], recruitmentDeadline: '2026-12-01' };
-  const defaults = await service.createProject(payload);
-  assert.equal(defaults.status, 'Public');
-  assert.equal(defaults.recruitmentStatus, 'Open');
-  const explicit = await service.createProject({ ...payload, status: 'Private', recruitmentStatus: 'Closed' });
-  assert.equal(explicit.status, 'Private');
-  assert.equal(explicit.recruitmentStatus, 'Closed');
+test('creation posts the API contract and preserves the returned project', async () => {
+  const payload = { title: 'Test', projectField: 'IT', description: 'Test', memberTarget: 2, roleRequirements: [{ role: 'Dev', quantity: 1, requirements: 'React' }], skillIds: ['skill-id'], visibility: 0, recruitmentDeadline: '2026-12-01T12:00:00.000Z', expectedOutput: '2027-01-01T12:00:00.000Z' };
+  for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
+    const response = projectDetail();
+    const service = offlineService(async (url, options) => {
+      assert.equal(url, apiUrl.endsWith('/api') ? '/projects' : '/api/projects');
+      assert.equal(options.method, 'POST');
+      assert.deepEqual(JSON.parse(options.body), payload);
+      return response;
+    }, apiUrl);
+    assert.equal(await service.createProject(payload), response);
+  }
+  await assert.rejects(offlineService().createProject(payload), /API unavailable/);
+  await assert.rejects(offlineService(async () => ({})).createProject(payload), /không hợp lệ/);
 });
 
-test('offline join request starts Pending', async () => {
-  const request = await offlineService().submitJoinRequest({ projectId: 'project-1', role: 'Frontend' });
-  assert.equal(request.status, 'Pending');
+test('status tabs request the status endpoint with pagination and cancellation', async () => {
+  for (const status of [0, 2, 3]) {
+    for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
+      const response = { page: 2, pageSize: 10, totalItems: 11, totalPages: 2, projects: [{ id: 'status-project', status }] };
+      const controller = new AbortController();
+      const service = offlineService(async (url, options) => {
+        assert.equal(url, `${apiUrl.endsWith('/api') ? '' : '/api'}/projects/status/${status}?page=2&pageSize=10`);
+        assert.equal(options.method, 'GET');
+        assert.equal(options.signal, controller.signal);
+        return response;
+      }, apiUrl);
+      assert.equal(await service.listProjectsByStatus(status, 2, 10, controller.signal), response);
+    }
+  }
+  await assert.rejects(offlineService().listProjectsByStatus(0), /API unavailable/);
+  await assert.rejects(offlineService(async () => []).listProjectsByStatus(3), /không hợp lệ/);
 });
 
-test('offline invitation starts Sent', async () => {
-  const invitation = await offlineService().sendInvitation({ projectId: 'project-1', inviteeId: 'student-1', role: 'Frontend' });
-  assert.equal(invitation.status, 'Sent');
+test('project management POST requests use real responses and propagate failures', async () => {
+  for (const [method, payload, suffix, body] of [
+    ['submitJoinRequest', { projectId: 'project/id', role: 'Devops Engineer', message: 'Join' }, '/project%2Fid/join-requests', { role: 'Devops Engineer', message: 'Join' }],
+    ['sendInvitation', { projectId: 'project/id', inviteeId: 'user', role: 'Dev', message: 'Invite' }, '/project%2Fid/invitations', { inviteeId: 'user', role: 'Dev', message: 'Invite' }],
+  ]) {
+    for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
+      const response = { id: 'result', status: 0 };
+      const service = offlineService(async (url, options) => {
+        assert.equal(url, `${apiUrl.endsWith('/api') ? '' : '/api'}/projects${suffix}`);
+        assert.equal(options.method, 'POST');
+        assert.deepEqual(JSON.parse(options.body), body);
+        return response;
+      }, apiUrl);
+      assert.equal(await service[method](payload), response);
+    }
+    await assert.rejects(offlineService()[method](payload), /API unavailable/);
+    await assert.rejects(offlineService(async () => ({}))[method](payload), /không hợp lệ/);
+  }
+});
+
+test('member, invitation and join request PATCH actions use encoded ids and no request body', async () => {
+  for (const [method, args, suffix] of [
+    ['kickMember', ['project/id', 'user/id'], '/project%2Fid/members/user%2Fid/kick'],
+    ['leaveProject', ['project/id'], '/project%2Fid/leave'],
+    ['cancelInvitation', ['invite/id'], '/invitations/invite%2Fid/cancel'],
+    ['acceptInvitation', ['invite/id'], '/invitations/invite%2Fid/accept'],
+    ['rejectInvitation', ['invite/id'], '/invitations/invite%2Fid/reject'],
+    ['acceptJoinRequest', ['request/id'], '/join-requests/request%2Fid/accept'],
+    ['rejectJoinRequest', ['request/id'], '/join-requests/request%2Fid/reject'],
+    ['cancelJoinRequest', ['request/id'], '/join-requests/request%2Fid/cancel'],
+  ]) {
+    for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
+      const response = { id: 'result', status: 1 };
+      const service = offlineService(async (url, options) => {
+        assert.equal(url, `${apiUrl.endsWith('/api') ? '' : '/api'}/projects${suffix}`);
+        assert.equal(options.method, 'PATCH');
+        assert.equal(options.body, undefined);
+        return response;
+      }, apiUrl);
+      assert.equal(await service[method](...args), response);
+    }
+    await assert.rejects(offlineService()[method](...args), /API unavailable/);
+    await assert.rejects(offlineService(async () => ({ id: 'x', status: 'Pending' }))[method](...args), /không hợp lệ/);
+    assert.throws(() => offlineService()[method](''), /định danh/);
+  }
 });
 
 function recommendedMember() {
