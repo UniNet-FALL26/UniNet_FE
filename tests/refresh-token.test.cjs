@@ -58,3 +58,37 @@ test('pending join request error is localized while preserving API status', asyn
   const env = setup(async () => Response.json({ message: 'You already have a pending request' }, { status: 409 }));
   await assert.rejects(env.api.apiRequest('/api/projects/project-id/join-requests', { method: 'POST' }), error => error.message === 'Bạn đang có một yêu cầu tham gia chưa được xử lí' && error.status === 409);
 });
+
+test('project errors use code, retain metadata and translate parameterized limits', async () => {
+  for (const [code, message, expected] of [
+    ['INVALID_TITLE', 'Changed backend wording', 'Tên dự án phải có từ 1 đến 255 ký tự.'],
+    ['PROJECT_LIMIT_REACHED', 'You can lead a maximum of 5 ongoing projects simultaneously.', 'Bạn chỉ có thể đồng thời làm trưởng nhóm tối đa 5 dự án đang diễn ra.'],
+    ['INVALID_ROLE_REQUIREMENTS_TOTAL', 'Total recruitment quantity must equal 4 (memberTarget - 1 = 5 - 1).', 'Tổng số lượng tuyển phải bằng 4 (số thành viên dự kiến trừ đi người tạo dự án).'],
+  ]) {
+    const env = setup(async () => Response.json({ code, message }, { status: 409 }));
+    await assert.rejects(env.api.apiRequest('/projects', { method: 'POST' }), error => error.message === expected && error.code === code && error.status === 409);
+  }
+});
+
+test('shared project error codes follow route, method and permission cause', async () => {
+  for (const [route, method, code, message, expected] of [
+    ['/api/projects/id', 'PUT', 'INVALID_PROJECT_STATE', '', 'Chỉ có thể cập nhật dự án đang chờ duyệt, đã bị từ chối hoặc đang hoạt động và còn tuyển thành viên.'],
+    ['/projects/id/moderation', 'POST', 'INVALID_PROJECT_STATE', '', 'Chỉ có thể gửi duyệt dự án đang chờ duyệt hoặc đã bị từ chối.'],
+    ['/projects/id/join-requests', 'POST', 'INVALID_PROJECT_STATE', '', 'Dự án phải công khai và đang hoạt động để thực hiện thao tác này.'],
+    ['/projects/invitations/id/accept', 'PATCH', 'FORBIDDEN', 'Only the invitee can accept or decline this invitation.', 'Chỉ người được mời mới có thể chấp nhận hoặc từ chối lời mời này.'],
+    ['/projects/id/invitations', 'POST', 'FORBIDDEN', 'Only active student accounts can perform this action.', 'Chỉ tài khoản sinh viên đang hoạt động mới có thể thực hiện thao tác này. Vui lòng kiểm tra tài khoản của bạn và người được mời hoặc người gửi yêu cầu.'],
+    ['/api/moderator/projects/id/approve', 'POST', 'PROFILE_NOT_FOUND', '', 'Không tìm thấy hồ sơ người kiểm duyệt.'],
+    ['/projects/my/invitations?status=9', 'GET', 'INVALID_STATUS', '', 'Trạng thái lời mời không hợp lệ.'],
+  ]) {
+    const env = setup(async () => Response.json({ code, message }, { status: 403 }));
+    await assert.rejects(env.api.apiRequest(route, { method }), error => error.message === expected);
+  }
+});
+
+test('project fallback is Vietnamese and other APIs and successful moderation content stay intact', async () => {
+  const env = setup(async () => Response.json({ code: 'UNKNOWN', message: 'Internal failure' }, { status: 500 }));
+  await assert.rejects(env.api.apiRequest('/projects/id'), /Không thể thực hiện thao tác với dự án/);
+  await assert.rejects(env.api.apiRequest('/profile/me'), /Internal failure/);
+  const success = setup(async () => Response.json({ status: 'Error', violationReason: 'Dynamic AI reason' }));
+  assert.equal((await success.api.apiRequest('/projects/id/moderation')).violationReason, 'Dynamic AI reason');
+});

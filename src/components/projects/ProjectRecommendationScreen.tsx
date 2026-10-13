@@ -85,8 +85,8 @@ export function ProjectRecommendationScreen() {
         message: "Mời tham gia dự án dựa trên đề xuất phù hợp.",
       });
       setInvitedIds((current) => [...current, recommendation.userId]);
-    } catch {
-      setError("Không thể gửi lời mời. Vui lòng thử lại sau.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể gửi lời mời. Vui lòng thử lại sau.");
     }
   };
 
