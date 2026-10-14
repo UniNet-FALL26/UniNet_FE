@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, RECRUITMENT_STATUS_LABEL, type ProjectListItem } from "@/types/project";
+import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -422,12 +422,16 @@ export function ProjectExplorerScreen() {
             </View>
           ) : (
             filteredProjects.map((project) => {
-              const isOpen = (project.status === undefined || project.status === ApiProjectStatus.Active) && project.recruitmentStatus === ApiRecruitmentStatus.Open;
+              // Some list endpoints omit status; these tabs already identify the project status.
+              const projectStatus = project.status ?? statusTab ?? (activeTab === "Đang tuyển" ? ApiProjectStatus.Active : undefined);
+              const isOpen = projectStatus === ApiProjectStatus.Active;
+              // The API count excludes the project creator.
+              const memberCount = project.currentMemberCount + 1;
 
               const progress =
                 project.memberTarget > 0
                   ? Math.min(
-                      project.currentMemberCount / project.memberTarget,
+                      memberCount / project.memberTarget,
                       1,
                     )
                   : 0;
@@ -499,9 +503,7 @@ export function ProjectExplorerScreen() {
                         />
 
                         <Text style={styles.statusText}>
-                          {project.status !== undefined && project.status !== ApiProjectStatus.Active
-                            ? API_PROJECT_STATUS_LABEL[project.status]
-                            : RECRUITMENT_STATUS_LABEL[(["Open", "Full", "Closed", "Cancelled", "Expired"] as const)[project.recruitmentStatus]]}
+                          {projectStatus !== undefined ? API_PROJECT_STATUS_LABEL[projectStatus] ?? "Chưa cập nhật" : "Chưa cập nhật"}
                         </Text>
                       </View>
                     </View>
@@ -511,7 +513,7 @@ export function ProjectExplorerScreen() {
                     <View style={styles.progressSection}>
                       <View style={styles.progressLabels}>
                         <Text style={styles.progressText}>
-                          {project.currentMemberCount}/{project.memberTarget}{" "}
+                          {memberCount}/{project.memberTarget}{" "}
                           thành viên
                         </Text>
 

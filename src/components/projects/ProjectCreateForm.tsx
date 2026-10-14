@@ -172,20 +172,14 @@ export function ProjectCreateScreen() {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
-  const formatDateOnly = (date: Date | null) => {
-    if (!date) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
-  const openDeadlinePicker = () => {
-    const initialDate = recruitmentDeadline
-      ? new Date(recruitmentDeadline)
+  const openDateTimePicker = (target: Exclude<DatePickerTarget, null>) => {
+    const currentDate = target === "expectedOutput" ? expectedOutputDate : recruitmentDeadline;
+    const saveDate = target === "expectedOutput" ? setExpectedOutputDate : setRecruitmentDeadline;
+    const initialDate = currentDate
+      ? new Date(currentDate)
       : new Date();
 
-    if (!recruitmentDeadline) {
+    if (!currentDate) {
       initialDate.setHours(23, 59, 0, 0);
     }
 
@@ -220,7 +214,7 @@ export function ProjectCreateScreen() {
                 0,
                 0,
               );
-              setRecruitmentDeadline(finalDate);
+              saveDate(finalDate);
             },
           });
         },
@@ -229,34 +223,12 @@ export function ProjectCreateScreen() {
     }
 
     setTempDate(initialDate);
-    setDatePickerTarget("recruitmentDeadline");
+    setDatePickerTarget(target);
     setDatePickerStep("date");
   };
 
-  const openExpectedOutputDatePicker = () => {
-    const initialDate = expectedOutputDate
-      ? new Date(expectedOutputDate)
-      : new Date();
-
-    if (Platform.OS === "android") {
-      DateTimePickerAndroid.open({
-        value: initialDate,
-        mode: "date",
-        display: "calendar",
-        minimumDate: new Date(),
-        onValueChange: (_event, selectedDate) => {
-          if (selectedDate) {
-            setExpectedOutputDate(new Date(selectedDate));
-          }
-        },
-      });
-      return;
-    }
-
-    setTempDate(initialDate);
-    setDatePickerTarget("expectedOutput");
-    setDatePickerStep("date");
-  };
+  const openDeadlinePicker = () => openDateTimePicker("recruitmentDeadline");
+  const openExpectedOutputDatePicker = () => openDateTimePicker("expectedOutput");
 
   const closeDatePicker = () => {
     setDatePickerTarget(null);
@@ -375,7 +347,7 @@ export function ProjectCreateScreen() {
     if (!datePickerTarget || Platform.OS === "android") return null;
 
     const isOutputDate = datePickerTarget === "expectedOutput";
-    const mode = isOutputDate ? "date" : datePickerStep;
+    const mode = datePickerStep;
 
     return (
       <DateTimePicker
@@ -386,12 +358,6 @@ export function ProjectCreateScreen() {
         minimumDate={new Date()}
         onChange={(event, selectedDate) => {
           if (event.type === "dismissed" || !selectedDate) {
-            closeDatePicker();
-            return;
-          }
-
-          if (isOutputDate) {
-            setExpectedOutputDate(new Date(selectedDate));
             closeDatePicker();
             return;
           }
@@ -415,7 +381,8 @@ export function ProjectCreateScreen() {
             0,
             0,
           );
-          setRecruitmentDeadline(finalDate);
+          if (isOutputDate) setExpectedOutputDate(finalDate);
+          else setRecruitmentDeadline(finalDate);
           closeDatePicker();
         }}
       />
@@ -804,14 +771,14 @@ export function ProjectCreateScreen() {
               ) : null}
             </View>
 
-            {/* EXPECTED OUTPUT DATE (CHỈ CHỌN NGÀY THÁNG NĂM) */}
+            {/* EXPECTED OUTPUT DATE AND TIME */}
             <View style={styles.fieldContainer}>
               <Text style={styles.inputLabel}>
                 Ngày dự kiến bàn giao sản phẩm *
               </Text>
               <Pressable
                 onPress={openExpectedOutputDatePicker}
-                style={styles.dateButton}
+                style={[styles.dateButton, errors.expectedOutput && styles.dateButtonError]}
               >
                 <View style={[styles.dateIcon, { backgroundColor: "#E6FBF2" }]}>
                   <Text style={styles.dateIconText}>🎯</Text>
@@ -825,10 +792,10 @@ export function ProjectCreateScreen() {
                     ]}
                   >
                     {expectedOutputDate
-                      ? formatDateOnly(expectedOutputDate)
-                      : "Chọn ngày hoàn thành sản phẩm"}
+                      ? formatDateTime(expectedOutputDate)
+                      : "Chọn ngày và giờ hoàn thành"}
                   </Text>
-                  <Text style={styles.dateHelper}>Ngày / tháng / năm</Text>
+                  <Text style={styles.dateHelper}>Ngày / tháng / năm • Giờ : phút</Text>
                 </View>
 
                 <Text style={styles.dateArrow}>›</Text>

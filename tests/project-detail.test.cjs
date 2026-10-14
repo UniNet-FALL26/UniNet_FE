@@ -138,3 +138,23 @@ test('rejected projects show rejected badge and editing/deletion only for creato
   assert.equal(h.calls[0][0], 'deleteProject');
   assert.equal(h.calls[0][1][0], 'project');
 });
+
+
+test('member total includes creator and member list inserts creator exactly once', () => {
+  const missingCreator = harness(detail({ currentMemberCount: 1, members: [{ userId: 'member', fullName: 'Member', role: 'Dev' }] })).render();
+  assert.ok(missingCreator.includes('2 / 3'));
+  assert.ok(missingCreator.includes('2 thành viên'));
+  assert.ok(missingCreator.includes('Người tạo dự án'));
+  const includedCreator = harness(detail({ currentMemberCount: 1 })).render();
+  assert.ok(includedCreator.includes('2 / 3'));
+  assert.ok(includedCreator.includes('2 thành viên'));
+  assert.ok(!includedCreator.includes('3 thành viên'));
+});
+
+test('project details show project status independently of recruitment status', () => {
+  for (const status of [0, 1, 2, 3]) {
+    const html = harness(detail({ status, recruitmentStatus: 2 })).render();
+    assert.ok(html.includes('Trạng thái dự án:'));
+    assert.ok(html.includes(types.API_PROJECT_STATUS_LABEL[status]));
+  }
+});
