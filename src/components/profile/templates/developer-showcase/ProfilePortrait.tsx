@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
-import { profileMedia } from '@/components/profile/profile-media';
+import { profileMedia, isPortraitCutout } from '@/components/profile/profile-media';
 import type { PortfolioIdentity, ProfileTheme } from '@/types/portfolio';
 import { EditPhoto } from '@/components/profile/ProfileEditContext';
 
 export function ProfilePortrait({ profile, theme, compact }: { profile: PortfolioIdentity; theme: ProfileTheme; compact: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const cutout = profile.avatarUrl === 'https://example.com/uninet-samples/developer-portrait.png';
+  const cutout = isPortraitCutout(profile.avatarUrl);
   const source = profileMedia(profile.avatarUrl);
   const initials = profile.fullName.trim().split(/\s+/).slice(-2).map(part => part[0]).join('').toUpperCase();
   return <View testID="showcase-portrait" style={[s.box, { height: compact ? 250 : 370 }]}>

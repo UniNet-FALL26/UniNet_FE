@@ -7,17 +7,36 @@ const account = { id: 'editor-test-owner', email: 'editor@example.org', role: 0,
 let real = {
   profile: { ...account.profile, avatarUrl: null, coverUrl: null, bio: null, universityName: null, major: null }, isOwner: true,
   skillCatalog: [{ id: '11111111-1111-1111-1111-111111111111', name: 'React', category: 'Frontend', iconUrl: null }],
-  portfolio: { headline: null, careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null, isPublic: false, appearance: { profile: { template: 'developer-modern', theme: 'blue', font: 'Inter', sectionOrder: [], hiddenSections: ['skills', 'languages'] } }, skills: [], projects: [], education: [], experience: [], certificates: [], activities: [{ title: 'Existing activity' }], languages: [{ name: 'Existing language', level: 'Native' }], articles: [], socialLinks: [] },
+  portfolio: { headline: null, careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null, isPublic: false, appearance: { profile: { template: 'developer-landscape', theme: 'pink', font: 'Inter', sectionOrder: [], hiddenSections: ['skills', 'languages'] } }, skills: [], projects: [], education: [], experience: [], certificates: [], activities: [{ title: 'Existing activity' }], languages: [{ name: 'Existing language', level: 'Native' }], articles: [], socialLinks: [] },
 };
 (async () => {
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   const page = await browser.newPage(); const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  let gets = 0, writes = 0, failLoad = false, failSave = false;
+  let processes = 0, confirms = 0;
+  const portraitUrl = "https://res.cloudinary.com/fixture/image/upload/v1/uninet/portfolio/portraits/11111111111111111111111111111111.png";
+  let gets = 0, writes = 0, failLoad = false, failSave = false, failUpload = true;
+  const photoBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aAd8AAAAASUVORK5CYII=', 'base64');
   await page.route('**/*', async route => {
     const req = route.request(); const url = new URL(req.url()); const reply = body => route.fulfill({ json: body });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' } });
-    if (url.pathname === '/editor-avatar.svg') return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="240"><rect width="200" height="240" fill="#2563eb"/></svg>' });
+    if (url.pathname.endsWith('/ai-images/remove-background')) {
+      processes++;
+      assert.match(req.headers()['content-type'], /^multipart\/form-data; boundary=/);
+      return reply({success:true,data:{sessionId:'11111111-1111-1111-1111-111111111111',previewUrl:'data:image/png;base64,'+photoBytes.toString('base64'),hasTransparentBackground:true,expiresAt:'2099-01-01T00:00:00Z'}});
+    }
+    if (url.pathname.endsWith('/ai-images/confirm')) {
+      confirms++; assert.ok(req.postDataJSON().sessionId);
+      return failUpload ? route.fulfill({status:503,json:{message:'Lỗi tải ảnh kiểm thử'}}) : reply({success:true,data:{imageUrl:portraitUrl,publicId:'uninet/portfolio/portraits/11111111111111111111111111111111',hasTransparentBackground:true}});
+    }
+    if (url.pathname.includes('/ai-images/sessions/')) return route.fulfill({status:204});
+    if (req.url() === portraitUrl) return route.fulfill({contentType:'image/png',body:photoBytes});
+    if (url.pathname.endsWith('/profile/images')) {
+      assert.match(req.headers()['content-type'], /^multipart\/form-data; boundary=/);
+      assert.ok(req.postDataBuffer().includes(photoBytes));
+      return failUpload ? route.fulfill({status:500,json:{message:'Lỗi tải ảnh kiểm thử'}}) : reply({url:`${origin}/editor-avatar.png`});
+    }
+    if (url.pathname === '/editor-avatar.png') return route.fulfill({ contentType: 'image/png', body: photoBytes });
     if (url.pathname.endsWith('/auth/login')) return reply({ account, accessToken: 'isolated-test-access', refreshToken: 'isolated-test-refresh', requiresProfileCompletion: false });
     if (url.pathname.endsWith('/auth/me') || url.pathname.endsWith('/profile/me')) return reply(account);
     if (url.pathname.endsWith('/profile/portfolio/editor/me')) {
@@ -34,10 +53,16 @@ let real = {
     await page.goto(`${origin}/profile/editor?template=developer-landscape&theme=pink`);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).waitFor(); assert.equal(gets, 0);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.reload();
+    await page.waitForFunction(() => {
+      const inputs = [...document.querySelectorAll('input')];
+      return inputs.length >= 2 && inputs.every(input => Object.keys(input).some(key => key.startsWith('__reactProps') && typeof input[key]?.onChange === 'function'));
+    });
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill('editor@example.org');
     await page.getByRole('textbox', { name: 'Mật khẩu', exact: true }).fill('isolated-test-password');
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(url => !url.pathname.includes('/login'));
     await page.getByRole('tab', { name: 'Cá nhân', exact: true }).click(); await page.getByRole('button', { name: 'Mẫu hồ sơ', exact: true }).click();
+    // Personal tab now loads the owner's data; count only reads while viewing demos.
+    gets = 0;
     const templates = { 'developer-modern': 'Developer Modern', 'developer-showcase': 'Developer Showcase', 'developer-landscape': 'Developer Landscape' };
     for (const name of Object.values(templates)) {
       await page.getByRole('button', { name: `Xem trước ${name}`, exact: true }).click(); await page.getByRole('button', { name: 'Chọn mẫu này', exact: true }).waitFor();
@@ -53,6 +78,14 @@ let real = {
     for (const title of ['Kỹ năng', 'Hành trình phát triển', 'Chứng chỉ', 'Blog & Chia sẻ', 'Dự án bản thân']) assert.equal(await page.getByRole('heading', { name: title, exact: true }).count(), 1, `Native heading ${title}`);
     assert.equal(await page.locator('[data-testid="landscape-contact"]:visible').count(), 1); assert.equal(await page.locator('[data-testid="landscape-footer"]:visible').count(), 1);
     assert.equal(await page.getByRole('button', { name: 'Lưu hồ sơ', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Chọn mẫu khác', exact: true }).count(), 1);
+    assert.equal(await page.getByText('Lưu hồ sơ', { exact: true }).count(), 0, 'Header save is icon-only');
+    assert.equal(await page.getByText('Chọn mẫu khác', { exact: true }).count(), 0, 'Header template chooser is icon-only');
+    await page.getByRole('button', { name: 'Chọn mẫu khác', exact: true }).click();
+    await page.getByRole('heading', { name: 'Mẫu hồ sơ', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Xem Developer Landscape màu Pink Sunset', exact: true }).click();
+    await page.getByRole('button', { name: 'Chọn mẫu này', exact: true }).click();
+    await page.getByRole('button', { name: 'Thêm dự án', exact: true }).waitFor();
     const add = async (name, fields) => {
       await page.getByRole('button', { name, exact: true }).click();
       for (const [label, value] of Object.entries(fields)) await page.getByRole('textbox', { name: label, exact: true }).fill(value);
@@ -79,20 +112,42 @@ let real = {
     await edit('Chỉnh sửa biệt danh', 'Biệt danh', 'An Mới');
     await edit('Chỉnh sửa chức danh', 'Chức danh', 'Lập trình viên của An');
     await edit('Chỉnh sửa giới thiệu', 'Giới thiệu', 'Giới thiệu thật của An');
-    await edit('Chỉnh sửa email liên hệ', 'Email liên hệ', 'an@example.org');
     await edit('Chỉnh sửa năm kinh nghiệm', 'Năm kinh nghiệm', '5.5');
     await edit('Chỉnh sửa gpa tại trường', 'GPA tại trường', '8.5/10');
-    await edit('Đổi ảnh đại diện', 'Liên kết ảnh', `${origin}/editor-avatar.svg`);
-    await edit('Đổi ảnh dự án Dự án thật của An', 'Liên kết ảnh', `${origin}/editor-avatar.svg`);
-    await edit('Đổi ảnh bài viết Bài viết của An', 'Liên kết ảnh', `${origin}/editor-avatar.svg`);
+    const choosePhoto = async label => {
+      const chooserPromise = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: label, exact: true }).click();
+      await (await chooserPromise).setFiles({ name: 'local-photo.png', mimeType: 'image/png', buffer: photoBytes });
+      await page.getByRole('heading', { name: label === 'Đổi ảnh đại diện' ? 'Ảnh chân dung' : 'Chọn ảnh hồ sơ', exact: true }).waitFor();
+      assert.equal(await page.getByRole('textbox', { name: 'Liên kết ảnh', exact: true }).count(), 0);
+    };
+    await choosePhoto('Đổi ảnh đại diện');
+    await page.getByText('Ảnh đã tách nền', { exact: true }).waitFor();
+    assert.equal(confirms, 0, 'No Cloudinary upload before confirm'); assert.equal(writes, 0, 'Processing does not save profile');
+    await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    await page.getByText('Lỗi tải ảnh kiểm thử', { exact: true }).waitFor();
+    assert.equal(writes, 0); failUpload = false;
+    await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    for (const label of ['Đổi ảnh dự án Dự án thật của An', 'Đổi ảnh bài viết Bài viết của An']) {
+      await choosePhoto(label); await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    }
+    await choosePhoto('Đổi ảnh đại diện');
+    await page.getByRole('button', { name: 'Bỏ ảnh', exact: true }).click();
+    await page.getByRole('button', { name: 'Hủy', exact: true }).click();
     assert.ok((await page.locator('[data-testid="landscape-stats"]:visible').innerText()).includes('5.5+')); assert.ok((await page.locator('[data-testid="landscape-stats"]:visible').innerText()).includes('8.5/10'));
     assert.equal(await page.getByRole('button', { name: /Chỉnh sửa.*(dự án|công nghệ)/i }).count(), 0, 'Derived counts are read-only');
     await page.getByRole('button', { name: 'Quay lại xem mẫu', exact: true }).click(); await page.getByRole('button', { name: 'Tiếp tục chỉnh sửa', exact: true }).click();
+    await page.getByRole('button', { name: 'Chọn mẫu khác', exact: true }).click();
+    await page.getByText('Thay đổi chưa được lưu', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Tiếp tục chỉnh sửa', exact: true }).click();
+    assert.ok(page.url().includes('/profile/editor'), 'Cancel template switching retains the editor draft');
     failSave = true; await page.getByRole('button', { name: 'Lưu hồ sơ', exact: true }).click(); await page.getByText('Lỗi lưu kiểm thử', { exact: true }).waitFor();
     failSave = false; await page.getByRole('button', { name: 'Lưu hồ sơ', exact: true }).click(); await page.getByText('Đã lưu hồ sơ.', { exact: true }).waitFor();
     assert.equal(writes, 2); assert.equal(real.profile.fullName, 'Nguyễn An Mới'); assert.equal(real.profile.bio, 'Giới thiệu thật của An');
+    assert.equal(real.profile.avatarUrl, portraitUrl, 'Cancelling photo removal keeps the chosen portrait');
+    assert.equal(confirms,2,'Failed confirm retries once, cancellation never uploads');
     assert.equal(real.portfolio.yearsOfExperience, 5.5); assert.equal(real.portfolio.gpa, '8.5/10'); assert.equal(real.portfolio.projects.length, 1); assert.equal(real.portfolio.skills.length, 1);
-    assert.equal(real.portfolio.projects[0].coverUrl, `${origin}/editor-avatar.svg`); assert.equal(real.portfolio.articles[0].coverUrl, `${origin}/editor-avatar.svg`);
+    assert.equal(real.portfolio.projects[0].coverUrl, `${origin}/editor-avatar.png`); assert.equal(real.portfolio.articles[0].coverUrl, `${origin}/editor-avatar.png`);
     assert.equal(real.portfolio.activities[0].title, 'Existing activity'); assert.equal(real.portfolio.languages[0].name, 'Existing language'); assert.equal(real.portfolio.isPublic, false);
     assert.deepEqual(real.portfolio.appearance.profile.hiddenSections, ['skills', 'languages']);
     await page.getByRole('button', { name: 'Quay lại xem mẫu', exact: true }).click(); await page.getByRole('button', { name: 'Quay lại mẫu hồ sơ', exact: true }).click();
@@ -101,20 +156,53 @@ let real = {
       await page.getByRole('button', { name: 'Thêm dự án', exact: true }).waitFor();
       for (const label of ['Thêm kỹ năng', 'Thêm học vấn', 'Thêm kinh nghiệm', 'Thêm chứng chỉ', 'Thêm bài viết']) assert.equal(await page.getByRole('button', { name: label, exact: true }).count(), 1, `${template} supports ${label} at its own section`);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${template} at ${width}`);
+      const saveBounds = await page.getByRole('button', { name: 'Lưu hồ sơ', exact: true }).boundingBox();
+      const chooseBounds = await page.getByRole('button', { name: 'Chọn mẫu khác', exact: true }).boundingBox();
+      assert.ok(saveBounds.width >= 44 && saveBounds.height >= 44 && chooseBounds.width >= 44 && chooseBounds.height >= 44);
+      assert.ok(Math.abs(saveBounds.y - chooseBounds.y) < 1 && chooseBounds.x + chooseBounds.width <= width, 'Header icons stay in the same row');
       assert.equal(await page.getByRole('heading', { name: 'Nguyễn An Mới', exact: true }).count(), 1);
       assert.equal(await page.getByRole('heading', { name: 'Hành trình phát triển', exact: true }).count(), 1);
+      if (template === 'developer-modern') {
+        const journeyTitle = page.getByRole('heading', { name: 'Hành trình phát triển', exact: true });
+        await journeyTitle.scrollIntoViewIfNeeded();
+        const headingBounds = await journeyTitle.boundingBox();
+        for (const label of ['Thêm học vấn', 'Thêm kinh nghiệm']) {
+          const bounds = await page.getByRole('button', { name: label, exact: true }).boundingBox();
+          assert.ok(bounds.y >= headingBounds.y + headingBounds.height, `${label} is below the journey heading at ${width}px`);
+          assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width, `${label} stays within the viewport`);
+        }
+        await page.screenshot({ path: `dist/profile-verification/modern-journey-controls-${width}.png` });
+      }
       assert.equal(await page.getByRole('heading', { name: 'Ngôn ngữ', exact: true }).count(), 0);
+      if (template === 'developer-showcase') {
+        assert.equal(await page.getByText('Liên hệ ngay', { exact: true }).count(), 0);
+        assert.equal(await page.getByRole('button', { name: 'Chỉnh sửa email liên hệ', exact: true }).count(), 0);
+        assert.equal(await page.getByText('Thêm email liên hệ', { exact: true }).count(), 0);
+      }
+      const footer = template === 'developer-showcase' ? page.locator('[data-testid="showcase-contact"]') : template === 'developer-landscape' ? page.locator('[data-testid="landscape-contact"]') : page.getByRole('button', { name: 'Thêm liên kết cá nhân', exact: true }).locator('..');
+      assert.equal(await footer.getByRole('button', { name: 'Chỉnh sửa email liên hệ', exact: true }).count(), 0, `${template} footer has no email edit control`);
+      assert.equal(await footer.getByText(/Thêm email liên hệ|Email liên hệ/, { exact: true }).count(), 0, `${template} footer has no email placeholder`);
       if (template !== 'developer-modern') assert.equal(await page.getByRole('heading', { name: 'Hoạt động', exact: true }).count(), 0);
       await page.getByRole('button', { name: 'Chỉnh sửa họ và tên', exact: true }).waitFor(); await page.getByRole('button', { name: 'Đổi ảnh đại diện', exact: true }).waitFor();
       const avatar = template === 'developer-modern' ? null : await page.locator(`[data-testid="${template === 'developer-landscape' ? 'landscape-portrait' : 'showcase-portrait'}"]:visible`).boundingBox();
+      assert.equal(await page.getByRole('button',{name:'Đổi ảnh bìa',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:'Đổi ảnh đại diện',exact:true}).count(),1);
       const camera = await page.getByRole('button', { name: 'Đổi ảnh đại diện', exact: true }).boundingBox();
       if (avatar) { assert.ok(camera.x > avatar.x + avatar.width / 2); assert.ok(camera.y > avatar.y + avatar.height / 2); }
       await page.getByRole('button', { name: 'Chỉnh sửa họ và tên', exact: true }).scrollIntoViewIfNeeded(); await page.screenshot({ path: `dist/profile-verification/editor-native-${template}-${width}.png` });
       await page.getByRole('heading', { name: 'Hành trình phát triển', exact: true }).scrollIntoViewIfNeeded(); await page.screenshot({ path: `dist/profile-verification/editor-native-sections-${template}-${width}.png` });
-      await page.getByRole('button', { name: 'Quay lại xem mẫu', exact: true }).click(); await page.getByRole('button', { name: 'Quay lại mẫu hồ sơ', exact: true }).click();
+      await page.getByRole('button', { name: 'Quay lại xem mẫu', exact: true }).click();
+      const discard = page.getByRole('button', { name: 'Bỏ thay đổi và quay lại', exact: true });
+      if (await discard.isVisible()) await discard.click();
+      await page.getByRole('button', { name: 'Quay lại mẫu hồ sơ', exact: true }).click();
     }
     failLoad = true; await page.getByRole('button', { name: 'Xem trước Developer Landscape', exact: true }).click(); await page.getByRole('button', { name: 'Chọn mẫu này', exact: true }).click(); await page.getByText('Lỗi tải kiểm thử', { exact: true }).waitFor();
     failLoad = false; await page.getByRole('button', { name: 'Thử lại', exact: true }).click(); await page.getByRole('button', { name: 'Thêm dự án', exact: true }).waitFor();
+    await edit('Chỉnh sửa họ và tên', 'Họ và tên', 'Tên chưa lưu');
+    await page.getByRole('button', { name: 'Chọn mẫu khác', exact: true }).click();
+    await page.getByRole('button', { name: 'Bỏ thay đổi và chọn mẫu khác', exact: true }).click();
+    await page.getByRole('heading', { name: 'Mẫu hồ sơ', exact: true }).waitFor();
+    assert.equal(real.profile.fullName, 'Nguyễn An Mới', 'Switching templates never silently saves the draft');
     assert.deepEqual(errors, []);
     console.log('Verified native template section grouping/footer, empty edit slots, pencil fields, camera placement, manual years/GPA, derived counts, additions, atomic editor payload, save/load retry and all templates at 320/768/1440px.');
   } catch (error) { await page.screenshot({ path: 'dist/profile-verification/editor-failure.png' }); console.error('Failure page:', page.url(), (await page.locator('body').innerText()).slice(0, 1200)); throw error; }

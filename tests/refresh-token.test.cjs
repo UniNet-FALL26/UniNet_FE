@@ -1,7 +1,7 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');const ts=require('typescript');
 const login=(prefix='old')=>({accessToken:prefix+'-access',refreshToken:prefix+'-refresh',expiresAt:'2026-10-04T12:30:00Z',account:{id:prefix==='other'?'other':'owner',email:'test@example.com',role:0,profileComplete:true,profile:null},requiresProfileCompletion:false});
 function setup(fetch){
- const cache=new Map();function load(name){if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController});return exports;}
+ const cache=new Map();function load(name){if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController,FormData});return exports;}
  return {storage:load('@/utils/storage').tokenStorage,api:load('@/services/api'),auth:load('@/services/auth.service').authService,...load('@/store/auth.store')};
 }
 test('expired access refreshes both tokens and retries same body/headers once; auth state stays synchronized',async()=>{
@@ -92,3 +92,9 @@ test('project fallback is Vietnamese and other APIs and successful moderation co
   const success = setup(async () => Response.json({ status: 'Error', violationReason: 'Dynamic AI reason' }));
   assert.equal((await success.api.apiRequest('/projects/id/moderation')).violationReason, 'Dynamic AI reason');
 });
+ test('multipart upload retains browser boundary and body across token refresh', async () => {
+ const calls=[]; const env=setup(async (url,options)=>{calls.push({url,options});if(url.endsWith('/auth/refresh'))return Response.json(login('new'));return options.headers.get('Authorization')==='Bearer new-access'?Response.json({url:'https://api.example.test/photo.png'}):new Response(null,{status:401});});
+ await env.authStore.setAuth(login()); const body=new FormData();body.append('file',new Blob(['image'],{type:'image/png'}),'photo.png');
+ await env.api.apiRequest('/profile/images',{method:'POST',body});
+ for(const call of [calls[0],calls[2]]){assert.equal(call.options.body,body);assert.equal(call.options.headers.has('Content-Type'),false);}
+ });

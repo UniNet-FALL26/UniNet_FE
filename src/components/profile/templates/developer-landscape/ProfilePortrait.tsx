@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioIdentity } from '@/types/portfolio';
-import { profileMedia } from '@/components/profile/profile-media';
+import { profileMedia, isPortraitCutout } from '@/components/profile/profile-media';
 import type { LandscapeTheme } from './DeveloperLandscapeThemes';
 import { EditPhoto } from '@/components/profile/ProfileEditContext';
 
 export type PortraitMode = 'auto' | 'cutout' | 'photo';
 export function ProfilePortrait({ profile, theme, compact, mode = 'auto' }: { profile: PortfolioIdentity; theme: LandscapeTheme; compact: boolean; mode?: PortraitMode }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const cutout = mode === 'cutout' || (mode === 'auto' && profile.avatarUrl === 'https://example.com/uninet-samples/developer-portrait.png');
+  const cutout = mode === 'cutout' || (mode === 'auto' && isPortraitCutout(profile.avatarUrl));
   const source = profileMedia(profile.avatarUrl);
   const initials = profile.fullName.trim().split(/\s+/).slice(-2).map(word => word[0]).join('').toUpperCase() || '?';
   return <View testID="landscape-portrait" style={[s.box, { height: compact ? 280 : 390 }]}>

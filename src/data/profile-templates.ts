@@ -16,5 +16,6 @@ export const profileTemplates: { id: string; name: string; themes: ProfileTheme[
 export const getProfileTemplate = (id?: string) => profileTemplates.find(template => template.id === id) ?? profileTemplates[0];
 export const getProfileTheme = (templateId?: string, themeId?: string) => {
   const template = getProfileTemplate(templateId);
-  return template.themes.find(theme => theme.id === themeId) ?? template.themes[0];
+  const resolved = template.id === 'developer-modern' && themeId === 'orange' ? 'amber' : themeId;
+  return template.themes.find(theme => theme.id === resolved) ?? template.themes[0];
 };

@@ -50,6 +50,8 @@ test('portrait supports explicit uploaded cutouts, ordinary photographs and init
   data.profile.avatarUrl = 'https://user.invalid/avatar.png';
   assert.ok(render(data).includes('alt="Ảnh đại diện Trịnh Trọng Quyền" data-fit="cover"'));
   assert.ok(render(data, { portraitMode: 'cutout' }).includes('alt="Ảnh đại diện Trịnh Trọng Quyền" data-fit="contain"'));
+  data.profile.avatarUrl = 'https://res.cloudinary.com/fixture/image/upload/v1/uninet/portfolio/portraits/11111111111111111111111111111111.png';
+  assert.ok(render(data).includes('alt="Ảnh đại diện Trịnh Trọng Quyền" data-fit="contain"'));
   data.profile.avatarUrl = null;
   assert.ok(render(data).includes('Ảnh đại diện bằng chữ viết tắt'));
 });
@@ -118,11 +120,12 @@ test('project cards show individual technology badges and omit empty technology 
   assert.ok(html.includes('aria-label="Công nghệ sử dụng"'));
   assert.ok(!renderProjects({ ...project, technologies: [] }).includes('aria-label="Công nghệ sử dụng"'));
 });
-test('contact uses real email or social links and omits absent contact actions', () => {
+test('footer retains safe social links and omits email contact actions', () => {
   const data = structuredClone(sample);
-  assert.ok(render(data).includes('Liên hệ qua LinkedIn'));
+  assert.ok(render(data).includes('LinkedIn'));
   data.portfolio.contactEmail = 'person@company.invalid';
-  assert.ok(render(data).includes('Liên hệ ngay'));
+  assert.ok(!render(data).includes('Liên hệ ngay'));
+  assert.ok(!render(data).includes('person@company.invalid'));
   data.portfolio.contactEmail = 'person@example.com';
   data.portfolio.socialLinks = [{ label: 'Unsafe', url: 'javascript:alert(1)' }];
   assert.ok(!render(data).includes('Liên hệ ngay'));

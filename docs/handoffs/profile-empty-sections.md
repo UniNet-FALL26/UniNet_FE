@@ -1,0 +1,7 @@
+# Empty portfolio sections
+
+User preference: all three templates hide empty sections in viewing, while editing retains empty slots and add controls.
+
+Modern Skills/Journey/Certificates/Articles previously rendered headings with empty arrays. Added the same editing-aware guards used in Showcase/Landscape. Existing Project/Activities guards remain. Modern and Showcase metrics now display only populated metrics in viewing; zero counts/absent GPA no longer create empty stat rows. Editing retains all metric fields. Showcase also respects the existing hidden `stats` preference. No data, API, persistence or template composition changes.
+
+Changed `templates/developer-modern/PortfolioSections.tsx` and `templates/developer-showcase/ShowcaseHero.tsx`. `tests/profile-empty-sections.test.cjs` exercises all three shared renderers with empty/partial portfolios at 320/768/1440px, data immutability, and editing controls despite hidden-section preferences. Before the fix, Modern empty/partial headings and Showcase absent metrics failed. After: all 9 tests pass. Related renderer/editor/draft/unload suites, TypeScript and production web export pass. Both production browser scripts (`profile-editor-browser-check.cjs`, `portfolio-display-browser-check.cjs`) pass, including all three empty editors, additions, saves and read-only viewing. Physical Android verification was unavailable when the device disconnected; component/render and browser checks cover the shared code.

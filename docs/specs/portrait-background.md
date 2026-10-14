@@ -1,0 +1,11 @@
+# Portrait background removal
+
+Student avatar selection automatically processes through authenticated BE; covers and entry images keep the existing flow. Dedicated local BiRefNet worker returns only a segmentation mask. Compose original decoded RGBA pixels with mask alpha, without RGB reconstruction, resizing or retouching. Normalize EXIF orientation for display.
+
+Processing returns an account-bound opaque session (30 minutes) and inline PNG preview, never a Cloudinary asset. Confirm is an idempotent server upload to a random `uninet/portfolio/portraits` public ID, PNG, overwrite=false. Confirmation only changes editor draft. Existing Save persists URL and atomically marks its owned asset retained. Legacy URLs remain compatible; any new Cloudinary portrait URL must exactly match an owned asset. All three templates recognize managed cutouts and contain them.
+
+Metadata table: PortraitAssets(Id, AccountId, PublicId, ImageUrl, CreatedAtUnix, State). State=3 durable upload intent before remote request, 0 uploaded draft, 1 retained, 2 pending cleanup; concurrency token prevents cleanup racing Save. Keep retained assets; cleanup unsaved/intended uploads after 24 hours, retry remote destruction. Sessions are bounded process memory; restart requires reselecting an unconfirmed image, deployment uses one API instance/sticky sessions. Worker internal shared token, bounded image dimensions/bytes, bounded concurrency, no client-supplied URLs. Secrets only environment/server config.
+
+Implementation order: worker and pixel tests; BE Cloudinary/session/ownership/migration and tests; FE automatic preview/confirm and renderer tests; typecheck/build/runtime review. Dependencies for worker are part of the requested segmentation feature. No production migration or deployment without separate instruction.
+
+Verify: `python -m unittest discover -s portrait-worker -p test_*.py`; `dotnet test UniNet.Tests/UniNet.Tests.csproj --no-restore -m:1`; `npx tsc --noEmit`; direct Node profile tests; Expo web export. Tests use isolated fake provider/cloud upload, never real accounts or keys. Live inference and upload require installed model and configured Cloudinary; report separately from fixture tests.
