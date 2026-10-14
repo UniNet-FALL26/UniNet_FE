@@ -156,6 +156,11 @@ export function ProjectDetailScreen() {
 
   const isRecruiting = isActive && project.recruitmentStatus === ApiRecruitmentStatus.Open;
   const isPublic = project.visibility === ProjectVisibility.Public;
+  // The API count excludes the project creator.
+  const memberCount = project.currentMemberCount + 1;
+  const members = project.members.some((member) => member.userId === project.creator.id)
+    ? project.members
+    : [{ userId: project.creator.id, fullName: project.creator.fullName, nickname: project.creator.nickname, avatarUrl: project.creator.avatarUrl, role: "Người tạo dự án", status: 0, joinedAt: project.createdAt }, ...project.members];
 
   return (
     <ScrollView
@@ -182,13 +187,11 @@ export function ProjectDetailScreen() {
 
         <View style={styles.headerInfo}>
           <Text style={styles.eyebrow}>
-            {project.projectField?.toUpperCase() || "CHI TIẾT DỰ ÁN"}
+            {project.projectField || "Chi tiết dự án"}
           </Text>
           <Text style={styles.title}>{project.title}</Text>
         </View>
       </View>
-
-      <Text style={styles.descriptionText}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật trạng thái"}</Text>
 
       {/* STATUS BADGES & CREATOR BAR */}
       <View style={styles.creatorBanner}>
@@ -206,7 +209,7 @@ export function ProjectDetailScreen() {
             )}
           </View>
           <View>
-            <Text style={styles.creatorLabel}>Người khởi xướng</Text>
+            <Text style={styles.creatorLabel}>Người tạo dự án</Text>
             <Text style={styles.creatorName}>
               {project.creator?.fullName || "Thành viên UniNet"}
             </Text>
@@ -253,7 +256,7 @@ export function ProjectDetailScreen() {
                 isPublic ? styles.badgeTextPrimary : styles.badgeTextPrivate,
               ]}
             >
-              {isPublic ? "🌐 Công khai" : "🔒 Riêng tư"}
+              {isPublic ? "Công khai" : "Riêng tư"}
             </Text>
           </View>
         </View>
@@ -262,17 +265,15 @@ export function ProjectDetailScreen() {
       {/* METRIC CARDS */}
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
-          <Text style={styles.metricIcon}>👥</Text>
           <Text style={styles.metricValue}>
-            {project.currentMemberCount} / {project.memberTarget}
+            {memberCount} / {project.memberTarget}
           </Text>
           <Text style={styles.metricLabel}>Thành viên</Text>
         </View>
 
         <View style={styles.metricCard}>
-          <Text style={styles.metricIcon}>📅</Text>
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {formatDate(project.recruitmentDeadline)}
+          <Text style={styles.metricValue}>
+            {formatDateTime(project.recruitmentDeadline)}
           </Text>
           <Text style={styles.metricLabel}>Hạn chót tuyển</Text>
         </View>
@@ -343,15 +344,15 @@ export function ProjectDetailScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Thành viên trong nhóm</Text>
           <Text style={styles.sectionCountText}>
-            {project.members.length} thành viên
+            {members.length} thành viên
           </Text>
         </View>
-        {project.members.length === 0 ? (
+        {members.length === 0 ? (
           <Text style={styles.descriptionText}>
             Chưa có thành viên trong nhóm.
           </Text>
         ) : (
-          project.members.map((member) => (
+          members.map((member) => (
             <View key={member.userId} style={styles.memberRow}>
               <View style={styles.creatorAvatar}>
                 {member.avatarUrl ? (
@@ -390,21 +391,26 @@ export function ProjectDetailScreen() {
       {/* MORE DETAILS */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Thông tin bàn giao & kế hoạch</Text>
+          <Text style={styles.sectionTitle}>Thông tin dự án</Text>
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Lĩnh vực chuyên ngành:</Text>
+          <Text style={styles.detailLabel}>Trạng thái dự án:</Text>
+          <Text style={styles.detailValue}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật"}</Text>
+        </View>
+
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Lĩnh vực:</Text>
           <Text style={styles.detailValue}>
             {project.projectField || "Công nghệ phần mềm"}
           </Text>
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Sản phẩm đầu ra dự kiến:</Text>
+          <Text style={styles.detailLabel}>Dự kiến hoàn thành:</Text>
           <Text style={styles.detailValue}>
             {project.expectedOutput
-              ? formatDate(project.expectedOutput)
+              ? formatDateTime(project.expectedOutput)
               : "Chưa thiết lập"}
           </Text>
         </View>
@@ -609,13 +615,20 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+}
+
 const styles = StyleSheet.create({
   confirmOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 },
   confirmCard: { width: "100%", maxWidth: 440, backgroundColor: colors.surface, borderRadius: 18, padding: 20, gap: 16 },
   managementRow: { gap: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14, marginTop: 14 },
   managementActions: { flexDirection: "row", gap: 10 },
   creatorImage: { width: 40, height: 40, borderRadius: 20 },
-  memberRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12 },
+  memberRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
   memberInfo: { flex: 1, gap: 4 },
   memberMeta: { color: colors.textSecondary, fontSize: 12 },
   container: {
@@ -663,21 +676,21 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: colors.primary,
     fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.2,
+    fontWeight: "600",
+    letterSpacing: 0,
     marginBottom: 4,
   },
   title: {
     color: colors.navy,
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "600",
     lineHeight: 34,
   },
 
   /* CREATOR BANNER */
   creatorBanner: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
@@ -702,7 +715,7 @@ const styles = StyleSheet.create({
   },
   creatorAvatarText: {
     color: colors.primary,
-    fontWeight: "800",
+    fontWeight: "600",
     fontSize: 13,
   },
   creatorLabel: {
@@ -721,7 +734,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 4,
   },
   badgeText: {
     fontSize: 11,
@@ -772,7 +785,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 8,
     padding: 14,
     alignItems: "flex-start",
   },
@@ -783,7 +796,7 @@ const styles = StyleSheet.create({
   metricValue: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   metricLabel: {
     color: colors.textSecondary,
@@ -795,7 +808,7 @@ const styles = StyleSheet.create({
   /* SECTION CARDS */
   sectionCard: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
@@ -809,7 +822,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   sectionCountText: {
     color: colors.primary,
@@ -935,7 +948,7 @@ const styles = StyleSheet.create({
   actionCardTitle: {
     color: colors.navy,
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   actionCardSub: {
     color: colors.textSecondary,
@@ -1002,7 +1015,7 @@ const styles = StyleSheet.create({
   statusBoxTitle: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   statusBoxDesc: {
     color: colors.textSecondary,
@@ -1035,7 +1048,7 @@ const styles = StyleSheet.create({
   avatarText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   candidateName: {
     color: colors.navy,
