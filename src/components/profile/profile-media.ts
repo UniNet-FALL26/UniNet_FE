@@ -1,4 +1,6 @@
 const prefix = 'https://example.com/uninet-samples/';
+export const isPortraitCutout = (url?: string | null) => url === `${prefix}developer-portrait.png`
+  || !!url && /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/(?:v\d+\/)?uninet\/portfolio\/portraits\/[a-f0-9]{32}\.png$/.test(url);
 const samples: Record<string, number> = {
   'developer-portrait.png': require('@/assets/images/profile-samples/developer-portrait.png'),
   'developer-cover.svg': require('@/assets/images/profile-samples/developer-cover.svg'),

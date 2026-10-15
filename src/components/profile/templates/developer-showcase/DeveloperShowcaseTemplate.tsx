@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { DeveloperModernTemplateProps } from '../developer-modern/DeveloperModernTemplate';
 import { PortfolioLink, ui } from '../developer-modern/PortfolioPrimitives';
 import { isSampleLink } from '@/components/profile/profile-media';
-import { ShowcaseContact, ShowcaseHero } from './ShowcaseHero';
+import { ShowcaseHero } from './ShowcaseHero';
 import { ShowcaseArticles, ShowcaseCertificates, ShowcaseJourney, ShowcaseProjects, ShowcaseSkills } from './ShowcaseSections';
 import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 
@@ -29,7 +29,7 @@ export function DeveloperShowcaseTemplate(props: DeveloperModernTemplateProps) {
       {order.map(id => <View key={id} onLayout={event => onSectionLayout?.(id === 'other-projects' ? 'projects' : id, event.nativeEvent.layout.y)}>{sections[id]}</View>)}
       {visible('contact') && <View testID="showcase-contact" style={[s.contact, { backgroundColor: theme.heroBackground, borderColor: theme.heroBorder, flexDirection: width >= 900 ? 'row' : 'column' }]}>
         <View style={s.copy}><Text style={[s.eyebrow, { color: theme.accent }]}>LET’S WORK TOGETHER</Text><Text role="heading" aria-level={2} style={[s.title, { color: theme.heroText }]}>Biến ý tưởng thành sản phẩm thực tế!</Text><Text style={[s.body, { color: theme.heroMuted }]}>Mình luôn sẵn sàng cho những cơ hội hợp tác và những dự án thú vị. Hãy cùng xây dựng điều có ý nghĩa.</Text></View>
-        <View style={s.actions}><ShowcaseContact data={data} theme={theme} thumbnail={thumbnail} /><View style={ui.chips}>{data.portfolio.socialLinks.filter(link => !isSampleLink(link.url)).map(link => <PortfolioLink key={link.label} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View><Text accessible={false} style={[s.handwriting, { color: theme.accent }]}>Build Something{'\n'}Amazing Together! ↗</Text></View>
+        <View style={s.actions}><View style={ui.chips}>{data.portfolio.socialLinks.filter(link => !isSampleLink(link.url)).map(link => <PortfolioLink key={link.label} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View><Text accessible={false} style={[s.handwriting, { color: theme.accent }]}>Build Something{'\n'}Amazing Together! ↗</Text></View>
       </View>}
     </View>
   </View>;

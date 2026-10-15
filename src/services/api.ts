@@ -1,9 +1,10 @@
 import { API_URL } from '@/constants/config';
 import { tokenStorage, type AuthSession } from '@/utils/storage';
 import type { LoginResponse } from '@/types/auth';
+import { localizeProjectError } from '@/services/project-errors';
 
 export class ApiError extends Error {
-  constructor(message: string, public status?: number) { super(message); }
+  constructor(message: string, public status?: number, public code?: string) { super(message); }
 }
 const expired = () => new ApiError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 401);
 const changed = () => new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.', 401);
@@ -17,12 +18,13 @@ async function fetchResponse(path: string, options: RequestInit): Promise<Respon
     throw new ApiError('Không thể kết nối. Vui lòng kiểm tra mạng và thử lại.');
   }
 }
-async function responseError(response: Response, path: string) {
+async function responseError(response: Response, path: string, method = 'GET') {
   const body: unknown = await response.json().catch(() => null);
   const message = body && typeof body === 'object' && 'message' in body && typeof body.message === 'string'
     ? body.message
     : response.status === 401 ? path.split('?')[0] === '/auth/login' ? 'Email hoặc mật khẩu không chính xác.' : expired().message : 'Có lỗi xảy ra. Vui lòng thử lại.';
-  return new ApiError(message, response.status);
+  const code = body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? body.code : undefined;
+  return new ApiError(localizeProjectError(path, method.toUpperCase(), response.status, code, message), response.status, code);
 }
 
 export async function refreshSession(expected?: AuthSession): Promise<LoginResponse> {
@@ -70,7 +72,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     response = await fetchResponse(path, { ...options, headers });
     if (response.status === 401) { await tokenStorage.clear(current); throw expired(); }
   }
-  if (!response.ok) throw await responseError(response, path);
+  if (!response.ok) throw await responseError(response, path, options.method);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }

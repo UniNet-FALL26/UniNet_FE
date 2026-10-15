@@ -4,16 +4,21 @@ import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
 import {
+  API_PROJECT_STATUS_LABEL,
+  ApiProjectStatus,
   ApiRecruitmentStatus,
   ProjectVisibility,
   type ProjectDetail,
   type ProjectRecommendation,
 } from "@/types/project";
+import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
 import { RecommendedMemberCard } from "@/components/projects/RecommendedMemberCard";
+import { useAuthStore } from "@/store/auth.store";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,10 +38,12 @@ export function ProjectDetailScreen() {
   const [joinRole, setJoinRole] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [joinRequestState, setJoinRequestState] = useState<
-    "idle" | "pending" | "rejected" | "member"
-  >("idle");
-  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  const { account } = useAuthStore();
+  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; preview?: boolean; deleted?: boolean } | null>(null);
+  const [acting, setActing] = useState(false);
+  const actingRef = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,8 +54,7 @@ export function ProjectDetailScreen() {
     setRecommendations([]);
     setJoinRole("");
     setJoinMessage("");
-    setJoinRequestState("idle");
-    setInvitedIds([]);
+    setConfirmation(null);
     async function load() {
       try {
         if (!id) throw new Error("Không tìm thấy mã dự án.");
@@ -59,9 +65,8 @@ export function ProjectDetailScreen() {
         if (controller.signal.aborted) return;
         setProject(detail);
         setJoinRole(detail.roleRequirements[0]?.roleName ?? "");
-        setJoinRequestState(detail.isMember ? "member" : "idle");
         setLoading(false);
-        if (detail.isCreator) {
+        if (detail.isCreator && detail.status === ApiProjectStatus.Active) {
           setRecommendationsLoading(true);
           const recs = await projectService.fetchRecommendations(id, controller.signal);
           if (!controller.signal.aborted) setRecommendations(recs);
@@ -82,51 +87,54 @@ export function ProjectDetailScreen() {
     }
     load();
     return () => controller.abort();
-  }, [id, retry]);
+  }, [id, retry, account?.id]);
 
   const roleOptions = useMemo(() => project?.roleRequirements ?? [], [project]);
   const isCreator = project?.isCreator === true;
   const isMember = project?.isMember === true;
-  const canRecruit =
-    project?.recruitmentStatus === ApiRecruitmentStatus.Open &&
-    project?.visibility === ProjectVisibility.Public;
+  const isActive = project?.status === ApiProjectStatus.Active;
+  const canRecruit = isActive && project?.recruitmentStatus === ApiRecruitmentStatus.Open && project?.visibility === ProjectVisibility.Public;
+  const invitations = project?.invitations ?? [];
+  const joinRequests = project?.joinRequests ?? [];
+  const myInvitation = invitations.find((item) => item.inviteeId === account?.id && item.status === 0);
+  const myJoinRequest = joinRequests.find((item) => item.userId === account?.id && item.status === 0);
+  const invitedIds = invitations.filter((item) => item.status === 0).map((item) => item.inviteeId);
 
-  const handleJoinRequest = async () => {
-    if (!project || isCreator || isMember || !canRecruit) return;
-    if (!joinRole) {
-      setError("Bạn cần chọn một vai trò để gửi yêu cầu tham gia.");
-      return;
-    }
+  const askConfirmation = (title: string, message: string, operation: () => Promise<unknown>, preview = false) => {
+    if (actingRef.current) return;
+    setError(null);
+    setConfirmation({ title, message, operation, preview });
+  };
+  const confirmAction = async () => {
+    if (!confirmation || actingRef.current) return;
+    actingRef.current = true;
+    setActing(true);
+    setError(null);
     try {
-      await projectService.submitJoinRequest({
-        projectId: project.id,
-        role: joinRole,
-        message: joinMessage.trim() || undefined,
-      });
-      setJoinRequestState("pending");
-      setError(null);
-    } catch {
-      setError("Không thể gửi yêu cầu tham gia. Vui lòng thử lại sau.");
+      await confirmation.operation();
+      setConfirmation(null);
+      setNotice(confirmation.preview ? "Chức năng gửi xác thực chưa kết nối API. Chưa có yêu cầu nào được gửi." : "Thao tác thành công.");
+      if (confirmation.deleted) router.replace("/(tabs)/groups" as never);
+      else if (!confirmation.preview) setRetry((value) => value + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể thực hiện thao tác. Vui lòng thử lại.");
+    } finally {
+      actingRef.current = false;
+      setActing(false);
     }
   };
-
+  const handleJoinRequest = () => {
+    if (!project || isCreator || isMember || !canRecruit || myInvitation || myJoinRequest) return;
+    if (!joinRole) { setError("Bạn cần chọn một vai trò để gửi yêu cầu tham gia."); return; }
+    askConfirmation("Gửi yêu cầu tham gia", `Bạn muốn tham gia dự án với vai trò ${joinRole}?`, () => projectService.submitJoinRequest({ projectId: project.id, role: joinRole, message: joinMessage.trim() || undefined }));
+  };
   const handleWithdrawRequest = () => {
-    setJoinRequestState("idle");
-    setJoinMessage("");
+    if (!myJoinRequest) return;
+    askConfirmation("Hủy yêu cầu tham gia", "Bạn muốn hủy yêu cầu tham gia dự án này?", () => projectService.cancelJoinRequest(myJoinRequest.id));
   };
-
   const handleInvite = async (recommendation: ProjectRecommendation, role: string) => {
-    if (!project) return;
-    try {
-      await projectService.sendInvitation({
-        projectId: project.id,
-        inviteeId: recommendation.userId,
-        role,
-      });
-      setInvitedIds((current) => [...current, recommendation.userId]);
-    } catch {
-      setError("Không thể gửi lời mời. Vui lòng thử lại.");
-    }
+    if (!project || !isCreator || !isActive || invitedIds.includes(recommendation.userId)) return;
+    askConfirmation("Mời thành viên", `Mời ${recommendation.fullName} tham gia với vai trò ${role}?`, () => projectService.sendInvitation({ projectId: project.id, inviteeId: recommendation.userId, role, message: "Mời bạn tham gia dự án." }));
   };
 
   if (loading) return <Loading />;
@@ -141,24 +149,34 @@ export function ProjectDetailScreen() {
         <Button
           title="Quay lại"
           variant="outline"
-          onPress={() => router.back()}
+          onPress={() => router.dismissTo("/(tabs)/groups" as never)}
         />
       </View>
     );
 
-  const isRecruiting = project.recruitmentStatus === ApiRecruitmentStatus.Open;
+  const isRecruiting = isActive && project.recruitmentStatus === ApiRecruitmentStatus.Open;
   const isPublic = project.visibility === ProjectVisibility.Public;
+  // The API count excludes the project creator.
+  const memberCount = project.currentMemberCount;
+  const members = project.members.some((member) => member.userId === project.creator.id)
+    ? project.members
+    : [{ userId: project.creator.id, fullName: project.creator.fullName, nickname: project.creator.nickname, avatarUrl: project.creator.avatarUrl, role: "Người tạo dự án", status: 0, joinedAt: project.createdAt }, ...project.members];
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       {/* HEADER WITH SYNCED BACK BUTTON */}
       <View style={styles.headerRow}>
         <Pressable
-          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại danh sách dự án"
+          hitSlop={12}
+          onPress={() => router.dismissTo("/(tabs)/groups" as never)}
           style={({ pressed }) => [
             styles.backButton,
             pressed && styles.backButtonPressed,
@@ -169,7 +187,7 @@ export function ProjectDetailScreen() {
 
         <View style={styles.headerInfo}>
           <Text style={styles.eyebrow}>
-            {project.projectField?.toUpperCase() || "CHI TIẾT DỰ ÁN"}
+            {project.projectField || "Chi tiết dự án"}
           </Text>
           <Text style={styles.title}>{project.title}</Text>
         </View>
@@ -191,7 +209,7 @@ export function ProjectDetailScreen() {
             )}
           </View>
           <View>
-            <Text style={styles.creatorLabel}>Người khởi xướng</Text>
+            <Text style={styles.creatorLabel}>Người tạo dự án</Text>
             <Text style={styles.creatorName}>
               {project.creator?.fullName || "Thành viên UniNet"}
             </Text>
@@ -213,11 +231,12 @@ export function ProjectDetailScreen() {
             >
               ●{" "}
               {
-                (
+                project.status !== ApiProjectStatus.Active ? API_PROJECT_STATUS_LABEL[project.status] : (
                   [
                     "Đang tuyển",
                     "Đã đủ thành viên",
                     "Đã đóng",
+                    "Đã hủy",
                     "Hết hạn",
                   ] as const
                 )[project.recruitmentStatus]
@@ -237,7 +256,7 @@ export function ProjectDetailScreen() {
                 isPublic ? styles.badgeTextPrimary : styles.badgeTextPrivate,
               ]}
             >
-              {isPublic ? "🌐 Công khai" : "🔒 Riêng tư"}
+              {isPublic ? "Công khai" : "Riêng tư"}
             </Text>
           </View>
         </View>
@@ -246,17 +265,15 @@ export function ProjectDetailScreen() {
       {/* METRIC CARDS */}
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
-          <Text style={styles.metricIcon}>👥</Text>
           <Text style={styles.metricValue}>
-            {project.currentMemberCount} / {project.memberTarget}
+            {memberCount} / {project.memberTarget}
           </Text>
           <Text style={styles.metricLabel}>Thành viên</Text>
         </View>
 
         <View style={styles.metricCard}>
-          <Text style={styles.metricIcon}>📅</Text>
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {formatDate(project.recruitmentDeadline)}
+          <Text style={styles.metricValue}>
+            {formatDateTime(project.recruitmentDeadline)}
           </Text>
           <Text style={styles.metricLabel}>Hạn chót tuyển</Text>
         </View>
@@ -327,15 +344,15 @@ export function ProjectDetailScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Thành viên trong nhóm</Text>
           <Text style={styles.sectionCountText}>
-            {project.members.length} thành viên
+            {members.length} thành viên
           </Text>
         </View>
-        {project.members.length === 0 ? (
+        {members.length === 0 ? (
           <Text style={styles.descriptionText}>
             Chưa có thành viên trong nhóm.
           </Text>
         ) : (
-          project.members.map((member) => (
+          members.map((member) => (
             <View key={member.userId} style={styles.memberRow}>
               <View style={styles.creatorAvatar}>
                 {member.avatarUrl ? (
@@ -363,6 +380,9 @@ export function ProjectDetailScreen() {
                   Ngày tham gia: {formatDate(member.joinedAt)}
                 </Text>
               </View>
+              {isCreator && isActive && member.userId !== project.creator.id && (
+                <Button title="Xóa thành viên" variant="outline" disabled={acting} onPress={() => askConfirmation("Xóa thành viên", `Bạn muốn xóa ${member.fullName} khỏi dự án?`, () => projectService.kickMember(project.id, member.userId))} />
+              )}
             </View>
           ))
         )}
@@ -371,21 +391,26 @@ export function ProjectDetailScreen() {
       {/* MORE DETAILS */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Thông tin bàn giao & kế hoạch</Text>
+          <Text style={styles.sectionTitle}>Thông tin dự án</Text>
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Lĩnh vực chuyên ngành:</Text>
+          <Text style={styles.detailLabel}>Trạng thái dự án:</Text>
+          <Text style={styles.detailValue}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật"}</Text>
+        </View>
+
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Lĩnh vực:</Text>
           <Text style={styles.detailValue}>
             {project.projectField || "Công nghệ phần mềm"}
           </Text>
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Sản phẩm đầu ra dự kiến:</Text>
+          <Text style={styles.detailLabel}>Dự kiến hoàn thành:</Text>
           <Text style={styles.detailValue}>
             {project.expectedOutput
-              ? formatDate(project.expectedOutput)
+              ? formatDateTime(project.expectedOutput)
               : "Chưa thiết lập"}
           </Text>
         </View>
@@ -394,12 +419,12 @@ export function ProjectDetailScreen() {
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>⚠️ {error}</Text>
-          <Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} />
+          {!confirmation && <Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} />}
         </View>
       ) : null}
 
       {/* JOIN REQUEST SECTION (GUEST) */}
-      {!isCreator && !isMember && canRecruit && joinRequestState === "idle" && (
+      {!isCreator && !isMember && canRecruit && !myInvitation && !myJoinRequest && (
         <View style={styles.actionCard}>
           <Text style={styles.actionCardTitle}>Tham gia cùng nhóm</Text>
           <Text style={styles.actionCardSub}>
@@ -453,8 +478,8 @@ export function ProjectDetailScreen() {
 
       {!isCreator &&
         !isMember &&
-        canRecruit &&
-        joinRequestState === "pending" && (
+        isActive &&
+        !!myJoinRequest && (
           <View style={styles.statusBox}>
             <Text style={styles.statusBoxIcon}>⏳</Text>
             <Text style={styles.statusBoxTitle}>Đang đợi duyệt hồ sơ</Text>
@@ -470,7 +495,7 @@ export function ProjectDetailScreen() {
           </View>
         )}
 
-      {!isCreator && joinRequestState === "member" && (
+      {!isCreator && isMember && isActive && (
         <View style={[styles.statusBox, styles.statusBoxSuccess]}>
           <Text style={styles.statusBoxIcon}>🎉</Text>
           <Text style={styles.statusBoxTitle}>Bạn đã là thành viên</Text>
@@ -480,8 +505,62 @@ export function ProjectDetailScreen() {
         </View>
       )}
 
+      {notice ? <Text accessibilityRole="alert" style={styles.descriptionText}>{notice}</Text> : null}
+
+      {!isCreator && isMember && isActive && <Button title="Rời dự án" variant="outline" disabled={acting} onPress={() => askConfirmation("Rời dự án", "Bạn muốn rời dự án này?", () => projectService.leaveProject(project.id))} />}
+
+      {!isCreator && !isMember && isActive && myInvitation && (
+        <View style={styles.actionCard}>
+          <Text style={styles.actionCardTitle}>Lời mời tham gia dự án</Text>
+          <Text style={styles.descriptionText}>{myInvitation.inviterFullName} mời bạn tham gia với vai trò {myInvitation.role}.</Text>
+          {!!myInvitation.message && <Text style={styles.descriptionText}>{myInvitation.message}</Text>}
+          <Button title="Chấp nhận lời mời" disabled={acting} onPress={() => askConfirmation("Chấp nhận lời mời", "Bạn muốn chấp nhận lời mời tham gia dự án?", () => projectService.acceptInvitation(myInvitation.id))} />
+          <Button title="Từ chối lời mời" variant="outline" disabled={acting} onPress={() => askConfirmation("Từ chối lời mời", "Bạn muốn từ chối lời mời này?", () => projectService.rejectInvitation(myInvitation.id))} />
+        </View>
+      )}
+
+      {isCreator && isActive && <>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Lời mời đã gửi</Text>
+          {!invitations.length && <Text style={styles.descriptionText}>Chưa có lời mời nào.</Text>}
+          {invitations.map((invitation) => <View key={invitation.id} style={styles.managementRow}>
+            <Text style={styles.creatorName}>{invitation.inviteeFullName}</Text>
+            <Text style={styles.descriptionText}>Vai trò: {invitation.role} · {invitation.status === 0 ? "Đang chờ phản hồi" : "Đã xử lý"}</Text>
+            {!!invitation.message && <Text style={styles.descriptionText}>{invitation.message}</Text>}
+            {invitation.status === 0 && <Button title="Hủy lời mời" variant="outline" disabled={acting} onPress={() => askConfirmation("Hủy lời mời", `Hủy lời mời gửi đến ${invitation.inviteeFullName}?`, () => projectService.cancelInvitation(invitation.id))} />}
+          </View>)}
+        </View>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Yêu cầu tham gia</Text>
+          {!joinRequests.length && <Text style={styles.descriptionText}>Chưa có yêu cầu tham gia nào.</Text>}
+          {joinRequests.map((request) => <View key={request.id} style={styles.managementRow}>
+            <Text style={styles.creatorName}>{request.fullName}</Text>
+            <Text style={styles.descriptionText}>Vai trò: {request.role} · {request.status === 0 ? "Chờ duyệt" : "Đã xử lý"}</Text>
+            {!!request.message && <Text style={styles.descriptionText}>{request.message}</Text>}
+            {request.status === 0 && <View style={styles.managementActions}>
+              <Button title="Đồng ý" style={{ flex: 1 }} disabled={acting} onPress={() => askConfirmation("Đồng ý yêu cầu", `Cho phép ${request.fullName} tham gia dự án?`, () => projectService.acceptJoinRequest(request.id))} />
+              <Button title="Từ chối" style={{ flex: 1 }} variant="outline" disabled={acting} onPress={() => askConfirmation("Từ chối yêu cầu", `Từ chối yêu cầu của ${request.fullName}?`, () => projectService.rejectJoinRequest(request.id))} />
+            </View>}
+          </View>)}
+        </View>
+      </>}
+
+      {isCreator && project.status === ApiProjectStatus.Rejected && <View style={styles.actionCard}>
+        <Text style={styles.actionCardTitle}>Dự án bị từ chối</Text>
+        <Text style={styles.descriptionText}>Bạn có thể chỉnh sửa thông tin dự án hoặc xóa dự án.</Text>
+        <Button title="Chỉnh sửa dự án" disabled={acting} onPress={() => setEditing(true)} />
+        <Button title="Xóa dự án" variant="outline" disabled={acting} onPress={() => setConfirmation({ title: "Xóa dự án", message: `Bạn muốn xóa dự án “${project.title}”? Thao tác này không thể hoàn tác.`, operation: () => projectService.deleteProject(project.id), deleted: true })} />
+      </View>}
+      {editing && <ProjectEditForm project={project} onClose={() => setEditing(false)} onSaved={(updated) => { setProject(updated); setEditing(false); setError(null); setNotice("Đã cập nhật dự án."); }} />}
+
+      {isCreator && project.status === ApiProjectStatus.Completed && <View style={styles.actionCard}>
+        <Text style={styles.actionCardTitle}>Xác thực dự án hoàn thành</Text>
+        <Text style={styles.descriptionText}>Gửi dự án để xác thực kết quả thực hiện.</Text>
+        <Button title="Gửi xác thực" onPress={() => askConfirmation("Gửi xác thực", "Bạn muốn gửi dự án để xác thực? Chức năng hiện chưa kết nối API.", async () => {}, true)} />
+      </View>}
+
       {/* RECOMMENDATIONS (CREATOR VIEW) */}
-      {isCreator && canRecruit && (
+      {isCreator && isActive && (
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Gợi ý thành viên phù hợp:</Text>
@@ -499,6 +578,19 @@ export function ProjectDetailScreen() {
           </View>
         </View>
       )}
+      <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => { if (!acting) setConfirmation(null); }}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard} accessibilityViewIsModal>
+            <Text style={styles.actionCardTitle}>{confirmation?.title}</Text>
+            <Text style={styles.descriptionText}>{confirmation?.message}</Text>
+            {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
+            <View style={styles.managementActions}>
+              <Button title="Quay lại" style={{ flex: 1 }} variant="outline" disabled={acting} onPress={() => setConfirmation(null)} />
+              <Button title="Xác nhận" style={{ flex: 1 }} loading={acting} onPress={confirmAction} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -523,9 +615,20 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+}
+
 const styles = StyleSheet.create({
+  confirmOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 },
+  confirmCard: { width: "100%", maxWidth: 440, backgroundColor: colors.surface, borderRadius: 18, padding: 20, gap: 16 },
+  managementRow: { gap: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14, marginTop: 14 },
+  managementActions: { flexDirection: "row", gap: 10 },
   creatorImage: { width: 40, height: 40, borderRadius: 20 },
-  memberRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  memberRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
   memberInfo: { flex: 1, gap: 4 },
   memberMeta: { color: colors.textSecondary, fontSize: 12 },
   container: {
@@ -573,21 +676,21 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: colors.primary,
     fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.2,
+    fontWeight: "600",
+    letterSpacing: 0,
     marginBottom: 4,
   },
   title: {
     color: colors.navy,
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "600",
     lineHeight: 34,
   },
 
   /* CREATOR BANNER */
   creatorBanner: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
@@ -612,7 +715,7 @@ const styles = StyleSheet.create({
   },
   creatorAvatarText: {
     color: colors.primary,
-    fontWeight: "800",
+    fontWeight: "600",
     fontSize: 13,
   },
   creatorLabel: {
@@ -631,7 +734,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 4,
   },
   badgeText: {
     fontSize: 11,
@@ -682,7 +785,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 8,
     padding: 14,
     alignItems: "flex-start",
   },
@@ -693,7 +796,7 @@ const styles = StyleSheet.create({
   metricValue: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   metricLabel: {
     color: colors.textSecondary,
@@ -705,7 +808,7 @@ const styles = StyleSheet.create({
   /* SECTION CARDS */
   sectionCard: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
@@ -719,7 +822,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   sectionCountText: {
     color: colors.primary,
@@ -845,7 +948,7 @@ const styles = StyleSheet.create({
   actionCardTitle: {
     color: colors.navy,
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   actionCardSub: {
     color: colors.textSecondary,
@@ -912,7 +1015,7 @@ const styles = StyleSheet.create({
   statusBoxTitle: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   statusBoxDesc: {
     color: colors.textSecondary,
@@ -945,7 +1048,7 @@ const styles = StyleSheet.create({
   avatarText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   candidateName: {
     color: colors.navy,

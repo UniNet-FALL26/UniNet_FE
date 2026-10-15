@@ -1,7 +1,7 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');const ts=require('typescript');
 const login=(prefix='old')=>({accessToken:prefix+'-access',refreshToken:prefix+'-refresh',expiresAt:'2026-10-04T12:30:00Z',account:{id:prefix==='other'?'other':'owner',email:'test@example.com',role:0,profileComplete:true,profile:null},requiresProfileCompletion:false});
 function setup(fetch){
- const cache=new Map();function load(name){if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController});return exports;}
+ const cache=new Map();function load(name){if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController,FormData});return exports;}
  return {storage:load('@/utils/storage').tokenStorage,api:load('@/services/api'),auth:load('@/services/auth.service').authService,...load('@/store/auth.store')};
 }
 test('expired access refreshes both tokens and retries same body/headers once; auth state stays synchronized',async()=>{
@@ -53,3 +53,48 @@ test('late account response during restore cannot overwrite a new login',async()
 test('updated profile identity stays synchronized in cached session during an offline restore',async()=>{
  const env=setup(async()=>new Response(null,{status:503}));await env.authStore.setAuth(login());const snapshot=await env.storage.getSession();env.authStore.updateAccount({...login().account,profileComplete:false});assert.equal(await env.storage.getSession(),snapshot);await env.authStore.restoreSession();assert.equal(env.useAuthStore().account.profileComplete,false);assert.equal((await env.storage.getSession()).account.profileComplete,false);
 });
+
+test('pending join request error is localized while preserving API status', async () => {
+  const env = setup(async () => Response.json({ message: 'You already have a pending request' }, { status: 409 }));
+  await assert.rejects(env.api.apiRequest('/api/projects/project-id/join-requests', { method: 'POST' }), error => error.message === 'Bạn đang có một yêu cầu tham gia chưa được xử lí' && error.status === 409);
+});
+
+test('project errors use code, retain metadata and translate parameterized limits', async () => {
+  for (const [code, message, expected] of [
+    ['INVALID_TITLE', 'Changed backend wording', 'Tên dự án phải có từ 1 đến 255 ký tự.'],
+    ['PROJECT_LIMIT_REACHED', 'You can lead a maximum of 5 ongoing projects simultaneously.', 'Bạn chỉ có thể đồng thời làm trưởng nhóm tối đa 5 dự án đang diễn ra.'],
+    ['INVALID_ROLE_REQUIREMENTS_TOTAL', 'Total recruitment quantity must equal 4 (memberTarget - 1 = 5 - 1).', 'Tổng số lượng tuyển phải bằng 4 (số thành viên dự kiến trừ đi người tạo dự án).'],
+  ]) {
+    const env = setup(async () => Response.json({ code, message }, { status: 409 }));
+    await assert.rejects(env.api.apiRequest('/projects', { method: 'POST' }), error => error.message === expected && error.code === code && error.status === 409);
+  }
+});
+
+test('shared project error codes follow route, method and permission cause', async () => {
+  for (const [route, method, code, message, expected] of [
+    ['/api/projects/id', 'PUT', 'INVALID_PROJECT_STATE', '', 'Chỉ có thể cập nhật dự án đang chờ duyệt, đã bị từ chối hoặc đang hoạt động và còn tuyển thành viên.'],
+    ['/projects/id/moderation', 'POST', 'INVALID_PROJECT_STATE', '', 'Chỉ có thể gửi duyệt dự án đang chờ duyệt hoặc đã bị từ chối.'],
+    ['/projects/id/join-requests', 'POST', 'INVALID_PROJECT_STATE', '', 'Dự án phải công khai và đang hoạt động để thực hiện thao tác này.'],
+    ['/projects/invitations/id/accept', 'PATCH', 'FORBIDDEN', 'Only the invitee can accept or decline this invitation.', 'Chỉ người được mời mới có thể chấp nhận hoặc từ chối lời mời này.'],
+    ['/projects/id/invitations', 'POST', 'FORBIDDEN', 'Only active student accounts can perform this action.', 'Chỉ tài khoản sinh viên đang hoạt động mới có thể thực hiện thao tác này. Vui lòng kiểm tra tài khoản của bạn và người được mời hoặc người gửi yêu cầu.'],
+    ['/api/moderator/projects/id/approve', 'POST', 'PROFILE_NOT_FOUND', '', 'Không tìm thấy hồ sơ người kiểm duyệt.'],
+    ['/projects/my/invitations?status=9', 'GET', 'INVALID_STATUS', '', 'Trạng thái lời mời không hợp lệ.'],
+  ]) {
+    const env = setup(async () => Response.json({ code, message }, { status: 403 }));
+    await assert.rejects(env.api.apiRequest(route, { method }), error => error.message === expected);
+  }
+});
+
+test('project fallback is Vietnamese and other APIs and successful moderation content stay intact', async () => {
+  const env = setup(async () => Response.json({ code: 'UNKNOWN', message: 'Internal failure' }, { status: 500 }));
+  await assert.rejects(env.api.apiRequest('/projects/id'), /Không thể thực hiện thao tác với dự án/);
+  await assert.rejects(env.api.apiRequest('/profile/me'), /Internal failure/);
+  const success = setup(async () => Response.json({ status: 'Error', violationReason: 'Dynamic AI reason' }));
+  assert.equal((await success.api.apiRequest('/projects/id/moderation')).violationReason, 'Dynamic AI reason');
+});
+ test('multipart upload retains browser boundary and body across token refresh', async () => {
+ const calls=[]; const env=setup(async (url,options)=>{calls.push({url,options});if(url.endsWith('/auth/refresh'))return Response.json(login('new'));return options.headers.get('Authorization')==='Bearer new-access'?Response.json({url:'https://api.example.test/photo.png'}):new Response(null,{status:401});});
+ await env.authStore.setAuth(login()); const body=new FormData();body.append('file',new Blob(['image'],{type:'image/png'}),'photo.png');
+ await env.api.apiRequest('/profile/images',{method:'POST',body});
+ for(const call of [calls[0],calls[2]]){assert.equal(call.options.body,body);assert.equal(call.options.headers.has('Content-Type'),false);}
+ });

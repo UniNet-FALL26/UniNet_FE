@@ -69,6 +69,8 @@ test('ordinary uploaded avatar is framed and cropped while known cutout is conta
   data.profile.avatarUrl = 'https://user.invalid/avatar.jpg';
   const html = render(data);
   assert.match(html, /alt="Ảnh đại diện Trịnh Trọng Quyền" data-fit="cover"/);
+  data.profile.avatarUrl = 'https://res.cloudinary.com/fixture/image/upload/v1/uninet/portfolio/portraits/11111111111111111111111111111111.png';
+  assert.match(render(data), /alt="Ảnh đại diện Trịnh Trọng Quyền" data-fit="contain"/);
 });
 test('both theme palettes meet AA text contrast in their intended contexts', () => {
   const luminance = hex => {

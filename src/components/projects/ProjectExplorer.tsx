@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import { ApiRecruitmentStatus, RECRUITMENT_STATUS_LABEL, type ProjectListItem } from "@/types/project";
+import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -19,15 +20,16 @@ import {
 const tabs = [
   "Đang tuyển",
   "Dự án của tôi",
-  "Yêu cầu tham gia",
-  "Lời mời đã gửi",
-  "Lời mời nhận được",
-  "Đã đóng tuyển",
+  "Dự án chờ duyệt",
+  "Dự án hoàn thành",
+  "Dự án bị từ chối",
 ] as const;
 
 type Tab = (typeof tabs)[number];
 
 export function ProjectExplorerScreen() {
+  const insets = useSafeAreaInsets();
+  const [searchFocused, setSearchFocused] = useState(false);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -70,12 +72,16 @@ export function ProjectExplorerScreen() {
     const timer = setTimeout(() => { setKeyword(searchQuery.trim()); setPage(1); }, 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-  const unsupportedTab = ["Yêu cầu tham gia", "Lời mời đã gửi", "Lời mời nhận được"].includes(activeTab);
+  const statusTab = activeTab === "Dự án hoàn thành" ? ApiProjectStatus.Completed
+    : activeTab === "Dự án chờ duyệt" ? ApiProjectStatus.Pending
+    : activeTab === "Dự án bị từ chối" ? ApiProjectStatus.Rejected : undefined;
+  const personalTab = activeTab !== "Đang tuyển";
   useEffect(() => {
     const controller = new AbortController();
-    if (unsupportedTab) { setProjects([]); setLoading(false); setError(null); return () => controller.abort(); }
     setLoading(true); setError(null); setProjects([]);
-    const request = activeTab === "Dự án của tôi"
+    const request = statusTab !== undefined
+      ? projectService.listProjectsByStatus(statusTab, page, 10, controller.signal)
+      : personalTab
       ? projectService.listMyProjects({ page, pageSize: 10 }, controller.signal)
       : projectService.listProjects({ page, pageSize: 10, keyword, field: selectedFields[0], skillnames: selectedSkills,
       recruitmentStatus: activeTab === "Đang tuyển" ? ApiRecruitmentStatus.Open : undefined,
@@ -86,10 +92,13 @@ export function ProjectExplorerScreen() {
       setKnownSkills((current) => Array.from(new Set([...current, ...data.projects.flatMap((project) => (project.skills ?? []).map((skill) => skill.skillName))])).sort());
       setKnownFields((current) => Array.from(new Set([...current, ...data.projects.map((project) => project.projectField)])).filter(Boolean).sort());
     }).catch((cause) => {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Không thể tải danh sách dự án.");
+      if (controller.signal.aborted) return;
+      if (cause?.status === 404 || (cause instanceof Error && /^projects? not found\.?$/i.test(cause.message.trim()))) {
+        setProjects([]); setTotalPages(0); setTotalItems(0); setError(null);
+      } else setError(cause instanceof Error ? cause.message : "Không thể tải danh sách dự án.");
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, unsupportedTab]);
+  }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, statusTab, personalTab]);
   const availableSkills = knownSkills;
   const availableFields = knownFields;
 
@@ -191,7 +200,6 @@ export function ProjectExplorerScreen() {
   // =========================
 
   const filteredProjects = projects.filter((project) => {
-    if (activeTab === "Đã đóng tuyển") return project.recruitmentStatus !== ApiRecruitmentStatus.Open;
     return true;
   });
 
@@ -200,11 +208,13 @@ export function ProjectExplorerScreen() {
   // =========================
 
   return (
-    <>
+    <View style={[styles.container, { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.screenContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {/* =========================
             HEADER
@@ -224,7 +234,7 @@ export function ProjectExplorerScreen() {
           <Button
             title="Tạo dự án"
             variant="primary"
-            onPress={() => router.push("/group/create" as never)}
+            onPress={() => router.navigate("/group/create" as never)}
             style={styles.ctaButton}
           />
         </View>
@@ -233,12 +243,15 @@ export function ProjectExplorerScreen() {
             SEARCH + FILTER
         ========================= */}
 
-        {activeTab !== "Dự án của tôi" && <View style={styles.searchSection}>
+        {!personalTab && <View style={styles.searchSection}>
           <View style={styles.searchRow}>
-            <View style={styles.searchContainer}>
+            <View style={[styles.searchContainer, (searchFocused || searchQuery.length > 0) && styles.searchContainerFocused]}>
               <Text style={styles.searchIcon}>🔍</Text>
 
               <TextInput
+                accessibilityLabel="Tìm kiếm dự án"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder="Tìm kiếm dự án..."
@@ -259,9 +272,12 @@ export function ProjectExplorerScreen() {
 
             <Pressable
               onPress={openFilter}
-              style={[
+              accessibilityRole="button"
+              accessibilityLabel="Lọc dự án"
+              style={({ pressed }) => [
                 styles.filterButton,
                 activeFilterCount > 0 && styles.filterButtonActive,
+                pressed && styles.filterButtonPressed,
               ]}
             >
               <Text
@@ -338,6 +354,8 @@ export function ProjectExplorerScreen() {
             return (
               <Pressable
                 key={tab}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
                 onPress={() => { setPage(1); setActiveTab(tab); }}
                 style={({ pressed }) => [
                   styles.tabButton,
@@ -346,7 +364,6 @@ export function ProjectExplorerScreen() {
                 ]}
               >
                 <Text
-                  numberOfLines={1}
                   style={[styles.tabText, isActive && styles.activeTabText]}
                 >
                   {tab}
@@ -374,19 +391,13 @@ export function ProjectExplorerScreen() {
         ========================= */}
 
         <View style={styles.content}>
-          {loading ? <Loading /> : error ? null : unsupportedTab ? (
-            <View style={styles.messageCard}><Text style={styles.messageText}>Danh sách yêu cầu và lời mời cần API riêng để hiển thị.</Text></View>
-          ) : filteredProjects.length === 0 ? (
+          {loading ? <Loading /> : error ? null : filteredProjects.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyBadge}>
                 <View style={styles.emptyBadgeDot} />
               </View>
 
-              <Text style={styles.emptyTitle}>Chưa có dự án nào phù hợp</Text>
-
-              <Text style={styles.emptyText}>
-                {activeTab === "Dự án của tôi" ? "Bạn chưa có dự án nào. Hãy tạo dự án mới để bắt đầu." : "Thử thay đổi từ khóa hoặc bộ lọc để tìm dự án phù hợp hơn."}
-              </Text>
+              <Text style={styles.emptyTitle}>Không có dự án nào, vui lòng tạo dự án.</Text>
 
               {activeTab !== "Dự án của tôi" && (searchQuery.length > 0 || activeFilterCount > 0) && (
                 <Pressable
@@ -405,18 +416,22 @@ export function ProjectExplorerScreen() {
               <Button
                 title="Tạo dự án mới"
                 variant="primary"
-                onPress={() => router.push("/group/create" as never)}
+                onPress={() => router.navigate("/group/create" as never)}
                 style={styles.emptyCta}
               />
             </View>
           ) : (
             filteredProjects.map((project) => {
-              const isOpen = project.recruitmentStatus === ApiRecruitmentStatus.Open;
+              // Some list endpoints omit status; these tabs already identify the project status.
+              const projectStatus = project.status ?? statusTab ?? (activeTab === "Đang tuyển" ? ApiProjectStatus.Active : undefined);
+              const isOpen = projectStatus === ApiProjectStatus.Active;
+              // The API count excludes the project creator.
+              const memberCount = project.currentMemberCount;
 
               const progress =
                 project.memberTarget > 0
                   ? Math.min(
-                      project.currentMemberCount / project.memberTarget,
+                      memberCount / project.memberTarget,
                       1,
                     )
                   : 0;
@@ -424,6 +439,8 @@ export function ProjectExplorerScreen() {
               return (
                 <Pressable
                   key={project.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xem chi tiết dự án ${project.title}`}
                   onPress={() =>
                     router.push({
                       pathname: "/group/[id]" as never,
@@ -486,14 +503,24 @@ export function ProjectExplorerScreen() {
                         />
 
                         <Text style={styles.statusText}>
-                          {RECRUITMENT_STATUS_LABEL[(["Open", "Full", "Closed", "Expired"] as const)[project.recruitmentStatus]]}
+                          {projectStatus !== undefined ? API_PROJECT_STATUS_LABEL[projectStatus] ?? "Chưa cập nhật" : "Chưa cập nhật"}
                         </Text>
                       </View>
                     </View>
 
-                    {/* MEMBER PROGRESS */}
+                    {/* MEMBER METADATA & PROGRESS */}
 
                     <View style={styles.progressSection}>
+                      <View style={styles.progressLabels}>
+                        <Text style={styles.progressText}>
+                          {memberCount}/{project.memberTarget}{" "}
+                          thành viên
+                        </Text>
+
+                        <Text style={styles.progressText}>
+                          Hạn: {formatDate(project.recruitmentDeadline)}
+                        </Text>
+                      </View>
                       <View style={styles.progressTrack}>
                         <View
                           style={[
@@ -506,20 +533,11 @@ export function ProjectExplorerScreen() {
                         />
                       </View>
 
-                      <View style={styles.progressLabels}>
-                        <Text style={styles.progressText}>
-                          {project.currentMemberCount}/{project.memberTarget}{" "}
-                          thành viên
-                        </Text>
 
-                        <Text style={styles.progressText}>
-                          Hạn: {formatDate(project.recruitmentDeadline)}
-                        </Text>
-                      </View>
                     </View>
 
-                    <Text style={styles.metaText}>{project.projectField}</Text>
-                    <Text style={styles.metaText} numberOfLines={3}>{project.description}</Text>
+                    <Text style={styles.fieldText}>{project.projectField}</Text>
+                    <Text style={styles.descriptionText} numberOfLines={2} ellipsizeMode="tail">{project.description}</Text>
 
                     {/* TECHNOLOGIES */}
 
@@ -527,9 +545,15 @@ export function ProjectExplorerScreen() {
                       <View style={styles.techRow}>
                         {(project.skills ?? []).map((skill) => (
                           <View key={skill.skillId} style={styles.techPill}>
-                            <Text numberOfLines={1} style={styles.techText}>
-                              {skill.skillName}
-                            </Text>
+                            {skill.iconUrl ? (
+                              <Image source={{ uri: skill.iconUrl }} style={styles.skillIcon} accessibilityLabel={skill.skillName} />
+                            ) : null}
+                            <View style={styles.skillInfo}>
+                              <Text style={styles.techText}>{skill.skillName}
+                                {skill.category ? <Text style={styles.skillMeta}> · {skill.category === "ToolsAndOther" ? "Công cụ và khác" : skill.category}</Text> : null}
+                                {skill.minLevel != null ? <Text style={styles.skillMeta}> · Cấp độ tối thiểu: {skill.minLevel}</Text> : null}
+                              </Text>
+                            </View>
                           </View>
                         ))}
                       </View>
@@ -550,7 +574,7 @@ export function ProjectExplorerScreen() {
             })
           )}
         </View>
-        {!loading && !error && !unsupportedTab && totalPages > 1 && (
+        {!loading && !error && totalPages > 1 && (
           <View style={styles.footerRow}>
             <Button title="Trang trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
             <Text style={styles.metaText}>Trang {page}/{totalPages}</Text>
@@ -755,7 +779,7 @@ export function ProjectExplorerScreen() {
           </View>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
@@ -804,7 +828,10 @@ const styles = StyleSheet.create({
   },
 
   screenContent: {
-    paddingBottom: 32,
+    paddingBottom: 24,
+    width: "100%",
+    maxWidth: 900,
+    alignSelf: "center",
   },
 
   // =========================
@@ -813,12 +840,12 @@ const styles = StyleSheet.create({
 
   header: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 12,
   },
 
   headerText: {
@@ -835,9 +862,9 @@ const styles = StyleSheet.create({
 
   title: {
     color: colors.navy,
-    fontSize: 23,
-    fontWeight: "800",
-    lineHeight: 29,
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 25,
   },
 
   subtitle: {
@@ -849,6 +876,10 @@ const styles = StyleSheet.create({
 
   ctaButton: {
     minWidth: 104,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    flexShrink: 0,
+    borderRadius: 12,
   },
 
   // =========================
@@ -871,15 +902,20 @@ const styles = StyleSheet.create({
   searchContainer: {
     flex: 1,
     minWidth: 0,
-    height: 44,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
   },
+
+  searchContainerFocused: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  filterButtonPressed: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  fieldText: { color: colors.primaryDark, fontSize: 12, fontWeight: "600", lineHeight: 17, marginBottom: 3 },
+  descriptionText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
 
   searchIcon: {
     fontSize: 15,
@@ -908,12 +944,12 @@ const styles = StyleSheet.create({
   },
 
   filterButton: {
-    width: 76,
-    height: 44,
-    paddingHorizontal: 8,
+    minWidth: 80,
+    height: 48,
+    paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: colors.border,
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
@@ -997,25 +1033,27 @@ const styles = StyleSheet.create({
 
   tabsContainer: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 10,
     gap: 8,
     alignItems: "center",
   },
 
   tabButton: {
-    height: 40,
-    paddingHorizontal: 15,
-    borderRadius: 20,
+    minHeight: 44,
+    flexShrink: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: colors.border,
   },
 
   activeTabButton: {
-    backgroundColor: "#EEF5FF",
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
 
@@ -1032,7 +1070,7 @@ const styles = StyleSheet.create({
   },
 
   activeTabText: {
-    color: colors.primary,
+    color: colors.surface,
   },
 
   // =========================
@@ -1042,8 +1080,8 @@ const styles = StyleSheet.create({
   content: {
     width: "100%",
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 28,
+    paddingTop: 2,
+    paddingBottom: 12,
     gap: 12,
   },
 
@@ -1090,15 +1128,16 @@ const styles = StyleSheet.create({
   cardBody: {
     flex: 1,
     minWidth: 0,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
 
   cardHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: 9,
+    gap: 8,
     width: "100%",
   },
 
@@ -1120,15 +1159,15 @@ const styles = StyleSheet.create({
 
   projectInfo: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 110,
   },
 
   projectTitle: {
     color: colors.navy,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
     lineHeight: 21,
-    marginBottom: 1,
+    marginBottom: 2,
   },
 
   metaText: {
@@ -1180,9 +1219,9 @@ const styles = StyleSheet.create({
 
   statusText: {
     color: colors.textPrimary,
-    fontSize: 10,
-    fontWeight: "800",
-    lineHeight: 14,
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 15,
   },
 
   // =========================
@@ -1190,13 +1229,15 @@ const styles = StyleSheet.create({
   // =========================
 
   progressSection: {
-    marginTop: 12,
+    marginTop: 10,
+    marginBottom: 10,
+    gap: 7,
   },
 
   progressTrack: {
-    height: 5,
+    height: 6,
     borderRadius: 3,
-    backgroundColor: "#E9EEF6",
+    backgroundColor: colors.border,
     overflow: "hidden",
   },
 
@@ -1211,18 +1252,18 @@ const styles = StyleSheet.create({
   },
 
   progressLabels: {
-    marginTop: 6,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    gap: 6,
   },
 
   progressText: {
     flexShrink: 1,
     color: colors.textSecondary,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   // =========================
@@ -1256,41 +1297,49 @@ const styles = StyleSheet.create({
   // =========================
 
   techRow: {
-    marginTop: 7,
+    marginTop: 8,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 6,
   },
 
   techPill: {
     maxWidth: "100%",
-    borderRadius: 999,
-    backgroundColor: "#FBFCFE",
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 8,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderColor: colors.border,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
 
   techText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 15,
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 17,
   },
+  skillIcon: { width: 18, height: 18, borderRadius: 4 },
+  skillInfo: { flexShrink: 1, gap: 2 },
+  skillMeta: { color: colors.textSecondary, fontSize: 11, lineHeight: 17 },
 
   // =========================
   // CARD FOOTER
   // =========================
 
   footerRow: {
-    marginTop: 13,
+    marginTop: 10,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: "#E7ECF3",
-    paddingTop: 10,
+    borderTopColor: colors.border,
+    paddingTop: 6,
   },
 
   detailHint: {
