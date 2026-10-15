@@ -426,7 +426,7 @@ export function ProjectExplorerScreen() {
               const projectStatus = project.status ?? statusTab ?? (activeTab === "Đang tuyển" ? ApiProjectStatus.Active : undefined);
               const isOpen = projectStatus === ApiProjectStatus.Active;
               // The API count excludes the project creator.
-              const memberCount = project.currentMemberCount + 1;
+              const memberCount = project.currentMemberCount;
 
               const progress =
                 project.memberTarget > 0
