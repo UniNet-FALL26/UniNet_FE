@@ -7,8 +7,8 @@ export type PartnerType = 0 | 1 | 2 | 3 | 4;
 export type VerificationStatus = 0 | 1 | 2 | 3;
 export type VerificationDocumentType = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type CompanyJobSkill = { skillId: string; name: string; category: number; requirementType: JobSkillRequirementType };
-export type CompanyJobBenefit = { title: string; description: string };
+export type CompanyJobSkill = { skillId: string | null; name: string; category: number | null; requirementType: JobSkillRequirementType };
+export type CompanyJobBenefit = { title: string; description: string; icon?: string };
 export type CompanyJob = {
   id: string; title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
   location: string | null; description: string | null; status: CompanyJobStatus; startAt: string | null; deadline: string | null;
@@ -18,8 +18,8 @@ export type CompanyJob = {
 export type CompanyJobInput = {
   title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
   location: string; description: string; startAt: string | null; deadline: string; status: Exclude<CompanyJobStatus, 3>;
-  responsibilities: string[]; requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
-  skills: { skillId: string; requirementType: JobSkillRequirementType }[]; benefits: CompanyJobBenefit[];
+  requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
+  skills: { skillId?: string; name?: string; requirementType: JobSkillRequirementType }[]; benefits: CompanyJobBenefit[];
 };
 export type CompanyProfile = {
   id: string; companyName: string; partnerType: PartnerType; description: string | null; industry: string | null;
