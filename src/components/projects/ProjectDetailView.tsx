@@ -157,7 +157,7 @@ export function ProjectDetailScreen() {
   const isRecruiting = isActive && project.recruitmentStatus === ApiRecruitmentStatus.Open;
   const isPublic = project.visibility === ProjectVisibility.Public;
   // The API count excludes the project creator.
-  const memberCount = project.currentMemberCount + 1;
+  const memberCount = project.currentMemberCount;
   const members = project.members.some((member) => member.userId === project.creator.id)
     ? project.members
     : [{ userId: project.creator.id, fullName: project.creator.fullName, nickname: project.creator.nickname, avatarUrl: project.creator.avatarUrl, role: "Người tạo dự án", status: 0, joinedAt: project.createdAt }, ...project.members];
