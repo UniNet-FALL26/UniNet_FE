@@ -490,19 +490,19 @@ export function ProjectExplorerScreen() {
                       <View
                         style={[
                           styles.statusBadge,
-                          isOpen ? styles.statusOpen : styles.statusClosed,
+                          projectStatus === ApiProjectStatus.Completed ? styles.statusCompleted : isOpen ? styles.statusOpen : styles.statusClosed,
                         ]}
                       >
                         <View
                           style={[
                             styles.statusDot,
-                            isOpen
+                            projectStatus === ApiProjectStatus.Completed ? styles.statusDotCompleted : isOpen
                               ? styles.statusDotOpen
                               : styles.statusDotClosed,
                           ]}
                         />
 
-                        <Text style={styles.statusText}>
+                        <Text style={[styles.statusText, projectStatus === ApiProjectStatus.Completed && styles.statusTextCompleted]}>
                           {projectStatus !== undefined ? API_PROJECT_STATUS_LABEL[projectStatus] ?? "Chưa cập nhật" : "Chưa cập nhật"}
                         </Text>
                       </View>
@@ -1202,6 +1202,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F0C2C8",
   },
+
+  statusCompleted: {
+    backgroundColor: colors.projectCompletedBackground,
+    borderWidth: 1,
+    borderColor: colors.projectCompletedBorder,
+  },
+  statusDotCompleted: { backgroundColor: colors.projectCompleted },
+  statusTextCompleted: { color: colors.projectCompleted },
 
   statusDot: {
     width: 6,

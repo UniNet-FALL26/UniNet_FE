@@ -1,0 +1,12 @@
+import { ApiProjectStatus, ApiRecruitmentStatus, ProjectVisibility, type ProjectDetail, type ProjectListResponse } from '@/types/project';
+
+// Toggle off when Completed projects are ready on the backend.
+export const USE_COMPLETED_PROJECT_MOCK = true;
+export const completedProjects: ProjectDetail[] = [
+  { id: 'mock-completed-uninet', title: 'UniNet — Kết nối cộng đồng sinh viên', projectField: 'Công nghệ thông tin', description: 'Nền tảng giúp sinh viên tìm đồng đội, cộng tác trong dự án và kết nối cơ hội nghề nghiệp. Nhóm đã hoàn thành ứng dụng Android, tích hợp API và nghiệm thu các chức năng chính.', memberTarget: 4, currentMemberCount: 4, recruitmentDeadline: '2026-08-01T17:00:00Z', visibility: ProjectVisibility.Public, recruitmentStatus: ApiRecruitmentStatus.Closed, status: ApiProjectStatus.Completed, createdAt: '2026-06-01T02:00:00Z', updatedAt: '2026-10-15T09:00:00Z', creator: { id: 'mock-student-01', fullName: 'Nguyễn Minh Anh', nickname: 'minhanh', avatarUrl: null }, expectedOutput: 'Ứng dụng Android, mã nguồn, tài liệu hướng dẫn sử dụng và video demo các chức năng đã hoàn thành.', roleRequirements: [{ id: 'mock-role-01', roleName: 'Frontend Developer', quantity: 2, requirements: 'React Native, TypeScript' }, { id: 'mock-role-02', roleName: 'Backend Developer', quantity: 2, requirements: '.NET, SQL Server' }], skills: [{ skillId: 'mock-skill-react', skillName: 'React Native', category: 'Mobile', iconUrl: null, minLevel: 2 }, { skillId: 'mock-skill-ts', skillName: 'TypeScript', category: 'Programming', iconUrl: null, minLevel: 2 }], isCreator: true, isMember: true, invitations: [], joinRequests: [], members: ['Nguyễn Minh Anh', 'Trần Hoàng Nam', 'Lê Thu Hà', 'Phạm Gia Bảo'].map((fullName, index) => ({ userId: `mock-student-0${index + 1}`, fullName, nickname: null, avatarUrl: null, role: index === 0 ? 'Leader' : index === 1 ? 'Frontend Developer' : 'Backend Developer', status: 1, joinedAt: '2026-06-02T02:00:00Z' })) },
+];
+
+export function completedProjectPage(page: number, pageSize: number): ProjectListResponse {
+  const size = Math.max(1, pageSize);
+  return { page, pageSize: size, totalItems: completedProjects.length, totalPages: Math.ceil(completedProjects.length / size), projects: completedProjects.slice((page - 1) * size, page * size).map(({ updatedAt, expectedOutput, roleRequirements, isCreator, isMember, invitations, joinRequests, members, ...item }) => item) };
+}

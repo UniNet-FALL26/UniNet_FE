@@ -12,6 +12,7 @@ import {
   type ProjectRecommendation,
 } from "@/types/project";
 import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
+import { ProjectVerificationFlow } from "@/components/projects/ProjectVerificationFlow";
 import { RecommendedMemberCard } from "@/components/projects/RecommendedMemberCard";
 import { useAuthStore } from "@/store/auth.store";
 import { router, useLocalSearchParams } from "expo-router";
@@ -220,13 +221,13 @@ export function ProjectDetailScreen() {
           <View
             style={[
               styles.badge,
-              isRecruiting ? styles.badgeSuccess : styles.badgeMuted,
+              project.status === ApiProjectStatus.Completed ? styles.badgeCompleted : isRecruiting ? styles.badgeSuccess : styles.badgeMuted,
             ]}
           >
             <Text
               style={[
                 styles.badgeText,
-                isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
+                project.status === ApiProjectStatus.Completed ? styles.badgeTextCompleted : isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
               ]}
             >
               ●{" "}
@@ -396,7 +397,7 @@ export function ProjectDetailScreen() {
 
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Trạng thái dự án:</Text>
-          <Text style={styles.detailValue}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật"}</Text>
+          <Text style={[styles.detailValue, project.status === ApiProjectStatus.Completed && styles.badgeTextCompleted]}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật"}</Text>
         </View>
 
         <View style={styles.detailRow}>
@@ -556,7 +557,7 @@ export function ProjectDetailScreen() {
       {isCreator && project.status === ApiProjectStatus.Completed && <View style={styles.actionCard}>
         <Text style={styles.actionCardTitle}>Xác thực dự án hoàn thành</Text>
         <Text style={styles.descriptionText}>Gửi dự án để xác thực kết quả thực hiện.</Text>
-        <Button title="Gửi xác thực" onPress={() => askConfirmation("Gửi xác thực", "Bạn muốn gửi dự án để xác thực? Chức năng hiện chưa kết nối API.", async () => {}, true)} />
+        <ProjectVerificationFlow key={`${account?.id}:${project.id}`} projectId={project.id} projectTitle={project.title} accountId={account?.id} />
       </View>}
 
       {/* RECOMMENDATIONS (CREATOR VIEW) */}
@@ -743,6 +744,12 @@ const styles = StyleSheet.create({
   badgeSuccess: {
     backgroundColor: "#E8F8F0",
   },
+  badgeCompleted: {
+    backgroundColor: colors.projectCompletedBackground,
+    borderWidth: 1,
+    borderColor: colors.projectCompletedBorder,
+  },
+  badgeTextCompleted: { color: colors.projectCompleted },
   badgeTextSuccess: {
     color: "#0F9D58",
     fontSize: 11,
