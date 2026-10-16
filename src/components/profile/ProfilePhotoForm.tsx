@@ -7,6 +7,7 @@ import { colors } from '@/constants/colors';
 import { backgroundRemovalService, type BackgroundRemovalPreview } from '@/services/background-removal.service';
 import { pickProfileImage, uploadProfileImage } from '@/utils/profile-image-picker';
 import { splitProfileImageUrl, withProfileImageCrop } from '@/utils/profile-image-crop';
+import { PortraitProcessingPreview } from './PortraitProcessingPreview';
 
 type CropTarget = 'avatarUrl' | 'coverUrl';
 type Props = {
@@ -180,16 +181,11 @@ export function ProfilePhotoForm({ initialAsset, onConfirm, onClose, portrait = 
         <View style={s.zoomRow}><Text style={s.zoomLabel}>−</Text><View style={s.zoomTrack} {...zoomDrag.panHandlers} accessibilityRole="adjustable" accessibilityLabel="Mức phóng to ảnh" accessibilityValue={{ min: 100, max: 300, now: Math.round(cropZoom * 100) }}><View style={[s.zoomFill, { width: `${((cropZoom - 1) / 2) * 100}%` }]} /><View style={[s.zoomThumb, { left: `${((cropZoom - 1) / 2) * 100}%` }]} /></View><Text style={s.zoomLabel}>+</Text><Text style={s.zoomValue}>{Math.round(cropZoom * 100)}%</Text></View>
         <Button title={editingOriginal ? 'Áp dụng khung' : 'Dùng khung ảnh này'} onPress={applyCrop} style={s.smallButton} />
         {(cropX !== 0 || cropY !== 0 || cropZoom !== 1) && <Button title="Khôi phục ảnh gốc" variant="outline" style={s.smallButton} onPress={() => { setCropX(0); setCropY(0); setCropZoom(1); if (editingOriginal && asset) setUrl(splitProfileImageUrl(asset.uri).source); }} />}
-      </> : asset ? <View style={s.previews}>
+      </> : asset && portrait ? <PortraitProcessingPreview key={`${asset.uri}-${attempt}`} source={asset.uri} preview={preview?.previewUrl} processing={processing} uploading={uploading} /> : asset ? <View style={s.previews}>
         <View style={s.column}><Text style={s.hint}>Ảnh gốc</Text><Image source={{ uri: asset.uri }} contentFit="contain" style={s.preview} accessibilityLabel="Ảnh đã chọn từ máy" /></View>
-        {portrait && preview && <View style={s.column}><Text style={s.hint}>Ảnh đã tách nền</Text><View style={s.checker}>
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>{Array.from({ length: 10 }, (_, row) => <View key={row} style={s.checkerRow}>{Array.from({ length: 10 }, (_, col) => <View key={col} style={[s.tile, { backgroundColor: (row + col) % 2 ? '#DDE1E6' : '#FFFFFF' }]} />)}</View>)}</View>
-          <Image source={{ uri: preview.previewUrl }} contentFit="contain" style={s.preview} accessibilityLabel="Ảnh chân dung tách nền trong suốt" />
-        </View></View>}
       </View> : <Text>Ảnh sẽ được bỏ khỏi hồ sơ.</Text>}
       {!!asset && <Text style={s.hint}>Chọn ảnh JPG, PNG hoặc WebP, tối đa 5 MB.</Text>}
-      {processing && <Text accessibilityLiveRegion="polite" style={s.hint}>{portrait ? 'Đang tách nền ảnh chân dung…' : 'Đang tải ảnh lên…'}</Text>}
-      {uploading && <Text accessibilityLiveRegion="polite" style={s.hint}>Đang lưu ảnh lên Cloudinary…</Text>}
+      {processing && !portrait && <Text accessibilityLiveRegion="polite" style={s.hint}>Đang tải ảnh lên…</Text>}
       {portrait && preview && !uploading && <Text style={s.hint}>Xác nhận để dùng ảnh này. Sau đó bấm Lưu hồ sơ để lưu thay đổi.</Text>}
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
       <View style={s.photoActions}>

@@ -1,0 +1,9 @@
+# Portrait processing feedback
+
+- `PortraitProcessingPreview.tsx` reserves original/result panels, shows a blue scan and indeterminate status while processing, and transparent result preview on completion. No invented percentage or provider stage.
+- After 20 seconds, waiting copy explains that processing may take longer. Reduced motion disables moving scan/track on web and native; timers and animation stop on transitions/unmount. Retry remounts feedback for a fresh wait.
+- `ProfilePhotoForm` retains its process/preview/confirm/draft/save sequence, retry behavior and abort/session cleanup; crop and ordinary image upload remain intact.
+- Verification: TypeScript, 16 focused FE tests and 16 Gemini BE tests pass. Browser regression covers animated scan, 320/768/1440px layouts, long wait, provider failure/retry, success/confirm without profile write, reduced motion and cancellation. Screenshots: ignored `dist/portrait-processing/`.
+- Live provider probe on 2026-10-16: one request with the repository sample portrait, current BE request schema and `thinking_level=low` returned HTTP 503: configured `gemini-3.8-flash` is experiencing high demand. No user portrait or profile was sent/modified. Successful live segmentation/Cloudinary confirmation remains unverified.
+- Subsequent BE commits use `thinking_level=low`, add local U2NETP fallback and cap display previews at 1024px while retaining the full image for confirmation. See BE `docs/handoffs/portrait-local-fallback.md` and `portrait-large-preview.md`. The deployed Render version was not verified; FE-only changes cannot update the hosted processor.
+- Browser regression also passed with a real local cutout and a user-selected JPEG/large preview, through isolated HTTP fixtures. Optional `PORTRAIT_TEST_SOURCE` and `PORTRAIT_TEST_PREVIEW` select local diagnostic files; personal photos and generated outputs remain outside Git.
