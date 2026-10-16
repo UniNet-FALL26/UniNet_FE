@@ -426,7 +426,7 @@ export function ProjectExplorerScreen() {
               const projectStatus = project.status ?? statusTab ?? (activeTab === "Đang tuyển" ? ApiProjectStatus.Active : undefined);
               const isOpen = projectStatus === ApiProjectStatus.Active;
               // The API count excludes the project creator.
-              const memberCount = project.currentMemberCount + 1;
+              const memberCount = project.currentMemberCount;
 
               const progress =
                 project.memberTarget > 0
@@ -490,19 +490,19 @@ export function ProjectExplorerScreen() {
                       <View
                         style={[
                           styles.statusBadge,
-                          isOpen ? styles.statusOpen : styles.statusClosed,
+                          projectStatus === ApiProjectStatus.Completed ? styles.statusCompleted : isOpen ? styles.statusOpen : styles.statusClosed,
                         ]}
                       >
                         <View
                           style={[
                             styles.statusDot,
-                            isOpen
+                            projectStatus === ApiProjectStatus.Completed ? styles.statusDotCompleted : isOpen
                               ? styles.statusDotOpen
                               : styles.statusDotClosed,
                           ]}
                         />
 
-                        <Text style={styles.statusText}>
+                        <Text style={[styles.statusText, projectStatus === ApiProjectStatus.Completed && styles.statusTextCompleted]}>
                           {projectStatus !== undefined ? API_PROJECT_STATUS_LABEL[projectStatus] ?? "Chưa cập nhật" : "Chưa cập nhật"}
                         </Text>
                       </View>
@@ -1202,6 +1202,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F0C2C8",
   },
+
+  statusCompleted: {
+    backgroundColor: colors.projectCompletedBackground,
+    borderWidth: 1,
+    borderColor: colors.projectCompletedBorder,
+  },
+  statusDotCompleted: { backgroundColor: colors.projectCompleted },
+  statusTextCompleted: { color: colors.projectCompleted },
 
   statusDot: {
     width: 6,
