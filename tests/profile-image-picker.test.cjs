@@ -9,6 +9,10 @@ function setup(os, picker, request) {
   const load = name => {
     if (name === 'react-native') return { Platform: { OS: os } };
     if (name === 'expo-image-picker') return picker;
+    if (name === 'expo-file-system') return { File: class {
+      constructor(uri) { this.uri = uri; this.size = 100; this.type = uri.endsWith('.webp') ? 'image/webp' : uri.endsWith('.png') ? 'image/png' : 'image/jpeg'; }
+      async bytes() { return Uint8Array.from([7, 8, 9]); }
+    } };
     if (name === '@/services/api') return { apiRequest: request };
     const module = {};
     vm.runInNewContext(ts.transpileModule(fs.readFileSync(`src/${name.replace('@/', '')}.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
@@ -51,4 +55,18 @@ test('native multipart retains the local URI and rejects temporary response URLs
     return { url: 'blob:temporary' };
   });
   await assert.rejects(env.uploadProfileImage({ uri: 'file:///device/photo.jpg', mimeType: 'image/jpeg', fileSize: 100 }, new AbortController().signal), /thử lại/);
+});
+test('native image multipart is readable by the installed Expo fetch converter', async () => {
+  const converter = {};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('node_modules/expo/src/winter/fetch/convertFormData.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+    exports: converter, Blob, TextEncoder, Uint8Array, require: () => ({ blobToArrayBufferAsync: blob => blob.arrayBuffer() }),
+  });
+  const env = setup('android', {}, async (_, options) => {
+    const result = await converter.convertFormDataAsync({ entries: () => options.body.entries }, 'test-boundary');
+    const encoded = new TextDecoder().decode(result.body);
+    assert.match(encoded, /name="file"/); assert.match(encoded, /image\/png/);
+    assert.ok(result.body.includes(7));
+    return { url: 'https://api.example.test/photo.png' };
+  });
+  await env.uploadProfileImage({ uri: 'file:///device/photo.png', mimeType: 'image/png', fileSize: 100 }, new AbortController().signal);
 });

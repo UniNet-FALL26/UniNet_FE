@@ -12,7 +12,12 @@ function setup(os, request, picker = {}, fetchFile = fetch) {
   function load(name) {
     if (name === 'react-native') return { Platform: { OS: os } };
     if (name === 'expo-image-picker') return picker;
+    if (name === 'expo-file-system') return { File: class {
+      constructor(uri) { this.uri = uri; this.size = 100; this.type = uri.endsWith('.webp') ? 'image/webp' : uri.endsWith('.png') ? 'image/png' : 'image/jpeg'; }
+      async bytes() { return Uint8Array.from([7, 8, 9]); }
+    } };
     if (name === './api' || name === '@/services/api') return { apiRequest: request };
+    if (name.startsWith('./')) name = `@/services/${name.slice(2)}`;
     if (cache.has(name)) return cache.get(name);
     const exports = {}; cache.set(name, exports);
     const source = fs.readFileSync(`src/${name.replace('@/', '')}.ts`, 'utf8');

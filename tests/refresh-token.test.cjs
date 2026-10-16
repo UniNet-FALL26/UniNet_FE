@@ -4,6 +4,54 @@ function setup(fetch){
  const cache=new Map();function load(name){if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController,FormData});return exports;}
  return {storage:load('@/utils/storage').tokenStorage,api:load('@/services/api'),auth:load('@/services/auth.service').authService,...load('@/store/auth.store')};
 }
+test('logout clears the entire current session and auth state without network access', async () => {
+ const env=setup(async()=>{throw new Error('logout must work offline');});
+ await env.authStore.setAuth(login());
+ await env.auth.logout();
+ assert.equal(env.storage.getSession(),null);
+ assert.equal(await env.storage.get(),null);
+ assert.deepEqual(JSON.parse(JSON.stringify(env.useAuthStore())),{account:null,accessToken:null,isAuthenticated:false,isLoading:false});
+ await env.auth.logout();
+ assert.equal(env.storage.getSession(),null);
+});
+test('successful responses from a logged-out or replaced session cannot expose old user data', async () => {
+ for(const action of ['logout','login']) {
+  let complete; const pending=new Promise(resolve=>complete=resolve);
+  const env=setup(async()=>pending); await env.authStore.setAuth(login());
+  const request=env.api.apiRequest('/profile/portfolio/me');
+  const rejected=assert.rejects(request,error=>error.status===401);
+  if(action==='logout') await env.authStore.clearAuth(); else await env.authStore.setAuth(login('other'));
+  complete(Response.json({privateData:'old-user'})); await rejected;
+  assert.equal(await env.storage.get(),action==='logout'?null:'other-access');
+ }
+});
+test('logout during response body parsing also discards old user data', async () => {
+ let complete, started;
+ const parsing=new Promise(resolve=>started=resolve);
+ const body=new Promise(resolve=>complete=resolve);
+ const env=setup(async()=>({ok:true,status:200,json:()=>{started();return body;}}));
+ await env.authStore.setAuth(login());
+ const request=env.api.apiRequest('/profile/portfolio/me');
+ const rejected=assert.rejects(request,error=>error.status===401);
+ await parsing; await env.auth.logout(); complete({privateData:'old-user'});
+ await rejected; assert.equal(env.storage.getSession(),null);
+});
+test('logout-all revokes server sessions then clears local auth; server failure preserves it', async () => {
+ for(const status of [204,503]) {
+  const calls=[];const env=setup(async(url,options)=>{calls.push({url,options});return new Response(null,{status});});
+  await env.authStore.setAuth(login());
+  if(status===204) {await env.auth.logoutAll();assert.equal(env.storage.getSession(),null);}
+  else {await assert.rejects(env.auth.logoutAll());assert.equal(await env.storage.get(),'old-access');}
+  assert.equal(calls[0].url,'https://api.example.test/api/auth/logout-all');
+  assert.equal(calls[0].options.method,'POST');
+ }
+});
+test('late logout-all cannot clear a newly signed-in account', async () => {
+ let complete;const pending=new Promise(resolve=>complete=resolve);const env=setup(async()=>pending);
+ await env.authStore.setAuth(login());const result=env.auth.logoutAll();const rejected=assert.rejects(result);
+ await env.authStore.setAuth(login('other'));complete(new Response(null,{status:204}));
+ await rejected;assert.equal(await env.storage.get(),'other-access');
+});
 test('expired access refreshes both tokens and retries same body/headers once; auth state stays synchronized',async()=>{
  const calls=[];const env=setup(async(url,options)=>{calls.push({url,options});if(url.endsWith('/auth/refresh'))return Response.json(login('new'));return new Headers(options.headers).get('Authorization')==='Bearer new-access'?Response.json({ok:true}):new Response(null,{status:401});});
  await env.authStore.setAuth(login());const result=await env.api.apiRequest('/profile/portfolio/me',{method:'PUT',body:'{"title":"keep"}',headers:new Headers({'X-Test':'keep'})});

@@ -6,7 +6,7 @@ import type { LoginRequest, RegisterPartnerRequest, RegisterStudentRequest } fro
 export function useAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function run<T>(operation: () => Promise<T>, onSuccess: (result: T) => Promise<void>) {
+  async function run<T>(operation: () => Promise<T>, onSuccess: (result: T) => Promise<void> = async () => {}) {
     if (loading) return false;
     setLoading(true); setError(null);
     try { await onSuccess(await operation()); return true; }
@@ -18,7 +18,8 @@ export function useAuth() {
     login: (request: LoginRequest) => run(() => authService.login(request), authStore.setAuth),
     register: (request: RegisterStudentRequest) => run(() => authService.registerStudent(request), authStore.setAuth),
     registerPartner: (request: RegisterPartnerRequest) => run(() => authService.registerPartner(request), authStore.setAuth),
-    logout: () => run(() => authService.logout(), () => authStore.clearAuth()),
+    logout: () => run(() => authService.logout()),
+    logoutAll: () => run(() => authService.logoutAll()),
     google: () => run(() => Promise.resolve(authService.loginWithGoogle()), authStore.setAuth),
   };
 }

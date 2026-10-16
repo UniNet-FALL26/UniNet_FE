@@ -5,12 +5,12 @@ import type { ImagePickerAsset } from 'expo-image-picker';
 import { Button } from '@/components/ui/Button';
 import { colors } from '@/constants/colors';
 import { pickProfileImage, uploadProfileImage } from '@/utils/profile-image-picker';
-import { portraitService, type PortraitPreview } from '@/services/portrait.service';
+import { backgroundRemovalService, type BackgroundRemovalPreview } from '@/services/background-removal.service';
 
 export function ProfilePhotoForm({ initialAsset, portrait = false, onConfirm, onClose }: { initialAsset: ImagePickerAsset; portrait?: boolean; onConfirm: (url: string) => void; onClose: () => void }) {
   const [asset, setAsset] = useState<ImagePickerAsset | null>(initialAsset);
   const [url, setUrl] = useState<string | null>(null);
-  const [preview, setPreview] = useState<PortraitPreview | null>(null);
+  const [preview, setPreview] = useState<BackgroundRemovalPreview | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [choosing, setChoosing] = useState(false);
@@ -27,8 +27,8 @@ export function ProfilePhotoForm({ initialAsset, portrait = false, onConfirm, on
     if (!asset) return;
     const controller = new AbortController();
     if (portrait) {
-      portraitService.process(asset, controller.signal).then(next => {
-        if (controller.signal.aborted) { void portraitService.release(next.sessionId).catch(() => {}); return; }
+      backgroundRemovalService.process(asset, controller.signal).then(next => {
+        if (controller.signal.aborted) { void backgroundRemovalService.release(next.sessionId).catch(() => {}); return; }
         activeSession.current = next.sessionId; setPreview(next);
       }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tách được nền. Vui lòng thử lại.'); });
     } else {
@@ -37,7 +37,7 @@ export function ProfilePhotoForm({ initialAsset, portrait = false, onConfirm, on
     }
     return () => {
       controller.abort();
-      if (activeSession.current) { void portraitService.release(activeSession.current).catch(() => {}); activeSession.current = null; }
+      if (activeSession.current) { void backgroundRemovalService.release(activeSession.current).catch(() => {}); activeSession.current = null; }
     };
   }, [asset, attempt, portrait]);
   const choose = async () => {
@@ -54,7 +54,7 @@ export function ProfilePhotoForm({ initialAsset, portrait = false, onConfirm, on
     const controller = new AbortController(); upload.current = controller;
     setUploading(true); setError('');
     try {
-      const uploadedUrl = await portraitService.confirm(preview.sessionId, controller.signal);
+      const uploadedUrl = await backgroundRemovalService.confirm(preview.sessionId, controller.signal);
       if (!controller.signal.aborted) { activeSession.current = null; onConfirm(uploadedUrl); }
     } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Không tải được ảnh lên Cloudinary. Vui lòng thử lại.'); }
     finally { upload.current = null; if (mounted.current) setUploading(false); }

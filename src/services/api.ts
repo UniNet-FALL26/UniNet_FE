@@ -61,6 +61,10 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   if (!headers.has('Content-Type') && !(typeof FormData !== 'undefined' && options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (original?.accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${original.accessToken}`);
   let response = await fetchResponse(path, { ...options, headers });
+  const assertCurrentSession = () => {
+    if (original && tokenStorage.getSession()?.generation !== original.generation) throw changed();
+  };
+  assertCurrentSession();
   // Never refresh failed authentication, public requests or a caller-supplied unrelated bearer.
   const authPath = /^\/auth\/(?:login|register|google|refresh)(?:\/|$)/.test(path.split('?')[0]);
   if (response.status === 401 && !authPath && original && headers.get('Authorization') === `Bearer ${original.accessToken}`) {
@@ -72,7 +76,10 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     response = await fetchResponse(path, { ...options, headers });
     if (response.status === 401) { await tokenStorage.clear(current); throw expired(); }
   }
+  assertCurrentSession();
   if (!response.ok) throw await responseError(response, path, options.method);
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  const result = await response.json() as T;
+  assertCurrentSession();
+  return result;
 }

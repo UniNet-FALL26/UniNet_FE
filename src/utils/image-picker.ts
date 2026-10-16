@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { File } from 'expo-file-system';
 
 export async function pickImage(): Promise<ImagePicker.ImagePickerAsset | null> {
   if (Platform.OS !== 'web') {
@@ -19,7 +20,9 @@ export async function imageBody(asset: ImagePicker.ImagePickerAsset, signal?: Ab
   } else {
     const type = asset.mimeType || 'image/jpeg';
     validateImage(asset.fileSize, type);
-    body.append('file', { uri: asset.uri, name: asset.fileName || 'image.jpg', type } as unknown as Blob);
+    const file = new File(asset.uri);
+    validateImage(file.size, file.type || type);
+    body.append('file', file);
   }
   return body;
 }

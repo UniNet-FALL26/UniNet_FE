@@ -122,7 +122,7 @@ function visitorResponse() {
       await page.screenshot({ path: `dist/portfolio-display-verification/editor-${width}.png` });
     }
     await signIn(); await page.getByRole('tab', { name: 'Cá nhân', exact: true }).click(); await button('Mở cài đặt').click();
-    const toggle = page.getByRole('switch', { name: 'Hiển thị hồ sơ portfolio', exact: true }); await toggle.waitFor();
+    const toggle = page.getByRole('switch', { name: 'Hiển thị mẫu hồ sơ', exact: true }); await toggle.waitFor();
     failDisplay = true; await toggle.click(); await page.getByText('Lỗi cài đặt kiểm thử', { exact: true }).waitFor();
     assert.equal(saved.portfolio.appearance.profile.showPortfolio, true);
     failDisplay = false; await button('Thử lưu lại').click(); await page.getByText('Đã cập nhật cách hiển thị hồ sơ.', { exact: true }).waitFor();
