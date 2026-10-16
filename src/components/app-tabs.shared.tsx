@@ -19,11 +19,7 @@ const tabs: TabItem[] = [
 const shortcuts: Shortcut[] = [
   { label: 'Không gian\nlàm việc', href: '/(tabs)/workspace', icon: { ios: 'briefcase.fill', android: 'work', web: 'work' }, tint: '#1476DA', background: '#E8F3FF' },
   { label: 'Cơ hội', href: '/(tabs)/opportunities', icon: { ios: 'briefcase', android: 'business_center', web: 'business_center' }, tint: '#E34B66', background: '#FFF0F3' },
-  { label: 'Học tập', href: '/(tabs)/learning', icon: { ios: 'graduationcap.fill', android: 'school', web: 'school' }, tint: '#8650DD', background: '#F3EEFF' },
-  { label: 'Sự kiện', href: '/(tabs)/events', icon: { ios: 'calendar', android: 'event', web: 'event' }, tint: '#ED7B22', background: '#FFF2E9' },
   { label: 'Nhóm', href: '/(tabs)/groups', icon: { ios: 'person.3.fill', android: 'groups', web: 'groups' }, tint: '#15A882', background: '#E8FAF4' },
-  { label: 'Tài liệu', href: '/(tabs)/documents', icon: { ios: 'folder.fill', android: 'folder', web: 'folder' }, tint: '#159DD0', background: '#E8F7FD' },
-  { label: 'Kỹ năng', href: '/(tabs)/skills', icon: { ios: 'chart.bar.fill', android: 'bar_chart', web: 'bar_chart' }, tint: '#7654D5', background: '#F2EEFF' },
   { label: 'Khác', href: '/(tabs)/more', icon: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }, tint: '#697891', background: '#F2F4F8' },
 ];
 
