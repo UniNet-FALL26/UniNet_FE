@@ -7,6 +7,7 @@ import { projectFields } from "@/constants/project-fields";
 import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { Image as DecorativeImage } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Image,
@@ -16,6 +17,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -31,6 +33,7 @@ type Tab = (typeof tabs)[number];
 
 export function ProjectExplorerScreen() {
   const insets = useSafeAreaInsets();
+  const compactHero = useWindowDimensions().width < 768;
   const [searchFocused, setSearchFocused] = useState(false);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,21 +236,22 @@ export function ProjectExplorerScreen() {
             HEADER
         ========================= */}
 
-        <View style={styles.header}>
-          <View pointerEvents="none" style={styles.heroOrb} />
-          <View pointerEvents="none" style={styles.heroOrbSmall} />
+        <View style={[styles.header, compactHero && styles.headerCompact]}>
+          <View pointerEvents="none" style={StyleSheet.absoluteFill} accessible={false} importantForAccessibility="no-hide-descendants">
+            <DecorativeImage source={require("../../../assets/images/project-explorer-hero.svg")} contentFit="cover" style={StyleSheet.absoluteFill} />
+            <DecorativeImage source={require("../../../assets/images/project-explorer-team.svg")} contentFit="contain" style={[styles.heroArtwork, compactHero && styles.heroArtworkCompact]} />
+          </View>
           <View style={styles.headerText}>
             <View style={styles.eyebrowBadge}>
-              <View style={styles.eyebrowDot} />
-              <Text style={styles.eyebrow}>KẾT NỐI ĐỂ CÙNG TẠO NÊN</Text>
+              <Text style={styles.eyebrow}>KẾT NỐI ĐỂ CÙNG TẠO NÊN GIÁ TRỊ</Text>
             </View>
-            <Text style={styles.title}>Khám phá các dự án</Text>
+            <Text style={[styles.title, compactHero && styles.titleCompact]}>Khám phá các dự án</Text>
             <Text style={styles.heroDescription}>Ý tưởng lớn bắt đầu từ một đội ngũ phù hợp.</Text>
           </View>
           <View style={styles.heroFooter}>
             <Text style={styles.subtitle}>
               {filteredProjects.length > 0
-                ? `${filteredProjects.length} dự án trên trang / ${totalItems} kết quả`
+                ? `${filteredProjects.length} dự án tiềm năng / ${totalItems} kết quả`
                 : "Tìm đồng đội phù hợp cho ý tưởng của bạn"}
             </Text>
             <Button
@@ -255,6 +259,7 @@ export function ProjectExplorerScreen() {
               variant="primary"
               onPress={() => router.navigate("/group/create" as never)}
               style={styles.ctaButton}
+              textStyle={styles.ctaButtonText}
             />
           </View>
         </View>
@@ -266,7 +271,7 @@ export function ProjectExplorerScreen() {
         {!personalTab && <View style={styles.searchSection}>
           <View style={styles.searchRow}>
             <View style={[styles.searchContainer, (searchFocused || searchQuery.length > 0) && styles.searchContainerFocused]}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <View accessible={false} style={styles.searchLens}><View style={styles.searchLensHandle} /></View>
 
               <TextInput
                 accessibilityLabel="Tìm kiếm dự án"
@@ -300,14 +305,12 @@ export function ProjectExplorerScreen() {
                 pressed && styles.filterButtonPressed,
               ]}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  activeFilterCount > 0 && styles.filterButtonTextActive,
-                ]}
-              >
-                ☷
-              </Text>
+              <View accessible={false} style={styles.filterIcon}>
+                {[0, 1, 2].map((row) => <View key={row} style={styles.filterIconRow}>
+                  <View style={[styles.filterIconDot, activeFilterCount > 0 && styles.filterIconActive]} />
+                  <View style={[styles.filterIconLine, activeFilterCount > 0 && styles.filterIconActive]} />
+                </View>)}
+              </View>
 
               <Text
                 style={[
@@ -865,7 +868,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 24,
     width: "100%",
-    maxWidth: 1080,
+    maxWidth: 1000,
     alignSelf: "center",
   },
 
@@ -875,19 +878,24 @@ const styles = StyleSheet.create({
 
   header: {
     marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
+    marginBottom: 12,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+    minHeight: 156,
     backgroundColor: "#102D62",
-    borderRadius: 20,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#AEC9F4",
     overflow: "hidden",
-    gap: 12,
+    gap: 0,
   },
 
-  heroOrb: { position: "absolute", width: 230, height: 230, borderRadius: 115, right: -95, top: -95, backgroundColor: "#204780", borderWidth: 30, borderColor: "#1A3C70" },
-  heroOrbSmall: { position: "absolute", width: 90, height: 90, borderRadius: 45, right: 35, bottom: -60, backgroundColor: "#315A96" },
-  eyebrowBadge: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 8 },
-  eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#6DE2CD" },
-  heroDescription: { color: "#CCDCF5", fontSize: 14, lineHeight: 22, marginTop: 8, maxWidth: 560 },
+  headerCompact: { padding: 18, minHeight: 200, gap: 12 },
+  heroArtwork: { position: "absolute", width: 340, height: 176, right: 100, top: -4 },
+  heroArtworkCompact: { right: -100, opacity: 0.22 },
+  eyebrowBadge: { marginBottom: 10 },
+  heroDescription: { color: "#CCDCF5", fontSize: 13, lineHeight: 20, marginTop: 8 },
   heroFooter: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14 },
   resultsHeader: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   resultsHeading: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
@@ -901,7 +909,7 @@ const styles = StyleSheet.create({
   },
 
   eyebrow: {
-    color: "#A9DFED",
+    color: "#6DCCFF",
     fontSize: 10,
     letterSpacing: 1.2,
     fontWeight: "700",
@@ -909,11 +917,11 @@ const styles = StyleSheet.create({
 
   title: {
     color: "#FFFFFF",
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: "800",
-    lineHeight: 38,
-    maxWidth: 360,
+    lineHeight: 42,
   },
+  titleCompact: { fontSize: 27, lineHeight: 34 },
 
   subtitle: {
     marginTop: 3,
@@ -924,12 +932,13 @@ const styles = StyleSheet.create({
 
   ctaButton: {
     backgroundColor: "#287AF0",
-    minWidth: 104,
-    minHeight: 46,
+    minWidth: 96,
+    minHeight: 38,
     paddingHorizontal: 12,
     flexShrink: 0,
-    borderRadius: 14,
+    borderRadius: 8,
   },
+  ctaButtonText: { fontSize: 12, fontWeight: "700" },
 
   // =========================
   // SEARCH
@@ -944,21 +953,21 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     width: "100%",
   },
 
   searchContainer: {
     flex: 1,
     minWidth: 0,
-    height: 52,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: "#D7E6FF",
+    borderRadius: 13,
+    paddingHorizontal: 16,
   },
 
   searchContainerFocused: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
@@ -970,12 +979,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginRight: 8,
   },
+  searchLens: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: colors.primary, marginRight: 14 },
+  searchLensHandle: { position: "absolute", width: 6, height: 2, borderRadius: 1, backgroundColor: colors.primary, right: -5, bottom: -2, transform: [{ rotate: "45deg" }] },
+  filterIcon: { gap: 2 },
+  filterIconRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+  filterIconDot: { width: 3, height: 3, borderRadius: 1, backgroundColor: colors.textSecondary },
+  filterIconLine: { width: 10, height: 2, borderRadius: 1, backgroundColor: colors.textSecondary },
+  filterIconActive: { backgroundColor: colors.primary },
 
   searchInput: {
     flex: 1,
     minWidth: 0,
     color: colors.textPrimary,
-    fontSize: 13,
+    fontSize: 12,
     paddingVertical: 10,
   },
 
@@ -993,8 +1009,8 @@ const styles = StyleSheet.create({
   },
 
   filterButton: {
-    minWidth: 80,
-    height: 52,
+    minWidth: 72,
+    height: 40,
     paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
@@ -1004,17 +1020,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
+    boxShadow: "0 2px 6px #16366B12",
   },
 
   filterButtonActive: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
-  },
-
-  filterButtonText: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    lineHeight: 20,
   },
 
   filterButtonLabel: {

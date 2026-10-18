@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModulePage } from '@/components/ui/ModulePage';
 import { Button } from '@/components/ui/Button';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { StudentVerificationModal } from '@/components/settings/StudentVerificationModal';
+import { useStudentVerification } from '@/hooks/useStudentVerification';
 import { StudentProfileStarter } from '@/components/profile/StudentProfileStarter';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
@@ -36,6 +38,9 @@ export default function ProfileScreen() {
   const [avatarPhoto, setAvatarPhoto] = useState<{ accountId: string; asset: ImagePickerAsset } | null>(null);
   const [reminderNow, setReminderNow] = useState(Date.now);
   const [dismissedReminderAccount, setDismissedReminderAccount] = useState<string | null>(null);
+  const [verificationAccountId, setVerificationAccountId] = useState<string | null>(null);
+  const showVerification = student && isAuthenticated && !!account && verificationAccountId === account.id;
+  const verification = useStudentVerification(showVerification ? account.id : undefined);
   const photoController = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
   const desktop = Platform.OS === 'web' && width >= 1200;
@@ -96,12 +101,12 @@ export default function ProfileScreen() {
   const theme = getProfileTheme(template.id, data?.portfolio.appearance.profile.theme);
   const reminder = verificationReminder(account?.createdAt, data?.profile.isVerified ?? account?.profile?.isVerified ?? false, reminderNow);
   const showReminder = isAuthenticated && !!reminder && dismissedReminderAccount !== account?.id;
-  const compactHeader = profileWidth < 1100 || !student;
-  const header = <View style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }, showReminder && compactHeader && styles.stackedHeader]}>
-    <View style={[styles.reminderSlot, showReminder && compactHeader && styles.fullReminder]}>{showReminder && <VerificationBanner compact={compactHeader} onVerify={() => router.push(student ? { pathname: '/settings', params: { account: '1' } } : '/settings')} onDismiss={() => setDismissedReminderAccount(account?.id ?? null)} />}</View>
-    <View style={styles.headerActions}>
-      {student && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.settings, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
-      {(!desktop || !student) && <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
+  const compactHeader = profileWidth < 600 || !student;
+  const header = <View style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }]}>
+    <View style={styles.reminderSlot}>{showReminder && <VerificationBanner compact={compactHeader} onVerify={() => student && account ? setVerificationAccountId(account.id) : router.push('/settings')} onDismiss={() => setDismissedReminderAccount(account?.id ?? null)} />}</View>
+    <View style={[styles.headerActions, compactHeader && styles.compactHeaderActions]}>
+      {student && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
+      {(!desktop || !student) && <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
     </View>
   </View>;
   if (!student) return <ModulePage title="Cá nhân" description="Thông tin và hoạt động của bạn trên UniNet." sections={['Hồ sơ của tôi', 'Bài viết đã lưu', 'Cài đặt']} header={header} />;
@@ -122,6 +127,7 @@ export default function ProfileScreen() {
     {desktop && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded onPortfolioChanged={result => { if (account?.id && result.isOwner) setLoaded({ accountId: account.id, data: result }); }} /></View>}
     </View>
     {avatarPhoto && isAuthenticated && avatarPhoto.accountId === account?.id && <ProfilePhotoForm portrait initialAsset={avatarPhoto.asset} confirmationHint="Xác nhận để lưu ảnh đại diện này vào hồ sơ của bạn." onClose={() => setAvatarPhoto(null)} onConfirm={url => { void saveAvatar(url); }} />}
+    {showVerification && <StudentVerificationModal key={account.id} account={account} name={account.profile?.displayName || account.profile?.fullName || account.email.split('@')[0]} schoolName={data?.profile.universityName} value={verification.value} loading={verification.loading} error={verification.error} onRefresh={verification.refresh} onSubmitted={verification.submitted} onClose={() => setVerificationAccountId(null)} />}
   </SafeAreaView>;
 }
 
@@ -132,6 +138,7 @@ const styles = StyleSheet.create({
   photoStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 8 }, photoMessage: { color: colors.textPrimary, textAlign: 'center', padding: 8 },
   header: { flexShrink: 0, zIndex: 1, backgroundColor: colors.background, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  reminderSlot: { flex: 1, minWidth: 0, flexDirection: 'row' }, stackedHeader: { flexDirection: 'column-reverse', alignItems: 'flex-end' }, fullReminder: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: '100%' }, settings: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }, pressed: { opacity: 0.65 },
+  compactHeaderActions: { gap: 4 }, compactSettings: { width: 32, height: 36 },
+  reminderSlot: { flex: 1, minWidth: 0, flexDirection: 'row' }, settings: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }, pressed: { opacity: 0.65 },
   state: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }, error: { color: colors.error, fontSize: 14, lineHeight: 22, textAlign: 'center' }, saved: { width: '100%', maxWidth: 1120, alignSelf: 'center' },
 });
