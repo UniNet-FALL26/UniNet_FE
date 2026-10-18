@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ModulePage } from '@/components/ui/ModulePage';
 import { Button } from '@/components/ui/Button';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { StudentProfileStarter } from '@/components/profile/StudentProfileStarter';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [frameWidth, setFrameWidth] = useState(0);
+  const [columnWidth, setColumnWidth] = useState(0);
   const [changingPhoto, setChangingPhoto] = useState(false);
   const [photoMessage, setPhotoMessage] = useState('');
   const [photoError, setPhotoError] = useState(false);
@@ -36,6 +38,8 @@ export default function ProfileScreen() {
   const [dismissedReminderAccount, setDismissedReminderAccount] = useState<string | null>(null);
   const photoController = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
+  const desktop = Platform.OS === 'web' && width >= 1200;
+  const profileWidth = desktop ? columnWidth || width - 456 : width;
   const data = isAuthenticated && loaded?.accountId === account?.id ? loaded?.data : null;
   useFocusEffect(useCallback(() => {
     setReminderNow(Date.now());
@@ -92,31 +96,38 @@ export default function ProfileScreen() {
   const theme = getProfileTheme(template.id, data?.portfolio.appearance.profile.theme);
   const reminder = verificationReminder(account?.createdAt, data?.profile.isVerified ?? account?.profile?.isVerified ?? false, reminderNow);
   const showReminder = isAuthenticated && !!reminder && dismissedReminderAccount !== account?.id;
-  const compactHeader = width < 1100 || !student;
-  const header = <View style={[styles.header, !student && { maxWidth: 600 }, showReminder && compactHeader && styles.stackedHeader]}>
+  const compactHeader = profileWidth < 1100 || !student;
+  const header = <View style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }, showReminder && compactHeader && styles.stackedHeader]}>
     <View style={[styles.reminderSlot, showReminder && compactHeader && styles.fullReminder]}>{showReminder && <VerificationBanner compact={compactHeader} onVerify={() => router.push(student ? { pathname: '/settings', params: { account: '1' } } : '/settings')} onDismiss={() => setDismissedReminderAccount(account?.id ?? null)} />}</View>
     <View style={styles.headerActions}>
       {student && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.settings, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
-      <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>
+      {(!desktop || !student) && <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
     </View>
   </View>;
   if (!student) return <ModulePage title="Cá nhân" description="Thông tin và hoạt động của bạn trên UniNet." sections={['Hồ sơ của tôi', 'Bài viết đã lưu', 'Cài đặt']} header={header} />;
   return <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={[styles.body, desktop && styles.desktopBody]}>
+    <View testID="profile-main-column" style={[styles.mainColumn, desktop && styles.desktopMainColumn]} onLayout={event => { if (desktop) setColumnWidth(event.nativeEvent.layout.width); }}>
     {header}
     {changingPhoto && <View style={styles.photoStatus}><ActivityIndicator color={colors.primary} /><Text>Đang cập nhật ảnh…</Text></View>}
     {!!photoMessage && <Text accessibilityRole="alert" style={[styles.photoMessage, photoError && { color: colors.error }]}>{photoMessage}</Text>}
     {error ? <View style={styles.state}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View>
       : !data ? <View style={styles.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ" color={colors.primary} /></View>
       : <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {data && shouldShowPortfolio(data) ? <View style={styles.saved}>
-          <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={Math.min(frameWidth || width, 1120)} /></View>
-        </View> : <StudentProfileStarter key={data.profile.id} profile={data.profile} width={width} onChooseTemplate={chooseTemplate} onChangePhoto={target => { void changePhoto(target); }} changingPhoto={changingPhoto} />}
+        {data && shouldShowPortfolio(data) ? <View style={[styles.saved, desktop && styles.desktopSaved]}>
+          <View testID="profile-template-frame" onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={desktop ? frameWidth || profileWidth : Math.min(frameWidth || width, 1120)} /></View>
+        </View> : <StudentProfileStarter key={data.profile.id} profile={data.profile} width={profileWidth} onChooseTemplate={chooseTemplate} onChangePhoto={target => { void changePhoto(target); }} changingPhoto={changingPhoto} />}
       </ScrollView>}
+    </View>
+    {desktop && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded onPortfolioChanged={result => { if (account?.id && result.isOwner) setLoaded({ accountId: account.id, data: result }); }} /></View>}
+    </View>
     {avatarPhoto && isAuthenticated && avatarPhoto.accountId === account?.id && <ProfilePhotoForm portrait initialAsset={avatarPhoto.asset} confirmationHint="Xác nhận để lưu ảnh đại diện này vào hồ sơ của bạn." onClose={() => setAvatarPhoto(null)} onConfirm={url => { void saveAvatar(url); }} />}
   </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
+  body: { flex: 1, minHeight: 0 }, desktopBody: { width: '100%', maxWidth: 1800, alignSelf: 'center', flexDirection: 'row', gap: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }, mainColumn: { flex: 1, minWidth: 0, minHeight: 0 }, settingsColumn: { width: 400, overflow: 'hidden', borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' },
+  desktopSaved: { alignSelf: 'flex-start', maxWidth: '100%' }, desktopHeader: { maxWidth: '100%', paddingHorizontal: 0 }, desktopMainColumn: { marginTop: -13 },
   safe: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.background }, scrollContent: { paddingBottom: 24 },
   photoStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 8 }, photoMessage: { color: colors.textPrimary, textAlign: 'center', padding: 8 },
   header: { flexShrink: 0, zIndex: 1, backgroundColor: colors.background, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 8 },

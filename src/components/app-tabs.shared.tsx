@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   profileAction: { flexDirection: 'row', gap: 9, paddingHorizontal: 10, marginLeft: 4 },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EAF3FF', borderWidth: 2, borderColor: '#DEEEFF' },
   compactHeader: { paddingHorizontal: 16, gap: 16 }, compactLink: { paddingHorizontal: 6, gap: 4 }, compactLabel: { fontSize: 11 },
-  desktopNav: { flex: 1, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 },
+  desktopNav: { flex: 1, paddingLeft: 24, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 },
   desktopLink: { minHeight: 44, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 11 },
   desktopLinkActive: { backgroundColor: '#EAF3FF' }, desktopLinkHovered: { backgroundColor: '#F0F6FD' },
   desktopLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },

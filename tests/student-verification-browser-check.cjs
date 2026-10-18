@@ -146,12 +146,13 @@ async function assertFits(page, width) {
     assert.ok(reads > beforeSubmitReads, 'success refetches authoritative status');
     await assertVisible(dialog(page).getByText('Đại học Bách khoa', { exact: true }));
     assert.equal(await button(page, 'Xác minh tài khoản').count(), 0, 'pending has no resubmit CTA');
+    assert.equal(await button(page, 'Đóng').count(), 0, 'overview has no bottom close button');
     assert.equal(await dialog(page).getByRole('img').count(), 0, 'sensitive document hidden in overview');
     for (const width of [320, 440, 1440]) {
       await page.setViewportSize({ width, height: 956 }); await assertFits(page, width);
       await page.screenshot({ path: `${output}/pending-${width}.png`, animations: 'disabled' });
     }
-    await button(page, 'Đóng').click();
+    await button(page, 'Đóng thông tin tài khoản').click();
     await assertVisible(accountRow.getByText('Đang xét duyệt', { exact: true }));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await assertVisible(button(page, 'Đăng nhập'));
@@ -161,7 +162,7 @@ async function assertFits(page, width) {
     await accountRow.click();
     await assertVisible(dialog(page).getByText('SV-2026001', { exact: true }));
     assert.equal(submissions, 2, 'reopening/reloading pending does not create another request');
-    await button(page, 'Đóng').click();
+    await button(page, 'Đóng thông tin tài khoản').click();
 
     // Server review changes are read on reopening, as on returning to the settings page.
     verification = { ...verification, status: 1, isVerified: true, reviewedAt: '2026-10-18T03:00:00Z' };
@@ -169,7 +170,7 @@ async function assertFits(page, width) {
     await assertVisible(dialog(page).getByText('Đã xác minh sinh viên', { exact: true }));
     assert.equal(await button(page, 'Xác minh tài khoản').count(), 0);
     await page.screenshot({ path: `${output}/approved.png`, animations: 'disabled' });
-    await button(page, 'Đóng').click();
+    await button(page, 'Đóng thông tin tài khoản').click();
     await assertVisible(accountRow.getByText('Đã xác minh', { exact: true }));
     verification = { ...verification, status: 2, isVerified: false, rejectReason: 'Ảnh mờ, vui lòng gửi giấy xác nhận đang học.' };
     await accountRow.click();
@@ -192,13 +193,13 @@ async function assertFits(page, width) {
       for (const key of ['fullName', 'schoolName', 'studentCode', 'document']) assert.ok(payload.body.includes(`name="${key}"`), `multipart field ${key}`);
       assert.ok(!payload.body.includes('name="userId"'), 'ownership never posted from client');
     }
-    await button(page, 'Đóng').click();
+    await button(page, 'Đóng thông tin tài khoản').click();
     verification = { ...verification, status: 1, isVerified: true, reviewedAt: '2026-10-18T03:00:00Z' };
     await page.evaluate(() => { history.pushState({}, '', '/notifications'); dispatchEvent(new PopStateEvent('popstate')); });
     await button(page, notice.message).click();
     await assertVisible(dialog(page).getByText('Đã xác minh sinh viên', { exact: true }));
     assert.equal(new URL(page.url()).pathname, '/settings', 'review notification opens account details');
-    await button(page, 'Đóng').click();
+    await button(page, 'Đóng thông tin tài khoản').click();
     expire = true; await accountRow.click();
     await assertVisible(button(page, 'Đăng nhập'));
     await assertVisible(page.getByText('Đăng nhập để quản lý tài khoản và hồ sơ của bạn.', { exact: true }));
