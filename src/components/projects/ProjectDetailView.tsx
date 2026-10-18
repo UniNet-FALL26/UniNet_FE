@@ -18,6 +18,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  useWindowDimensions,
   Image,
   Modal,
   Pressable,
@@ -28,6 +29,7 @@ import {
 } from "react-native";
 
 export function ProjectDetailScreen() {
+  const compact = useWindowDimensions().width < 600;
   const { id } = useLocalSearchParams<{ id: string }>();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [recommendations, setRecommendations] = useState<
@@ -268,7 +270,7 @@ export function ProjectDetailScreen() {
       </View>
 
       {/* METRIC CARDS */}
-      <View style={styles.metricsGrid}>
+      <View style={[styles.metricsGrid, compact && { flexDirection: "column" }]}>
         <View style={styles.metricCard}>
           <Text style={styles.metricKicker}>ĐỘI NGŨ DỰ ÁN</Text>
           <Text style={styles.metricValue}>
@@ -467,7 +469,8 @@ export function ProjectDetailScreen() {
             })}
           </View>
 
-          <Input
+          <Input appearance="project"
+
             label="Lời nhắn / Giới thiệu bản thân"
             value={joinMessage}
             onChangeText={setJoinMessage}
@@ -649,8 +652,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 20,
     paddingBottom: 48,
-    gap: 18,
-    maxWidth: 900,
+    gap: 16,
+    maxWidth: 1080,
     width: "100%",
     alignSelf: "center",
   },
@@ -658,10 +661,10 @@ const styles = StyleSheet.create({
   /* HEADER & BACK BUTTON (SYNCED VỚI CREATE FORM) */
   hero: {
     backgroundColor: "#102D62",
-    borderRadius: 26,
-    padding: 20,
+    borderRadius: 20,
+    padding: 16,
     overflow: "hidden",
-    gap: 24,
+    gap: 16,
   },
   heroOrb: { position: "absolute", width: 250, height: 250, borderRadius: 125, right: -120, top: -100, backgroundColor: "#204780", borderWidth: 30, borderColor: "#1A3C70" },
   heroOrbSmall: { position: "absolute", width: 100, height: 100, borderRadius: 50, right: 50, bottom: -75, backgroundColor: "#315A96" },
@@ -713,12 +716,12 @@ const styles = StyleSheet.create({
   creatorBanner: {
     borderTopWidth: 1,
     borderTopColor: "#385381",
-    paddingTop: 18,
+    paddingTop: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: 16,
+    gap: 12,
   },
   creatorProfile: {
     flexDirection: "row",
@@ -806,18 +809,19 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 12,
   },
   metricCard: {
     flex: 1,
-    minWidth: "46%",
+    minWidth: 0,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: "#D9E5FA",
     borderRadius: 20,
-    padding: 18,
+    padding: 16,
     alignItems: "flex-start",
     gap: 4,
+    minHeight: 132,
   },
   metricKicker: { color: colors.primaryDark, fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 8 },
   deadlineCard: { backgroundColor: "#EDF3FF" },
@@ -844,11 +848,11 @@ const styles = StyleSheet.create({
   /* SECTION CARDS */
   sectionCard: {
     backgroundColor: colors.surface,
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E1E8F5",
     padding: 20,
-    gap: 16,
+    gap: 12,
     shadowColor: "#0B3E9C",
     shadowOpacity: 0.04,
     shadowRadius: 14,
@@ -898,7 +902,10 @@ const styles = StyleSheet.create({
     borderColor: "#D3E4FF",
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 18,
+    borderRadius: 12,
+    minHeight: 36,
+    maxWidth: "100%",
+    justifyContent: "center",
   },
   techTagText: {
     color: colors.primary,
@@ -908,14 +915,14 @@ const styles = StyleSheet.create({
 
   /* ROLES LIST */
   rolesList: {
-    gap: 10,
+    gap: 16,
   },
   roleCard: {
-    backgroundColor: "#F4F7FD",
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     gap: 12,
   },
   roleCardHeader: {
@@ -930,6 +937,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     flex: 1,
+    minWidth: 0,
   },
   roleBullet: {
     width: 6,
@@ -948,6 +956,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
+    marginLeft: "auto",
   },
   roleQuantityText: {
     color: colors.primary,
@@ -955,9 +964,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   roleReqBox: {
-    backgroundColor: colors.surface,
-    padding: 9,
-    borderRadius: 8,
+    backgroundColor: "#EEF5FF",
+    padding: 12,
+    borderRadius: 12,
   },
   roleReqLabel: {
     color: colors.textSecondary,

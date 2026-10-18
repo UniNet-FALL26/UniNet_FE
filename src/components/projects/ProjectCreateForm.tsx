@@ -10,6 +10,7 @@ import DateTimePicker, {
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -30,6 +31,7 @@ const emptyRole = () => ({
 type DatePickerTarget = "recruitmentDeadline" | "expectedOutput" | null;
 
 export function ProjectCreateScreen() {
+  const compact = useWindowDimensions().width < 600;
   const [title, setTitle] = useState("");
   const [projectField, setProjectField] = useState("");
   const [customProjectField, setCustomProjectField] = useState("");
@@ -424,7 +426,8 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.card}>
-            <Input
+            <Input appearance="project"
+
               label="Tên dự án *"
               value={title}
               onChangeText={setTitle}
@@ -498,7 +501,8 @@ export function ProjectCreateScreen() {
               {/* INPUT NẾU CHỌN LĨNH VỰC "KHÁC" */}
               {projectField === "Khác" ? (
                 <View style={styles.customFieldInputWrapper}>
-                  <Input
+                  <Input appearance="project"
+
                     label="Tên lĩnh vực khác *"
                     value={customProjectField}
                     onChangeText={setCustomProjectField}
@@ -509,7 +513,8 @@ export function ProjectCreateScreen() {
               ) : null}
             </View>
 
-            <Input
+            <Input appearance="project"
+
               label="Mô tả dự án *"
               value={description}
               onChangeText={setDescription}
@@ -531,7 +536,8 @@ export function ProjectCreateScreen() {
               {/* Ô thêm công nghệ custom */}
               <View style={styles.customTechInputRow}>
                 <View style={styles.customTechInputContainer}>
-                  <Input
+                  <Input appearance="project"
+
                     label="Thêm công nghệ khác"
                     value={customTechInput}
                     onChangeText={setCustomTechInput}
@@ -606,7 +612,8 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.card}>
-            <Input
+            <Input appearance="project"
+
               label="Số thành viên mục tiêu *"
               value={memberTarget}
               onChangeText={setMemberTarget}
@@ -651,9 +658,10 @@ export function ProjectCreateScreen() {
                   ) : null}
                 </View>
 
-                <View style={styles.roleRow}>
+                <View style={[styles.roleRow, compact && { flexDirection: "column" }]}>
                   <View style={styles.roleNameWrapper}>
-                    <Input
+                    <Input appearance="project"
+
                       label="Tên vai trò *"
                       value={role.role}
                       onChangeText={(value) => updateRole(index, "role", value)}
@@ -661,8 +669,9 @@ export function ProjectCreateScreen() {
                     />
                   </View>
 
-                  <View style={styles.quantityWrapper}>
-                    <Input
+                  <View style={[styles.quantityWrapper, compact && { width: "100%" }]}>
+                    <Input appearance="project"
+
                       label="Số lượng *"
                       value={String(role.quantity)}
                       onChangeText={(value) =>
@@ -674,7 +683,8 @@ export function ProjectCreateScreen() {
                   </View>
                 </View>
 
-                <Input
+                <Input appearance="project"
+
                   label="Yêu cầu của vai trò *"
                   value={role.requirements}
                   onChangeText={(value) =>
@@ -835,7 +845,7 @@ export function ProjectCreateScreen() {
         ) : null}
 
         {/* ACTIONS */}
-        <View style={styles.actions}>
+        <View style={[styles.actions, compact && { flexDirection: "column" }]}>
           <Button
             title="Hủy bỏ"
             variant="outline"
@@ -872,8 +882,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 20,
     paddingBottom: 48,
-    gap: 18,
-    maxWidth: 780,
+    gap: 24,
+    maxWidth: 1080,
     width: "100%",
     alignSelf: "center",
   },
@@ -883,17 +893,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    marginBottom: 4,
+    marginBottom: 0,
   },
 
   headerText: {
     flex: 1,
+    minWidth: 0,
   },
 
   backButton: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -981,9 +992,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 18,
-    padding: 16,
-    gap: 16,
+    borderRadius: 20,
+    padding: 20,
+    gap: 24,
   },
 
   /* INPUT */
@@ -1014,11 +1025,11 @@ const styles = StyleSheet.create({
 
   /* DROPDOWN */
   dropdownButton: {
-    minHeight: 50,
+    minHeight: 52,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -1095,17 +1106,18 @@ const styles = StyleSheet.create({
   /* TECHNOLOGY */
   customTechInputRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: 8,
     marginVertical: 4,
   },
 
   customTechInputContainer: {
     flex: 1,
+    minWidth: 0,
   },
 
   addTechButton: {
-    height: 50,
+    height: 52,
     paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: "#EEF5FF",
@@ -1113,7 +1125,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20, // cân chỉnh alignment với Input có label
+
   },
 
   addTechButtonPressed: {
@@ -1134,19 +1146,21 @@ const styles = StyleSheet.create({
   },
 
   techChip: {
-    minHeight: 38,
-    paddingHorizontal: 13,
-    borderRadius: 19,
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 7,
+    maxWidth: "100%",
   },
 
   techChipSelected: {
-    backgroundColor: "#E8F1FF",
-    borderColor: colors.primary,
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
   },
 
   techChipText: {
@@ -1156,7 +1170,7 @@ const styles = StyleSheet.create({
   },
 
   techChipTextSelected: {
-    color: colors.primary,
+    color: "#FFFFFF",
     fontWeight: "700",
   },
 
@@ -1166,6 +1180,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    flexWrap: "wrap",
   },
 
   addRoleButton: {

@@ -21,7 +21,6 @@ const tabs: TabItem[] = [
 const shortcuts: Shortcut[] = [
   { label: 'Không gian\nlàm việc', href: '/(tabs)/workspace', icon: { ios: 'briefcase.fill', android: 'work', web: 'work' }, tint: '#1476DA', background: '#E8F3FF' },
   { label: 'Cơ hội', href: '/(tabs)/opportunities', icon: { ios: 'briefcase', android: 'business_center', web: 'business_center' }, tint: '#E34B66', background: '#FFF0F3' },
-  { label: 'Nhóm', href: '/(tabs)/groups', icon: { ios: 'person.3.fill', android: 'groups', web: 'groups' }, tint: '#15A882', background: '#E8FAF4' },
   { label: 'Khác', href: '/(tabs)/more', icon: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }, tint: '#697891', background: '#F2F4F8' },
 ];
 
@@ -78,11 +77,14 @@ export default function AppTabs() {
     return () => back.remove();
   }, [menuOpen, progress]);
 
+  const desktopShortcuts: TabItem[] = shortcuts.map(item => ({ ...item, label: item.label.replace('\n', ' '), paths: [String(item.href).replace('/(tabs)', '')], activeIcon: item.icon }));
   const desktopItems: TabItem[] = [
-    tabs[0],
-    ...shortcuts.slice(0, 3).map(item => ({ ...item, label: item.label.replace('\n', ' '), paths: [String(item.href).replace('/(tabs)', '')], activeIcon: item.icon })),
     { label: 'Dự án', href: '/(tabs)/projects', paths: ['/projects'], icon: { ios: 'square.grid.2x2', android: 'grid_view', web: 'grid_view' }, activeIcon: { ios: 'square.grid.2x2.fill', android: 'grid_view', web: 'grid_view' } },
+    desktopShortcuts[0],
+    desktopShortcuts[1],
+    tabs[0],
     tabs[1],
+    desktopShortcuts[2],
   ];
   return <View style={styles.root}>
     {desktop && <View testID="desktop-app-header" style={[styles.desktopHeader, { paddingTop: insets.top }]}>

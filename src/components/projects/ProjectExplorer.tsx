@@ -477,8 +477,9 @@ export function ProjectExplorerScreen() {
                       },
                     } as never)
                   }
-                  style={({ pressed }) => [
+                  style={({ pressed, hovered }) => [
                     styles.card,
+                    hovered && styles.cardHovered,
                     pressed && styles.cardPressed,
                   ]}
                 >
@@ -864,7 +865,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 24,
     width: "100%",
-    maxWidth: 900,
+    maxWidth: 1080,
     alignSelf: "center",
   },
 
@@ -874,19 +875,19 @@ const styles = StyleSheet.create({
 
   header: {
     marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 22,
+    marginBottom: 16,
+    padding: 16,
     backgroundColor: "#102D62",
-    borderRadius: 26,
+    borderRadius: 20,
     overflow: "hidden",
-    gap: 22,
+    gap: 12,
   },
 
   heroOrb: { position: "absolute", width: 230, height: 230, borderRadius: 115, right: -95, top: -95, backgroundColor: "#204780", borderWidth: 30, borderColor: "#1A3C70" },
   heroOrbSmall: { position: "absolute", width: 90, height: 90, borderRadius: 45, right: 35, bottom: -60, backgroundColor: "#315A96" },
-  eyebrowBadge: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 },
+  eyebrowBadge: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 8 },
   eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#6DE2CD" },
-  heroDescription: { color: "#CCDCF5", fontSize: 14, lineHeight: 22, marginTop: 8, maxWidth: 310 },
+  heroDescription: { color: "#CCDCF5", fontSize: 14, lineHeight: 22, marginTop: 8, maxWidth: 560 },
   heroFooter: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14 },
   resultsHeader: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   resultsHeading: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
@@ -950,13 +951,13 @@ const styles = StyleSheet.create({
   searchContainer: {
     flex: 1,
     minWidth: 0,
-    height: 54,
+    height: 52,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: 12,
     paddingHorizontal: 12,
   },
 
@@ -993,9 +994,9 @@ const styles = StyleSheet.create({
 
   filterButton: {
     minWidth: 80,
-    height: 54,
+    height: 52,
     paddingHorizontal: 10,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -1141,13 +1142,13 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     backgroundColor: colors.surface,
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E1E8F5",
     overflow: "hidden",
 
     shadowColor: "#0B3E9C",
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.04,
     shadowRadius: 16,
     shadowOffset: {
       width: 0,
@@ -1156,6 +1157,8 @@ const styles = StyleSheet.create({
 
     elevation: 2,
   },
+
+  cardHovered: { borderColor: colors.primary, shadowOpacity: 0.13, shadowRadius: 18 },
 
   cardPressed: {
     opacity: 0.9,
@@ -1215,15 +1218,16 @@ const styles = StyleSheet.create({
   projectTitle: {
     color: colors.navy,
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
     lineHeight: 24,
     marginBottom: 2,
   },
 
   metaText: {
-    color: colors.textSecondary,
+    color: colors.navy,
     fontSize: 13,
     lineHeight: 18,
+    fontWeight: "600",
   },
 
   // =========================
@@ -1366,22 +1370,22 @@ const styles = StyleSheet.create({
 
   techPill: {
     maxWidth: "100%",
-    minHeight: 28,
+    minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    borderRadius: 8,
-    backgroundColor: "#F0F5FF",
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderColor: "#D3E4FF",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
 
   techText: {
-    color: colors.textPrimary,
+    color: colors.primary,
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "700",
     lineHeight: 17,
   },
   skillIcon: { width: 18, height: 18, borderRadius: 4 },
