@@ -3,6 +3,7 @@ import type { AccountRole } from '@/constants/roles';
 export type AuthAccount = {
   id: string;
   email: string;
+  createdAt?: string;
   role: AccountRole;
   profileComplete: boolean;
   profile: { id: string; fullName: string; nickname: string; organizationName: string | null; partnerType?: number | null; displayName: string; isVerified: boolean } | null;

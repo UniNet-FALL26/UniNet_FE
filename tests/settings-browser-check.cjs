@@ -17,6 +17,7 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8083';
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' } });
     if (path.endsWith('/auth/login')) return route.fulfill({ json: { account, accessToken: 'settings-test-access', refreshToken: 'settings-test-refresh', requiresProfileCompletion: false } });
     if (path.endsWith('/auth/me')) return route.fulfill({ json: account });
+    if (path.endsWith('/student/verification/me')) return route.fulfill({ json: { id: 'verified-request', status: 1, isVerified: true, fullName: account.profile.fullName, schoolName: 'Trường kiểm thử', studentCode: 'SV001', submittedAt: '2026-10-16T03:00:00Z', reviewedAt: '2026-10-17T03:00:00Z', rejectReason: null, documentName: 'student.png' } });
     if (path.endsWith('/profile/portfolio/me')) return route.fulfill({ json: data });
     if (path.endsWith('/profile/portfolio/display/me')) { displayCalls++; assert.equal(req.method(), 'PUT'); data.portfolio.appearance.profile.showPortfolio = req.postDataJSON().showPortfolio; return route.fulfill({ json: data }); }
     if (path.includes('/api/')) return route.fulfill({ json: [] });
@@ -41,6 +42,8 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8083';
       }
       assert.equal(await button('Đổi mật khẩu').isDisabled(), true);
       await page.screenshot({ path: `dist/settings-verification/settings-${width}.png`, fullPage: true, animations: 'disabled' });
+      await page.getByTestId('settings-brand-footer').scrollIntoViewIfNeeded();
+      await page.getByTestId('settings-brand-footer').screenshot({ path: `dist/settings-verification/settings-footer-${width}.png`, animations: 'disabled' });
     }
     assert.equal(await button('Chỉnh sửa hồ sơ').count(), 0);
     assert.equal(await page.getByText('Không gian của bạn. Theo cách của bạn.', { exact: true }).count(), 0);
@@ -51,7 +54,7 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8083';
     await page.getByRole('dialog').getByText(account.email, { exact: true }).waitFor();
     await page.setViewportSize({ width: 320, height: 900 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    await button('Đóng thông tin').click();
+    await button('Đóng').click();
     assert.equal(await button('Đăng xuất tất cả thiết bị').count(), 0);
     for (const title of ['Điều khoản dịch vụ', 'Chính sách bảo mật']) {
       await button(title).click();

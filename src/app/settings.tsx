@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ACCOUNT_ROLE } from '@/constants/roles';
@@ -12,13 +12,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { portfolioService } from '@/services/portfolio.service';
 import { hasStudentPortfolioContent } from '@/utils/student-profile';
 import type { PortfolioResponse } from '@/types/portfolio';
+import { useStudentVerification } from '@/hooks/useStudentVerification';
+import { StudentVerificationModal } from '@/components/settings/StudentVerificationModal';
+import { verificationPresentation } from '@/utils/student-verification';
 
 export default function SettingsScreen() {
   const { account, isAuthenticated, isLoading } = useAuthStore();
   const { logout, loading: loggingOut, error: logoutError, clearError } = useAuth();
   const [dialog, setDialog] = useState<'account' | 'terms' | 'privacy' | null>(null);
+  const params = useLocalSearchParams<{ account?: string }>();
   const wide = useWindowDimensions().width >= 900;
   const student = account?.role === ACCOUNT_ROLE.STUDENT;
+  const verification = useStudentVerification(student && isAuthenticated ? account?.id : undefined);
+  const verificationStatus = verification.value ? verificationPresentation(verification.value) : null;
+  useEffect(() => { setDialog(null); }, [account?.id]);
+  useEffect(() => { if (params.account === '1' && student && isAuthenticated) setDialog('account'); }, [params.account, student, isAuthenticated, account?.id]);
   const [loaded, setLoaded] = useState<{ accountId: string; data: PortfolioResponse } | null>(null);
   const data = isAuthenticated && loaded && loaded.accountId === account?.id ? loaded.data : null;
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [attempt, setAttempt] = useState(0);
@@ -60,7 +68,7 @@ export default function SettingsScreen() {
   const role = student ? 'Sinh viên' : account?.role === ACCOUNT_ROLE.PARTNER ? 'Đối tác' : 'Quản trị viên';
   const displayPortfolio = data ? data.portfolio.appearance.profile.showPortfolio ?? hasStudentPortfolioContent(data) : false;
   const busy = saving || loggingOut;
-  const openDialog = (value: 'account' | 'terms' | 'privacy') => { clearError(); setDialog(value); };
+  const openDialog = (value: 'account' | 'terms' | 'privacy') => { clearError(); setDialog(value); if (value === 'account' && student) void verification.refresh(); };
   const closeDialog = () => { if (!loggingOut) { setDialog(null); clearError(); } };
   return <SafeAreaView style={s.safe}>
     <View style={s.topBar}><View style={s.topInner}>
@@ -94,7 +102,7 @@ export default function SettingsScreen() {
           <View style={s.section}>
             <View style={s.sectionHeading}><Text role="heading" aria-level={2} style={s.sectionTitle}>Tài khoản & bảo mật</Text><Text style={s.body}>Thông tin đăng nhập và quyền truy cập của bạn.</Text></View>
             <View style={s.group}>
-              <SettingsRow title="Thông tin tài khoản" description="Xem email, vai trò và trạng thái xác minh." name={{ ios: 'person.crop.circle', android: 'person_outline', web: 'person_outline' }} disabled={busy} onPress={() => openDialog('account')} />
+              <SettingsRow title="Thông tin tài khoản" description={student ? verificationStatus?.description || (verification.error ? 'Chưa tải được trạng thái xác minh. Nhấn để thử lại.' : 'Đang tải trạng thái xác minh sinh viên…') : 'Xem email, vai trò và trạng thái xác minh.'} badge={student ? verificationStatus?.label || (verification.error ? 'Thử lại' : 'Đang tải') : undefined} badgeColor={verificationStatus?.color} badgeBackground={verificationStatus?.background} name={{ ios: 'person.crop.circle', android: 'person_outline', web: 'person_outline' }} disabled={busy} onPress={() => openDialog('account')} />
               <SettingsRow title="Đổi mật khẩu" description="Tính năng đang được phát triển." name={{ ios: 'key', android: 'key', web: 'key' }} disabled badge="Sắp có" />
               {account?.role === ACCOUNT_ROLE.PARTNER && <SettingsRow title="Xác minh tài khoản" description="Quản lý hồ sơ xác minh của tổ chức." name={{ ios: 'checkmark.seal', android: 'verified', web: 'verified' }} disabled={busy} onPress={() => router.push('/(company)/verification')} />}
             </View>
@@ -108,11 +116,18 @@ export default function SettingsScreen() {
           </View>
           <View style={s.logoutGroup}><SettingsRow title="Đăng xuất" description="Kết thúc phiên trên thiết bị này." name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} danger disabled={busy} loading={loggingOut} onPress={() => { void signOut(); }} /></View>
           {!!logoutError && <Text accessibilityRole="alert" style={s.error}>{logoutError}</Text>}
-          <Text style={s.footer}>UniNet · Kết nối để cùng phát triển</Text>
+          <View style={s.footer} testID="settings-brand-footer">
+            <View style={s.footerBrand}>
+              <Image source={require('@/assets/images/uninet-mark.png')} resizeMode="contain" style={s.footerLogo} accessibilityLabel="Logo UniNet" />
+              <Text style={s.footerName}>UniNet</Text>
+            </View>
+            <Text style={s.footerTagline}>Kết nối để cùng phát triển</Text>
+          </View>
         </View>
       </View>}
     </ScrollView>
-    <Modal visible={dialog !== null} transparent animationType="fade" onRequestClose={closeDialog}>
+    {dialog === 'account' && student && account && isAuthenticated && <StudentVerificationModal key={account.id} account={account} name={name} schoolName={data?.profile.universityName} value={verification.value} loading={verification.loading} error={verification.error} onRefresh={verification.refresh} onSubmitted={verification.submitted} onClose={closeDialog} />}
+    <Modal visible={dialog !== null && !(dialog === 'account' && student)} transparent animationType="fade" onRequestClose={closeDialog}>
       <View style={s.scrim}><View role="dialog" aria-modal accessibilityViewIsModal style={s.dialog}>
         <View style={s.dialogHeading}><Text role="heading" aria-level={2} style={[s.sectionTitle, { flex: 1 }]}>{dialog === 'account' ? 'Thông tin tài khoản' : dialog === 'terms' ? 'Điều khoản dịch vụ' : 'Chính sách bảo mật'}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng" disabled={loggingOut} onPress={closeDialog} style={({ pressed }) => [s.back, pressed && s.pressed]}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={20} tintColor={colors.textPrimary} /></Pressable></View>
         {dialog === 'account' ? <>
@@ -134,10 +149,10 @@ type IconName = ComponentProps<typeof SymbolView>['name'];
 function SettingsIcon({ name, danger = false }: { name: IconName; danger?: boolean }) {
   return <View accessible={false} importantForAccessibility="no-hide-descendants" style={[s.icon, danger && s.dangerIcon]}><SymbolView name={name} size={21} tintColor={danger ? colors.error : colors.primary} /></View>;
 }
-function SettingsRow({ title, description, name, onPress, disabled, badge, danger, loading }: { title: string; description: string; name: IconName; onPress?: () => void; disabled?: boolean; badge?: string; danger?: boolean; loading?: boolean }) {
+function SettingsRow({ title, description, name, onPress, disabled, badge, badgeColor, badgeBackground, danger, loading }: { title: string; description: string; name: IconName; onPress?: () => void; disabled?: boolean; badge?: string; badgeColor?: string; badgeBackground?: string; danger?: boolean; loading?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={description} accessibilityState={{ disabled, busy: loading }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.row, s.actionRow, pressed && s.pressed, disabled && !badge && s.disabled]}>
     <SettingsIcon name={name} danger={danger} /><View style={s.rowCopy}><Text style={[s.label, danger && s.dangerText]}>{title}</Text><Text style={s.body}>{description}</Text></View>
-    {loading ? <ActivityIndicator size="small" color={colors.error} /> : badge ? <Text style={s.soon}>{badge}</Text> : <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={18} tintColor={danger ? colors.error : colors.textSecondary} />}
+    {loading ? <ActivityIndicator size="small" color={colors.error} /> : badge ? <Text style={[s.soon, badgeColor ? { color: badgeColor, backgroundColor: badgeBackground, maxWidth: 100, flexShrink: 1 } : undefined]}>{badge}</Text> : <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={18} tintColor={danger ? colors.error : colors.textSecondary} />}
   </Pressable>;
 }
 const s = StyleSheet.create({
@@ -145,6 +160,7 @@ const s = StyleSheet.create({
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 32, paddingTop: 40, paddingBottom: 48 }, mobileContent: { paddingHorizontal: 20, paddingTop: 28 },
   columns: { gap: 28 }, wideColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 40 }, identity: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: colors.border }, identityRail: { width: 236, flexDirection: 'column', alignItems: 'flex-start', paddingTop: 4, borderBottomWidth: 0 }, avatar: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight }, initials: { color: colors.primaryDark, fontSize: 23, fontWeight: '700' }, identityCopy: { flexShrink: 1, gap: 6, maxWidth: '100%' }, accountName: { color: colors.navy, fontSize: 19, lineHeight: 26, fontWeight: '700' }, email: { color: colors.textSecondary, fontSize: 13, lineHeight: 21, flexShrink: 1 }, roleBadge: { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, marginTop: 4 }, roleText: { color: colors.primaryDark, fontSize: 12, fontWeight: '600' }, railNote: { marginTop: 24, paddingTop: 24, borderTopWidth: 1, borderTopColor: colors.border, gap: 8 }, noteTitle: { color: colors.navy, fontSize: 14, fontWeight: '600' },
   main: { flex: 1, minWidth: 0, gap: 28 }, section: { gap: 14 }, sectionHeading: { gap: 5 }, sectionTitle: { color: colors.navy, fontSize: 18, lineHeight: 26, fontWeight: '700' }, group: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 18, overflow: 'hidden' }, panel: { backgroundColor: colors.surface, borderRadius: 18, padding: 24, gap: 16 }, row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 20, minHeight: 80 }, actionRow: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, rowCopy: { flex: 1, minWidth: 0, gap: 5 }, label: { color: colors.textPrimary, fontSize: 15, lineHeight: 22, fontWeight: '600' }, body: { color: colors.textSecondary, fontSize: 13, lineHeight: 21 }, icon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight }, dangerIcon: { backgroundColor: colors.error + '0D' }, dangerText: { color: colors.error }, pressed: { backgroundColor: colors.primaryLight }, disabled: { opacity: 0.55 }, soon: { color: colors.textSecondary, fontSize: 11, fontWeight: '600', backgroundColor: colors.background, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 6 },
-  feedback: { marginHorizontal: 18, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }, state: { padding: 24, gap: 16 }, error: { color: colors.error, fontSize: 13, lineHeight: 21 }, success: { color: colors.success, fontSize: 13, lineHeight: 21 }, logoutGroup: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 18, overflow: 'hidden' }, footer: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
+  feedback: { marginHorizontal: 18, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }, state: { padding: 24, gap: 16 }, error: { color: colors.error, fontSize: 13, lineHeight: 21 }, success: { color: colors.success, fontSize: 13, lineHeight: 21 }, logoutGroup: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 18, overflow: 'hidden' },
+  footer: { alignItems: 'center', gap: 7, paddingVertical: 6 }, footerBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 }, footerLogo: { width: 30, height: 30 }, footerName: { color: colors.navy, fontSize: 17, lineHeight: 24, fontWeight: '800' }, footerTagline: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, textAlign: 'center' },
   scrim: { flex: 1, backgroundColor: colors.navy + '66', alignItems: 'center', justifyContent: 'center', padding: 20 }, dialog: { backgroundColor: colors.surface, width: '100%', maxWidth: 440, borderRadius: 22, padding: 24, gap: 16 }, dialogHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, detail: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingBottom: 14, gap: 4 }, detailValue: { color: colors.textPrimary, fontSize: 15, lineHeight: 23, fontWeight: '500' },
 });
