@@ -1,3 +1,4 @@
+import { CommunityComposer } from '@/components/community/CommunityComposer';
 import { Button } from "@/components/ui/Button";
 import { colors } from "@/constants/colors";
 import type {
@@ -131,6 +132,7 @@ export default function CommunityScreen() {
   const { isAuthenticated } = useAuthStore();
 
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [createdPosts, setCreatedPosts] = useState<PostResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -211,6 +213,7 @@ export default function CommunityScreen() {
   );
 
   const handleToggleLike = (postId: string) => {
+    setCreatedPosts(posts => posts.map(post => post.id === postId ? { ...post, isFavorited: !post.isFavorited, favoriteCount: post.isFavorited ? Math.max(0, post.favoriteCount - 1) : post.favoriteCount + 1 } : post));
     setFeedItems((prev) =>
       prev.map((item) => {
         if (item.type === "post" && item.data.id === postId) {
@@ -232,6 +235,7 @@ export default function CommunityScreen() {
   };
 
   const handleToggleBookmark = (postId: string) => {
+    setCreatedPosts(posts => posts.map(post => post.id === postId ? { ...post, isSaved: !post.isSaved } : post));
     setFeedItems((prev) =>
       prev.map((item) => {
         if (item.type === "post" && item.data.id === postId) {
@@ -431,27 +435,7 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cộng đồng</Text>
-        {isAuthenticated && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Tạo bài viết mới"
-            onPress={() => router.push("/community/create" as any)}
-            style={({ pressed }) => [
-              styles.createBtn,
-              pressed && styles.pressed,
-            ]}
-          >
-            <SymbolView
-              name={{ ios: "square.and.pencil", android: "edit", web: "edit" }}
-              size={18}
-              tintColor={colors.primary}
-            />
-            <Text style={styles.createBtnLabel}>Tạo bài viết</Text>
-          </Pressable>
-        )}
-      </View>
+      {isAuthenticated && <View style={styles.composerContainer}><CommunityComposer onCreated={post => setCreatedPosts(posts => [post, ...posts])} /></View>}
 
       {loading ? (
         <View style={styles.stateContainer}>
@@ -470,7 +454,10 @@ export default function CommunityScreen() {
         </View>
       ) : (
         <FlatList
-          data={feedItems}
+          data={[
+            ...createdPosts.map(post => ({ id: `post-${post.id}`, type: 'post' as const, data: post })),
+            ...feedItems.filter(item => item.type !== 'post' || !createdPosts.some(post => post.id === item.data.id)),
+          ]}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) =>
             item.type === "post"
@@ -552,34 +539,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border || "#E5E7EB",
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.textPrimary,
-  },
-  createBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.primaryLight || "#EEF2FF",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  createBtnLabel: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  composerContainer: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4 },
   pressed: {
     opacity: 0.65,
   },
