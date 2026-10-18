@@ -172,93 +172,97 @@ export function ProjectDetailScreen() {
       keyboardDismissMode="on-drag"
     >
       {/* HEADER WITH SYNCED BACK BUTTON */}
-      <View style={styles.headerRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại danh sách dự án"
-          hitSlop={12}
-          onPress={() => router.dismissTo("/(tabs)/groups" as never)}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.backButtonPressed,
-          ]}
-        >
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
+      <View style={styles.hero}>
+        <View pointerEvents="none" style={styles.heroOrb} />
+        <View pointerEvents="none" style={styles.heroOrbSmall} />
+        <View style={styles.headerRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại danh sách dự án"
+            hitSlop={12}
+            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.backButtonPressed,
+            ]}
+          >
+            <Text style={styles.backIcon}>‹</Text>
+          </Pressable>
 
-        <View style={styles.headerInfo}>
-          <Text style={styles.eyebrow}>
-            {project.projectField || "Chi tiết dự án"}
-          </Text>
-          <Text style={styles.title}>{project.title}</Text>
+          <View style={styles.headerInfo}>
+            <Text style={styles.eyebrow}>
+              {project.projectField || "Chi tiết dự án"}
+            </Text>
+            <Text style={styles.title}>{project.title}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* STATUS BADGES & CREATOR BAR */}
-      <View style={styles.creatorBanner}>
-        <View style={styles.creatorProfile}>
-          <View style={styles.creatorAvatar}>
-            {project.creator.avatarUrl ? (
-              <Image
-                source={{ uri: project.creator.avatarUrl }}
-                style={styles.creatorImage}
-              />
-            ) : (
-              <Text style={styles.creatorAvatarText}>
-                {initials(project.creator?.fullName || "UN")}
+        {/* STATUS BADGES & CREATOR BAR */}
+        <View style={styles.creatorBanner}>
+          <View style={styles.creatorProfile}>
+            <View style={styles.creatorAvatar}>
+              {project.creator.avatarUrl ? (
+                <Image
+                  source={{ uri: project.creator.avatarUrl }}
+                  style={styles.creatorImage}
+                />
+              ) : (
+                <Text style={styles.creatorAvatarText}>
+                  {initials(project.creator?.fullName || "UN")}
+                </Text>
+              )}
+            </View>
+            <View style={styles.heroCreatorInfo}>
+              <Text style={styles.creatorLabel}>Người tạo dự án</Text>
+              <Text style={[styles.creatorName, styles.heroCreatorName]}>
+                {project.creator?.fullName || "Thành viên UniNet"}
               </Text>
-            )}
-          </View>
-          <View>
-            <Text style={styles.creatorLabel}>Người tạo dự án</Text>
-            <Text style={styles.creatorName}>
-              {project.creator?.fullName || "Thành viên UniNet"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.badgeRow}>
-          <View
-            style={[
-              styles.badge,
-              project.status === ApiProjectStatus.Completed ? styles.badgeCompleted : isRecruiting ? styles.badgeSuccess : styles.badgeMuted,
-            ]}
-          >
-            <Text
-              style={[
-                styles.badgeText,
-                project.status === ApiProjectStatus.Completed ? styles.badgeTextCompleted : isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
-              ]}
-            >
-              ●{" "}
-              {
-                project.status !== ApiProjectStatus.Active ? API_PROJECT_STATUS_LABEL[project.status] : (
-                  [
-                    "Đang tuyển",
-                    "Đã đủ thành viên",
-                    "Đã đóng",
-                    "Đã hủy",
-                    "Hết hạn",
-                  ] as const
-                )[project.recruitmentStatus]
-              }
-            </Text>
+            </View>
           </View>
 
-          <View
-            style={[
-              styles.badge,
-              isPublic ? styles.badgePrimary : styles.badgePrivate,
-            ]}
-          >
-            <Text
+          <View style={styles.badgeRow}>
+            <View
               style={[
-                styles.badgeText,
-                isPublic ? styles.badgeTextPrimary : styles.badgeTextPrivate,
+                styles.badge,
+                project.status === ApiProjectStatus.Completed ? styles.badgeCompleted : isRecruiting ? styles.badgeSuccess : styles.badgeMuted,
               ]}
             >
-              {isPublic ? "Công khai" : "Riêng tư"}
-            </Text>
+              <Text
+                style={[
+                  styles.badgeText,
+                  project.status === ApiProjectStatus.Completed ? styles.badgeTextCompleted : isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
+                ]}
+              >
+                ●{" "}
+                {
+                  project.status !== ApiProjectStatus.Active ? API_PROJECT_STATUS_LABEL[project.status] : (
+                    [
+                      "Đang tuyển",
+                      "Đã đủ thành viên",
+                      "Đã đóng",
+                      "Đã hủy",
+                      "Hết hạn",
+                    ] as const
+                  )[project.recruitmentStatus]
+                }
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.badge,
+                isPublic ? styles.badgePrimary : styles.badgePrivate,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.badgeText,
+                  isPublic ? styles.badgeTextPrimary : styles.badgeTextPrivate,
+                ]}
+              >
+                {isPublic ? "Công khai" : "Riêng tư"}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -266,14 +270,19 @@ export function ProjectDetailScreen() {
       {/* METRIC CARDS */}
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
+          <Text style={styles.metricKicker}>ĐỘI NGŨ DỰ ÁN</Text>
           <Text style={styles.metricValue}>
             {memberCount} / {project.memberTarget}
           </Text>
           <Text style={styles.metricLabel}>Thành viên</Text>
+          <View style={styles.memberTrack}>
+            <View style={[styles.memberFill, { width: `${project.memberTarget > 0 ? Math.min(Math.max(memberCount / project.memberTarget, 0), 1) * 100 : 0}%` }]} />
+          </View>
         </View>
 
-        <View style={styles.metricCard}>
-          <Text style={styles.metricValue}>
+        <View style={[styles.metricCard, styles.deadlineCard]}>
+          <Text style={[styles.metricKicker, styles.deadlineKicker]}>THỜI GIAN TUYỂN</Text>
+          <Text style={[styles.metricValue, styles.deadlineValue]}>
             {formatDateTime(project.recruitmentDeadline)}
           </Text>
           <Text style={styles.metricLabel}>Hạn chót tuyển</Text>
@@ -634,19 +643,30 @@ const styles = StyleSheet.create({
   memberMeta: { color: colors.textSecondary, fontSize: 12 },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#F2F5FC",
   },
   content: {
     paddingHorizontal: 18,
     paddingTop: 20,
     paddingBottom: 48,
-    gap: 16,
-    maxWidth: 780,
+    gap: 18,
+    maxWidth: 900,
     width: "100%",
     alignSelf: "center",
   },
 
   /* HEADER & BACK BUTTON (SYNCED VỚI CREATE FORM) */
+  hero: {
+    backgroundColor: "#102D62",
+    borderRadius: 26,
+    padding: 20,
+    overflow: "hidden",
+    gap: 24,
+  },
+  heroOrb: { position: "absolute", width: 250, height: 250, borderRadius: 125, right: -120, top: -100, backgroundColor: "#204780", borderWidth: 30, borderColor: "#1A3C70" },
+  heroOrbSmall: { position: "absolute", width: 100, height: 100, borderRadius: 50, right: 50, bottom: -75, backgroundColor: "#315A96" },
+  heroCreatorInfo: { flex: 1, minWidth: 0, gap: 4 },
+  heroCreatorName: { color: "#FFFFFF" },
   headerRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -655,10 +675,10 @@ const styles = StyleSheet.create({
   backButton: {
     width: 42,
     height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.surface,
+    borderRadius: 14,
+    backgroundColor: "#254777",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "#496590",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -666,45 +686,46 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   backIcon: {
-    color: colors.primary,
+    color: "#FFFFFF",
     fontSize: 30,
     lineHeight: 32,
     marginTop: -2,
   },
   headerInfo: {
     flex: 1,
+    minWidth: 0,
   },
   eyebrow: {
-    color: colors.primary,
+    color: "#A9DFED",
     fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 0,
-    marginBottom: 4,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   title: {
-    color: colors.navy,
-    fontSize: 24,
-    fontWeight: "600",
-    lineHeight: 34,
+    color: "#FFFFFF",
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 37,
   },
 
   /* CREATOR BANNER */
   creatorBanner: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#385381",
+    paddingTop: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 16,
   },
   creatorProfile: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    flex: 1,
+    minWidth: 170,
   },
   creatorAvatar: {
     width: 40,
@@ -720,7 +741,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   creatorLabel: {
-    color: colors.textSecondary,
+    color: "#CCDCF5",
     fontSize: 11,
   },
   creatorName: {
@@ -730,12 +751,13 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   badge: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
   badgeText: {
     fontSize: 11,
@@ -791,19 +813,26 @@ const styles = StyleSheet.create({
     minWidth: "46%",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 14,
+    borderColor: "#D9E5FA",
+    borderRadius: 20,
+    padding: 18,
     alignItems: "flex-start",
+    gap: 4,
   },
+  metricKicker: { color: colors.primaryDark, fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 8 },
+  deadlineCard: { backgroundColor: "#EDF3FF" },
+  deadlineKicker: { color: "#4D6090" },
+  deadlineValue: { fontSize: 18, lineHeight: 27 },
+  memberTrack: { height: 5, width: "100%", backgroundColor: "#E3ECFA", borderRadius: 3, overflow: "hidden", marginTop: 10 },
+  memberFill: { height: "100%", backgroundColor: colors.primary, borderRadius: 3 },
   metricIcon: {
     fontSize: 18,
     marginBottom: 6,
   },
   metricValue: {
     color: colors.navy,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 26,
+    fontWeight: "800",
   },
   metricLabel: {
     color: colors.textSecondary,
@@ -815,31 +844,46 @@ const styles = StyleSheet.create({
   /* SECTION CARDS */
   sectionCard: {
     backgroundColor: colors.surface,
-    borderRadius: 8,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    gap: 14,
+    borderColor: "#E1E8F5",
+    padding: 20,
+    gap: 16,
+    shadowColor: "#0B3E9C",
+    shadowOpacity: 0.04,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    paddingLeft: 10,
   },
   sectionTitle: {
     color: colors.navy,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "800",
+    flexShrink: 1,
   },
   sectionCountText: {
     color: colors.primary,
     fontSize: 12,
     fontWeight: "700",
+    backgroundColor: "#EEF5FF",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    overflow: "hidden",
   },
   descriptionText: {
     color: colors.textPrimary,
     fontSize: 14,
-    lineHeight: 22,
+    lineHeight: 24,
   },
 
   /* TAGS */
@@ -867,15 +911,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   roleCard: {
-    backgroundColor: colors.background,
+    backgroundColor: "#F4F7FD",
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 13,
-    padding: 12,
-    gap: 8,
+    borderRadius: 16,
+    padding: 14,
+    gap: 12,
   },
   roleCardHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
     justifyContent: "space-between",
     alignItems: "center",
   },
@@ -895,6 +941,7 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 14,
     fontWeight: "700",
+    flexShrink: 1,
   },
   roleQuantityBadge: {
     backgroundColor: "#E8F1FF",
@@ -929,7 +976,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 10,
+    flexWrap: "wrap",
+    gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
@@ -941,21 +990,22 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 13,
     fontWeight: "700",
+    flexShrink: 1,
   },
 
   /* ACTION BOX (GUEST FORM) */
   actionCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
+    backgroundColor: "#EDF4FF",
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    gap: 12,
+    borderColor: "#CDDFFA",
+    padding: 20,
+    gap: 14,
   },
   actionCardTitle: {
     color: colors.navy,
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "800",
   },
   actionCardSub: {
     color: colors.textSecondary,
@@ -979,10 +1029,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   roleChoiceChipActive: {
-    backgroundColor: "#EEF5FF",
+    backgroundColor: colors.navy,
     borderColor: colors.primary,
   },
   roleChoiceText: {
@@ -991,7 +1041,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   roleChoiceTextActive: {
-    color: colors.primary,
+    color: "#FFFFFF",
     fontWeight: "700",
   },
   textArea: {
@@ -1000,6 +1050,8 @@ const styles = StyleSheet.create({
   },
   fullButton: {
     width: "100%",
+    borderRadius: 14,
+    minHeight: 54,
   },
 
   /* STATUS BANNER BOXES */
