@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { colors } from "@/constants/colors";
-import { portfolioService } from "@/services/portfolio.service";
-import type { PortfolioResponse } from "@/types/portfolio";
+import { skillService, type SkillCatalogItem } from "@/services/skill.service";
+import { projectFields } from "@/constants/project-fields";
 import { ProjectVisibility, type CreateProjectRequest } from "@/types/project";
 import DateTimePicker, {
   DateTimePickerAndroid,
@@ -19,21 +19,6 @@ import {
   Text,
   View,
 } from "react-native";
-
-// Danh sách các domain/nghiệp vụ cụ thể trong ngành IT
-const projectFields = [
-  "EdTech (Giáo dục)",
-  "FinTech (Tài chính - Ngân hàng)",
-  "HealthTech (Y tế - Sức khỏe)",
-  "E-Commerce (Thương mại điện tử)",
-  "AI & Trí tuệ nhân tạo",
-  "IoT & Thành phố thông minh",
-  "Logistics & Vận tải",
-  "Social & Mạng xã hội",
-  "Game & Giải trí",
-  "An toàn thông tin / Security",
-  "Khác",
-];
 
 const emptyRole = () => ({
   id: "",
@@ -53,9 +38,9 @@ export function ProjectCreateScreen() {
   const [availableTechnologies, setAvailableTechnologies] = useState<string[]>(
     [],
   );
-  const [skillCatalog, setSkillCatalog] = useState<
-    NonNullable<PortfolioResponse["skillCatalog"]>
-  >([]);
+  const [skillCatalog, setSkillCatalog] = useState<SkillCatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogRetry, setCatalogRetry] = useState(0);
   const [technologies, setTechnologies] = useState<string[]>([]);
   const [customTechInput, setCustomTechInput] = useState("");
@@ -84,23 +69,23 @@ export function ProjectCreateScreen() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setSubmitError(null);
-    portfolioService
-      .getMine(controller.signal)
-      .then((data) => {
+    setCatalogError(null);
+    setCatalogLoading(true);
+    skillService
+      .getSkills(controller.signal)
+      .then((catalog) => {
         if (controller.signal.aborted) return;
-        const catalog = data.skillCatalog ?? [];
         setSkillCatalog(catalog);
         setAvailableTechnologies(catalog.map((skill) => skill.name));
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
-          setSubmitError(
+          setCatalogError(
             cause instanceof Error
               ? cause.message
               : "Không thể tải danh mục kỹ năng.",
           );
-      });
+      }).finally(() => { if (!controller.signal.aborted) setCatalogLoading(false); });
     return () => controller.abort();
   }, [catalogRetry]);
 
@@ -566,7 +551,12 @@ export function ProjectCreateScreen() {
                 </Pressable>
               </View>
 
-              {!availableTechnologies.length && (
+              {catalogLoading && <Text style={styles.sectionDescription}>Đang tải danh mục kỹ năng…</Text>}
+              {catalogError && <Text accessibilityRole="alert" style={styles.errorText}>{catalogError}</Text>}
+              {!catalogLoading && !catalogError && !availableTechnologies.length && (
+                <Text style={styles.sectionDescription}>Chưa có kỹ năng trong danh mục.</Text>
+              )}
+              {!catalogLoading && (catalogError || !availableTechnologies.length) && (
                 <Button
                   title="Tải lại danh mục kỹ năng"
                   variant="outline"

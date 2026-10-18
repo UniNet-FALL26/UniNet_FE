@@ -1,4 +1,6 @@
 import { apiRequest } from '@/services/api';
+import { skillService } from '@/services/skill.service';
+export type { SkillCatalogItem } from '@/services/skill.service';
 
 export type CompanyJobStatus = 0 | 1 | 2 | 3;
 export type CompanyJobWorkType = 0 | 1 | 2;
@@ -37,7 +39,6 @@ export type CompanyJobsPage = {
   page: number; pageSize: number; totalItems: number; totalPages: number; totalJobs: number;
   publishedJobs: number; draftJobs: number; closingSoonJobs: number; jobs: CompanyJob[];
 };
-export type SkillCatalogItem = { id: string; name: string; iconUrl: string | null; category: string };
 export type PartnerVerificationStatus = { id: string | null; status: VerificationStatus | null; rejectReason: string | null; submittedAt: string | null };
 export type PartnerVerificationDocument = { type: VerificationDocumentType; fileName: string; url: string };
 export type PartnerVerificationInput = { taxCode?: string | null; representativeName?: string | null; documents: PartnerVerificationDocument[] };
@@ -94,7 +95,7 @@ export const companyService = {
   updateJob: (jobId: string, input: CompanyJobInput, signal?: AbortSignal) => apiRequest<CompanyJob>(`/partner/jobs/${encodeURIComponent(jobId)}`, { method: 'PUT', body: JSON.stringify(input), signal }),
   updateJobStatus: (jobId: string, status: Exclude<CompanyJobStatus, 3>, signal?: AbortSignal) => apiRequest<CompanyJob>(`/partner/jobs/${encodeURIComponent(jobId)}/status`, { method: 'PATCH', body: JSON.stringify({ status }), signal }),
   deleteJob: (jobId: string, signal?: AbortSignal) => apiRequest<void>(`/partner/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE', signal }),
-  getSkills: (signal?: AbortSignal) => apiRequest<SkillCatalogItem[]>('/profile/skills', { signal }),
+  getSkills: skillService.getSkills,
   getVerificationStatus: (signal?: AbortSignal) => apiRequest<PartnerVerificationStatus>('/partner/verification/me', { signal }),
   submitVerification: (input: PartnerVerificationInput, signal?: AbortSignal) => apiRequest<PartnerVerificationStatus>('/partner/verification', { method: 'POST', body: JSON.stringify(input), signal }),
 };

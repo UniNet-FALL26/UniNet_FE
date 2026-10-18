@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
+import { skillService } from "@/services/skill.service";
+import { projectFields } from "@/constants/project-fields";
 import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -37,8 +39,10 @@ export function ProjectExplorerScreen() {
   const [totalItems, setTotalItems] = useState(0);
   const [retry, setRetry] = useState(0);
   const [keyword, setKeyword] = useState("");
-  const [knownSkills, setKnownSkills] = useState<string[]>([]);
-  const [knownFields, setKnownFields] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogRetry, setCatalogRetry] = useState(0);
 
   const [activeTab, setActiveTab] = useState<Tab>("Đang tuyển");
 
@@ -69,6 +73,18 @@ export function ProjectExplorerScreen() {
   // =========================
 
   useEffect(() => {
+    const controller = new AbortController();
+    setCatalogLoading(true);
+    setCatalogError(null);
+    skillService.getSkills(controller.signal).then((catalog) => {
+      if (!controller.signal.aborted) setAvailableSkills(Array.from(new Set(catalog.map((skill) => skill.name))));
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setCatalogError(cause instanceof Error ? cause.message : "Không thể tải danh mục kỹ năng.");
+    }).finally(() => { if (!controller.signal.aborted) setCatalogLoading(false); });
+    return () => controller.abort();
+  }, [catalogRetry]);
+
+  useEffect(() => {
     const timer = setTimeout(() => { setKeyword(searchQuery.trim()); setPage(1); }, 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -89,8 +105,6 @@ export function ProjectExplorerScreen() {
     request.then((data) => {
       if (controller.signal.aborted) return;
       setProjects(data.projects); setTotalPages(data.totalPages); setTotalItems(data.totalItems);
-      setKnownSkills((current) => Array.from(new Set([...current, ...data.projects.flatMap((project) => (project.skills ?? []).map((skill) => skill.skillName))])).sort());
-      setKnownFields((current) => Array.from(new Set([...current, ...data.projects.map((project) => project.projectField)])).filter(Boolean).sort());
     }).catch((cause) => {
       if (controller.signal.aborted) return;
       if (cause?.status === 404 || (cause instanceof Error && /^projects? not found\.?$/i.test(cause.message.trim()))) {
@@ -99,8 +113,7 @@ export function ProjectExplorerScreen() {
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, statusTab, personalTab]);
-  const availableSkills = knownSkills;
-  const availableFields = knownFields;
+  const availableFields = projectFields;
 
   // =========================
   // FILTER OPTIONS SEARCH
@@ -221,22 +234,29 @@ export function ProjectExplorerScreen() {
         ========================= */}
 
         <View style={styles.header}>
+          <View pointerEvents="none" style={styles.heroOrb} />
+          <View pointerEvents="none" style={styles.heroOrbSmall} />
           <View style={styles.headerText}>
+            <View style={styles.eyebrowBadge}>
+              <View style={styles.eyebrowDot} />
+              <Text style={styles.eyebrow}>KẾT NỐI ĐỂ CÙNG TẠO NÊN</Text>
+            </View>
             <Text style={styles.title}>Khám phá các dự án</Text>
-
+            <Text style={styles.heroDescription}>Ý tưởng lớn bắt đầu từ một đội ngũ phù hợp.</Text>
+          </View>
+          <View style={styles.heroFooter}>
             <Text style={styles.subtitle}>
               {filteredProjects.length > 0
                 ? `${filteredProjects.length} dự án trên trang / ${totalItems} kết quả`
                 : "Tìm đồng đội phù hợp cho ý tưởng của bạn"}
             </Text>
+            <Button
+              title="＋ Tạo dự án"
+              variant="primary"
+              onPress={() => router.navigate("/group/create" as never)}
+              style={styles.ctaButton}
+            />
           </View>
-
-          <Button
-            title="Tạo dự án"
-            variant="primary"
-            onPress={() => router.navigate("/group/create" as never)}
-            style={styles.ctaButton}
-          />
         </View>
 
         {/* =========================
@@ -376,6 +396,14 @@ export function ProjectExplorerScreen() {
         {/* =========================
             ERROR
         ========================= */}
+
+        <View style={styles.resultsHeader}>
+          <View style={styles.resultsHeading}>
+            <View style={styles.sectionMarker} />
+            <Text style={styles.resultsTitle}>{activeTab}</Text>
+          </View>
+          <Text style={styles.resultsCount}>{loading ? "Đang tải…" : `${totalItems} dự án`}</Text>
+        </View>
 
         {error ? (
           <View style={styles.messageCard}>
@@ -661,7 +689,12 @@ export function ProjectExplorerScreen() {
                   )}
                 </View>
 
-                {filteredAvailableSkills.length === 0 ? (
+                {catalogLoading ? <Text style={styles.noOptionText}>Đang tải kỹ năng…</Text> : catalogError ? (
+                  <View>
+                    <Text accessibilityRole="alert" style={styles.noOptionText}>{catalogError}</Text>
+                    <Button title="Thử tải lại kỹ năng" variant="outline" onPress={() => setCatalogRetry((value) => value + 1)} />
+                  </View>
+                ) : filteredAvailableSkills.length === 0 ? (
                   <Text style={styles.noOptionText}>
                     Không tìm thấy kỹ năng phù hợp.
                   </Text>
@@ -824,10 +857,11 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#F2F5FC",
   },
 
   screenContent: {
+    paddingTop: 16,
     paddingBottom: 24,
     width: "100%",
     maxWidth: 900,
@@ -839,14 +873,26 @@ const styles = StyleSheet.create({
   // =========================
 
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    padding: 22,
+    backgroundColor: "#102D62",
+    borderRadius: 26,
+    overflow: "hidden",
+    gap: 22,
   },
+
+  heroOrb: { position: "absolute", width: 230, height: 230, borderRadius: 115, right: -95, top: -95, backgroundColor: "#204780", borderWidth: 30, borderColor: "#1A3C70" },
+  heroOrbSmall: { position: "absolute", width: 90, height: 90, borderRadius: 45, right: 35, bottom: -60, backgroundColor: "#315A96" },
+  eyebrowBadge: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 },
+  eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#6DE2CD" },
+  heroDescription: { color: "#CCDCF5", fontSize: 14, lineHeight: 22, marginTop: 8, maxWidth: 310 },
+  heroFooter: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14 },
+  resultsHeader: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  resultsHeading: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  sectionMarker: { width: 4, height: 18, borderRadius: 2, backgroundColor: colors.primary },
+  resultsTitle: { fontSize: 17, fontWeight: "800", color: colors.navy, flexShrink: 1 },
+  resultsCount: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
 
   headerText: {
     flex: 1,
@@ -854,32 +900,34 @@ const styles = StyleSheet.create({
   },
 
   eyebrow: {
-    color: colors.primary,
-    fontSize: 12,
+    color: "#A9DFED",
+    fontSize: 10,
+    letterSpacing: 1.2,
     fontWeight: "700",
-    marginBottom: 4,
   },
 
   title: {
-    color: colors.navy,
-    fontSize: 20,
-    fontWeight: "700",
-    lineHeight: 25,
+    color: "#FFFFFF",
+    fontSize: 30,
+    fontWeight: "800",
+    lineHeight: 38,
+    maxWidth: 360,
   },
 
   subtitle: {
     marginTop: 3,
-    color: colors.textSecondary,
+    color: "#CCDCF5",
     fontSize: 12,
     lineHeight: 17,
   },
 
   ctaButton: {
+    backgroundColor: "#287AF0",
     minWidth: 104,
     minHeight: 46,
     paddingHorizontal: 12,
     flexShrink: 0,
-    borderRadius: 12,
+    borderRadius: 14,
   },
 
   // =========================
@@ -902,13 +950,13 @@ const styles = StyleSheet.create({
   searchContainer: {
     flex: 1,
     minWidth: 0,
-    height: 48,
+    height: 54,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 12,
   },
 
@@ -945,9 +993,9 @@ const styles = StyleSheet.create({
 
   filterButton: {
     minWidth: 80,
-    height: 48,
+    height: 54,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -1044,7 +1092,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surface,
@@ -1053,8 +1101,8 @@ const styles = StyleSheet.create({
   },
 
   activeTabButton: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
   },
 
   tabPressed: {
@@ -1082,7 +1130,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 2,
     paddingBottom: 12,
-    gap: 12,
+    gap: 18,
   },
 
   // =========================
@@ -1093,14 +1141,14 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: "#E1E8F5",
     overflow: "hidden",
 
     shadowColor: "#0B3E9C",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -1110,11 +1158,12 @@ const styles = StyleSheet.create({
   },
 
   cardPressed: {
-    opacity: 0.92,
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
   },
 
   accentBar: {
-    width: 3,
+    width: 4,
   },
 
   accentOpen: {
@@ -1128,9 +1177,9 @@ const styles = StyleSheet.create({
   cardBody: {
     flex: 1,
     minWidth: 0,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 12,
   },
 
   cardHeader: {
@@ -1142,9 +1191,10 @@ const styles = StyleSheet.create({
   },
 
   creatorAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primaryLight,
@@ -1164,9 +1214,9 @@ const styles = StyleSheet.create({
 
   projectTitle: {
     color: colors.navy,
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 21,
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 24,
     marginBottom: 2,
   },
 
@@ -1237,13 +1287,16 @@ const styles = StyleSheet.create({
   // =========================
 
   progressSection: {
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: 16,
+    marginBottom: 14,
+    padding: 12,
+    backgroundColor: "#F4F7FD",
+    borderRadius: 12,
     gap: 7,
   },
 
   progressTrack: {
-    height: 6,
+    height: 7,
     borderRadius: 3,
     backgroundColor: colors.border,
     overflow: "hidden",
@@ -1318,7 +1371,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderRadius: 8,
-    backgroundColor: colors.background,
+    backgroundColor: "#F0F5FF",
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 8,
@@ -1340,7 +1393,7 @@ const styles = StyleSheet.create({
   // =========================
 
   footerRow: {
-    marginTop: 10,
+    marginTop: 16,
     minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
@@ -1357,9 +1410,9 @@ const styles = StyleSheet.create({
   },
 
   arrowCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primaryLight,
