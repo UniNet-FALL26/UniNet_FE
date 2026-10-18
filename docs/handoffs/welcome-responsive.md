@@ -1,0 +1,10 @@
+# Responsive welcome screen
+
+- Updated `src/app/(auth)/welcome.tsx` to match the supplied UniNet campus reference. Desktop uses a right-side illustration and diagonal white panel with live logo, community badge, two-tone heading, account actions and trust footer.
+- Desktop panel geometry is `assets/images/welcome-content-panel.svg`: diagonal edge, inward corner beside the student's shoulder and translucent outer band. Its pale decorative arc is clipped inside the panel. Mobile uses its existing stacked layout.
+- Below 900px, content becomes a centered single column (max 600px). The logo, badge and introduction overlay a faded sky/campus scene; the student illustration runs edge to edge beneath the copy. Full-width buttons and partner registration sit on a white footer with pale blue polygons. `welcome-mobile-veil.svg` and `welcome-mobile-footer.svg` supply these native-compatible vector decorations. Safe-area insets and vertical scrolling accommodate small/short screens.
+- `assets/images/welcome-campus-reference.png` is an unchanged copy of the supplied reference. The image viewport clips to its rightmost 60%; all visible copy and navigation are separate components. Preserve this clipping if adjusting the illustration so the embedded reference UI stays hidden.
+- Login/register destinations are unchanged. Partner registration uses Expo Router `Link` for a real link with Enter-key support; the shared TextLink component was not changed.
+- Desktop campus rendering now lives in the shared auth layout to support the animated welcome/login transition. See `auth-desktop-transition.md`; welcome retains the left polygon/content and the existing mobile hero.
+- Verification: TypeScript and `tests/welcome-browser-check.cjs` pass. Real Chrome checked 320/390/440/768/1024/1366/1440/1920px, loaded artwork, horizontal bounds, desktop action visibility, button sizes, runtime errors and keyboard navigation to all three auth destinations. Accessibility tree checked with Chrome DevTools. Screenshots: ignored `dist/welcome-verification/`.
+- Native device screenshots were not tested. No dependencies, backend or authentication logic changed.

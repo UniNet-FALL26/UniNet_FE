@@ -10,16 +10,16 @@ const leftIconNames = {
   person: { ios: 'person', android: 'person', web: 'person' },
   business: { ios: 'building.2', android: 'business', web: 'business' },
 } as const;
-type Props = TextInputProps & { label: string; error?: string; leftIcon?: LeftIcon; passwordVisibility?: { visible: boolean; onToggle: () => void } };
-export function Input({ label, error, leftIcon, passwordVisibility, editable = true, style, ...props }: Props) {
+type Props = TextInputProps & { label: string; compact?: boolean; error?: string; leftIcon?: LeftIcon; passwordVisibility?: { visible: boolean; onToggle: () => void } };
+export function Input({ label, compact = false, error, leftIcon, passwordVisibility, editable = true, style, ...props }: Props) {
   const [focused, setFocused] = useState(false);
-  return <View style={styles.field}>
+  return <View style={[styles.field, compact && { gap: 4 }]}>
     <Text style={styles.label}>{label}</Text>
-    <View style={[styles.box, focused && styles.focused, !!error && styles.errorBox, !editable && styles.disabled]}>
+    <View style={[styles.box, compact && { minHeight: 44 }, focused && styles.focused, !!error && styles.errorBox, !editable && styles.disabled]}>
       {leftIcon && <SymbolView name={leftIconNames[leftIcon]} size={20} tintColor={colors.textSecondary} style={styles.leftIcon} />}
       <TextInput {...props} editable={editable} onFocus={event => { setFocused(true); props.onFocus?.(event); }} onBlur={event => { setFocused(false); props.onBlur?.(event); }}
-        placeholderTextColor={colors.textMuted} style={[styles.input, style]} accessibilityLabel={label} />
-      {passwordVisibility && <Pressable onPress={passwordVisibility.onToggle} accessibilityRole="button" accessibilityLabel={passwordVisibility.visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} accessibilityHint={`Cho trường ${label}`} disabled={!editable} hitSlop={4} style={({ pressed }) => [styles.rightIcon, pressed && styles.iconPressed]}>
+        placeholderTextColor={colors.textMuted} style={[styles.input, compact && { minHeight: 42 }, style]} accessibilityLabel={label} />
+      {passwordVisibility && <Pressable onPress={passwordVisibility.onToggle} accessibilityRole="button" accessibilityLabel={passwordVisibility.visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} accessibilityHint={`Cho trường ${label}`} disabled={!editable} hitSlop={4} style={({ pressed }) => [styles.rightIcon, compact && { height: 42 }, pressed && styles.iconPressed]}>
         <SymbolView name={passwordVisibility.visible ? { ios: 'eye.slash', android: 'visibility_off', web: 'visibility_off' } : { ios: 'eye', android: 'visibility', web: 'visibility' }} size={21} tintColor={colors.textSecondary} />
       </Pressable>}
     </View>
