@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <defs><clipPath id="panel"><path d="M0 0H1000V1000H264L150 640L211 565Z"/></clipPath></defs>
+  <path d="M-31 0H1000V1000H233L119 640L180 565Z" fill="#fff" fill-opacity=".45"/>
+  <path d="M0 0H1000V1000H264L150 640L211 565Z" fill="#fcfeff"/>
+  <g clip-path="url(#panel)"><path d="M650 0H1000V180Z" fill="#f3f9ff"/><path d="M0 790L150 1000H0ZM1000 680L820 1000H1000Z" fill="#f1f8ff"/></g>
+</svg>

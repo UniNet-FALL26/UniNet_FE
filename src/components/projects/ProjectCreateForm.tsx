@@ -1,14 +1,16 @@
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { colors } from "@/constants/colors";
-import { projectService } from "@/services/project.service";
-import type { CreateProjectRequest } from "@/types/project";
+import { skillService, type SkillCatalogItem } from "@/services/skill.service";
+import { projectFields } from "@/constants/project-fields";
+import { ProjectVisibility, type CreateProjectRequest } from "@/types/project";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,34 +20,6 @@ import {
   Text,
   View,
 } from "react-native";
-
-const defaultTechnologyOptions = [
-  "React Native",
-  "TypeScript",
-  "Node.js",
-  "Firebase",
-  "AI / LLM",
-  "Python",
-  "PostgreSQL",
-  "Docker",
-  "Next.js",
-  "Flutter",
-];
-
-// Danh sách các domain/nghiệp vụ cụ thể trong ngành IT
-const projectFields = [
-  "EdTech (Giáo dục)",
-  "FinTech (Tài chính - Ngân hàng)",
-  "HealthTech (Y tế - Sức khỏe)",
-  "E-Commerce (Thương mại điện tử)",
-  "AI & Trí tuệ nhân tạo",
-  "IoT & Thành phố thông minh",
-  "Logistics & Vận tải",
-  "Social & Mạng xã hội",
-  "Game & Giải trí",
-  "An toàn thông tin / Security",
-  "Khác",
-];
 
 const emptyRole = () => ({
   id: "",
@@ -57,14 +31,19 @@ const emptyRole = () => ({
 type DatePickerTarget = "recruitmentDeadline" | "expectedOutput" | null;
 
 export function ProjectCreateScreen() {
+  const compact = useWindowDimensions().width < 600;
   const [title, setTitle] = useState("");
   const [projectField, setProjectField] = useState("");
   const [customProjectField, setCustomProjectField] = useState("");
   const [description, setDescription] = useState("");
 
   const [availableTechnologies, setAvailableTechnologies] = useState<string[]>(
-    defaultTechnologyOptions,
+    [],
   );
+  const [skillCatalog, setSkillCatalog] = useState<SkillCatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogRetry, setCatalogRetry] = useState(0);
   const [technologies, setTechnologies] = useState<string[]>([]);
   const [customTechInput, setCustomTechInput] = useState("");
 
@@ -90,6 +69,28 @@ export function ProjectCreateScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setCatalogError(null);
+    setCatalogLoading(true);
+    skillService
+      .getSkills(controller.signal)
+      .then((catalog) => {
+        if (controller.signal.aborted) return;
+        setSkillCatalog(catalog);
+        setAvailableTechnologies(catalog.map((skill) => skill.name));
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted)
+          setCatalogError(
+            cause instanceof Error
+              ? cause.message
+              : "Không thể tải danh mục kỹ năng.",
+          );
+      }).finally(() => { if (!controller.signal.aborted) setCatalogLoading(false); });
+    return () => controller.abort();
+  }, [catalogRetry]);
+
   const totalRoleQuantity = useMemo(
     () => roles.reduce((sum, role) => sum + Number(role.quantity || 0), 0),
     [roles],
@@ -107,12 +108,16 @@ export function ProjectCreateScreen() {
     const trimmed = customTechInput.trim();
     if (!trimmed) return;
 
-    if (!availableTechnologies.includes(trimmed)) {
-      setAvailableTechnologies((prev) => [...prev, trimmed]);
+    const skill = skillCatalog.find(
+      (item) => item.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (!skill) {
+      setSubmitError("Vui lòng chọn công nghệ trong danh mục kỹ năng.");
+      return;
     }
-    if (!technologies.includes(trimmed)) {
-      setTechnologies((prev) => [...prev, trimmed]);
-    }
+    if (!technologies.includes(skill.name))
+      setTechnologies((prev) => [...prev, skill.name]);
+    setSubmitError(null);
     setCustomTechInput("");
   };
 
@@ -154,38 +159,14 @@ export function ProjectCreateScreen() {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
-  const formatDateOnly = (date: Date | null) => {
-    if (!date) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
-  const formatDateTimeForApi = (date: Date | null) => {
-    if (!date) return undefined;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}:00`;
-  };
-
-  const formatDateForApi = (date: Date | null) => {
-    if (!date) return undefined;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const openDeadlinePicker = () => {
-    const initialDate = recruitmentDeadline
-      ? new Date(recruitmentDeadline)
+  const openDateTimePicker = (target: Exclude<DatePickerTarget, null>) => {
+    const currentDate = target === "expectedOutput" ? expectedOutputDate : recruitmentDeadline;
+    const saveDate = target === "expectedOutput" ? setExpectedOutputDate : setRecruitmentDeadline;
+    const initialDate = currentDate
+      ? new Date(currentDate)
       : new Date();
 
-    if (!recruitmentDeadline) {
+    if (!currentDate) {
       initialDate.setHours(23, 59, 0, 0);
     }
 
@@ -220,7 +201,7 @@ export function ProjectCreateScreen() {
                 0,
                 0,
               );
-              setRecruitmentDeadline(finalDate);
+              saveDate(finalDate);
             },
           });
         },
@@ -229,34 +210,12 @@ export function ProjectCreateScreen() {
     }
 
     setTempDate(initialDate);
-    setDatePickerTarget("recruitmentDeadline");
+    setDatePickerTarget(target);
     setDatePickerStep("date");
   };
 
-  const openExpectedOutputDatePicker = () => {
-    const initialDate = expectedOutputDate
-      ? new Date(expectedOutputDate)
-      : new Date();
-
-    if (Platform.OS === "android") {
-      DateTimePickerAndroid.open({
-        value: initialDate,
-        mode: "date",
-        display: "calendar",
-        minimumDate: new Date(),
-        onValueChange: (_event, selectedDate) => {
-          if (selectedDate) {
-            setExpectedOutputDate(new Date(selectedDate));
-          }
-        },
-      });
-      return;
-    }
-
-    setTempDate(initialDate);
-    setDatePickerTarget("expectedOutput");
-    setDatePickerStep("date");
-  };
+  const openDeadlinePicker = () => openDateTimePicker("recruitmentDeadline");
+  const openExpectedOutputDatePicker = () => openDateTimePicker("expectedOutput");
 
   const closeDatePicker = () => {
     setDatePickerTarget(null);
@@ -312,6 +271,16 @@ export function ProjectCreateScreen() {
       nextErrors.recruitmentDeadline = "Hạn chót phải nằm trong tương lai.";
     }
 
+    if (!expectedOutputDate) {
+      nextErrors.expectedOutput = "Ngày dự kiến hoàn thành là bắt buộc.";
+    } else if (
+      recruitmentDeadline &&
+      expectedOutputDate.getTime() <= recruitmentDeadline.getTime()
+    ) {
+      nextErrors.expectedOutput =
+        "Ngày hoàn thành phải sau hạn tuyển thành viên.";
+    }
+
     return nextErrors;
   };
 
@@ -331,32 +300,31 @@ export function ProjectCreateScreen() {
       title: title.trim(),
       projectField: finalProjectField,
       description: description.trim(),
-      technologies,
+      skillIds: skillCatalog
+        .filter((skill) => technologies.includes(skill.name))
+        .map((skill) => skill.id),
       memberTarget: Number(memberTarget),
-      roles: roles.map((role) => ({
-        id: role.id,
+      roleRequirements: roles.map((role) => ({
         role: role.role.trim(),
         quantity: Number(role.quantity),
         requirements: role.requirements.trim(),
       })),
-      recruitmentDeadline: formatDateTimeForApi(recruitmentDeadline)!,
-      expectedOutput: formatDateForApi(expectedOutputDate),
-      status: isPrivate ? "Private" : "Public",
-      recruitmentStatus: "Open",
+      recruitmentDeadline: recruitmentDeadline!.toISOString(),
+      expectedOutput: expectedOutputDate!.toISOString(),
+      visibility: isPrivate
+        ? ProjectVisibility.Private
+        : ProjectVisibility.Public,
     };
 
     try {
-      const createdProject = await projectService.createProject(payload);
       router.push({
         pathname: "/group/recommendations" as never,
         params: {
-          projectId: createdProject.id,
+          draft: JSON.stringify(payload),
         },
       } as never);
     } catch {
-      setSubmitError(
-        "Không thể tạo dự án. Vui lòng kiểm tra dữ liệu và thử lại.",
-      );
+      setSubmitError("Không thể chuyển sang bước xác nhận. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
@@ -366,7 +334,7 @@ export function ProjectCreateScreen() {
     if (!datePickerTarget || Platform.OS === "android") return null;
 
     const isOutputDate = datePickerTarget === "expectedOutput";
-    const mode = isOutputDate ? "date" : datePickerStep;
+    const mode = datePickerStep;
 
     return (
       <DateTimePicker
@@ -377,12 +345,6 @@ export function ProjectCreateScreen() {
         minimumDate={new Date()}
         onChange={(event, selectedDate) => {
           if (event.type === "dismissed" || !selectedDate) {
-            closeDatePicker();
-            return;
-          }
-
-          if (isOutputDate) {
-            setExpectedOutputDate(new Date(selectedDate));
             closeDatePicker();
             return;
           }
@@ -406,7 +368,8 @@ export function ProjectCreateScreen() {
             0,
             0,
           );
-          setRecruitmentDeadline(finalDate);
+          if (isOutputDate) setExpectedOutputDate(finalDate);
+          else setRecruitmentDeadline(finalDate);
           closeDatePicker();
         }}
       />
@@ -427,7 +390,10 @@ export function ProjectCreateScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại danh sách dự án"
+            hitSlop={12}
+            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
             style={({ pressed }) => [
               styles.backButton,
               pressed && styles.backButtonPressed,
@@ -460,7 +426,8 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.card}>
-            <Input
+            <Input appearance="project"
+
               label="Tên dự án *"
               value={title}
               onChangeText={setTitle}
@@ -534,7 +501,8 @@ export function ProjectCreateScreen() {
               {/* INPUT NẾU CHỌN LĨNH VỰC "KHÁC" */}
               {projectField === "Khác" ? (
                 <View style={styles.customFieldInputWrapper}>
-                  <Input
+                  <Input appearance="project"
+
                     label="Tên lĩnh vực khác *"
                     value={customProjectField}
                     onChangeText={setCustomProjectField}
@@ -545,7 +513,8 @@ export function ProjectCreateScreen() {
               ) : null}
             </View>
 
-            <Input
+            <Input appearance="project"
+
               label="Mô tả dự án *"
               value={description}
               onChangeText={setDescription}
@@ -567,7 +536,8 @@ export function ProjectCreateScreen() {
               {/* Ô thêm công nghệ custom */}
               <View style={styles.customTechInputRow}>
                 <View style={styles.customTechInputContainer}>
-                  <Input
+                  <Input appearance="project"
+
                     label="Thêm công nghệ khác"
                     value={customTechInput}
                     onChangeText={setCustomTechInput}
@@ -587,6 +557,18 @@ export function ProjectCreateScreen() {
                 </Pressable>
               </View>
 
+              {catalogLoading && <Text style={styles.sectionDescription}>Đang tải danh mục kỹ năng…</Text>}
+              {catalogError && <Text accessibilityRole="alert" style={styles.errorText}>{catalogError}</Text>}
+              {!catalogLoading && !catalogError && !availableTechnologies.length && (
+                <Text style={styles.sectionDescription}>Chưa có kỹ năng trong danh mục.</Text>
+              )}
+              {!catalogLoading && (catalogError || !availableTechnologies.length) && (
+                <Button
+                  title="Tải lại danh mục kỹ năng"
+                  variant="outline"
+                  onPress={() => setCatalogRetry((value) => value + 1)}
+                />
+              )}
               <View style={styles.tagsWrap}>
                 {availableTechnologies.map((tech) => {
                   const selected = technologies.includes(tech);
@@ -630,7 +612,8 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.card}>
-            <Input
+            <Input appearance="project"
+
               label="Số thành viên mục tiêu *"
               value={memberTarget}
               onChangeText={setMemberTarget}
@@ -675,9 +658,10 @@ export function ProjectCreateScreen() {
                   ) : null}
                 </View>
 
-                <View style={styles.roleRow}>
+                <View style={[styles.roleRow, compact && { flexDirection: "column" }]}>
                   <View style={styles.roleNameWrapper}>
-                    <Input
+                    <Input appearance="project"
+
                       label="Tên vai trò *"
                       value={role.role}
                       onChangeText={(value) => updateRole(index, "role", value)}
@@ -685,8 +669,9 @@ export function ProjectCreateScreen() {
                     />
                   </View>
 
-                  <View style={styles.quantityWrapper}>
-                    <Input
+                  <View style={[styles.quantityWrapper, compact && { width: "100%" }]}>
+                    <Input appearance="project"
+
                       label="Số lượng *"
                       value={String(role.quantity)}
                       onChangeText={(value) =>
@@ -698,7 +683,8 @@ export function ProjectCreateScreen() {
                   </View>
                 </View>
 
-                <Input
+                <Input appearance="project"
+
                   label="Yêu cầu của vai trò *"
                   value={role.requirements}
                   onChangeText={(value) =>
@@ -785,14 +771,14 @@ export function ProjectCreateScreen() {
               ) : null}
             </View>
 
-            {/* EXPECTED OUTPUT DATE (CHỈ CHỌN NGÀY THÁNG NĂM) */}
+            {/* EXPECTED OUTPUT DATE AND TIME */}
             <View style={styles.fieldContainer}>
               <Text style={styles.inputLabel}>
-                Ngày dự kiến bàn giao sản phẩm
+                Ngày dự kiến bàn giao sản phẩm *
               </Text>
               <Pressable
                 onPress={openExpectedOutputDatePicker}
-                style={styles.dateButton}
+                style={[styles.dateButton, errors.expectedOutput && styles.dateButtonError]}
               >
                 <View style={[styles.dateIcon, { backgroundColor: "#E6FBF2" }]}>
                   <Text style={styles.dateIconText}>🎯</Text>
@@ -806,10 +792,10 @@ export function ProjectCreateScreen() {
                     ]}
                   >
                     {expectedOutputDate
-                      ? formatDateOnly(expectedOutputDate)
-                      : "Chọn ngày hoàn thành sản phẩm"}
+                      ? formatDateTime(expectedOutputDate)
+                      : "Chọn ngày và giờ hoàn thành"}
                   </Text>
-                  <Text style={styles.dateHelper}>Ngày / tháng / năm</Text>
+                  <Text style={styles.dateHelper}>Ngày / tháng / năm • Giờ : phút</Text>
                 </View>
 
                 <Text style={styles.dateArrow}>›</Text>
@@ -818,6 +804,10 @@ export function ProjectCreateScreen() {
           </View>
         </View>
 
+        {errors.expectedOutput ? (
+          <Text style={{ color: colors.error }}>{errors.expectedOutput}</Text>
+        ) : null}
+
         {/* PRIVATE PROJECT */}
         <View style={styles.privateCard}>
           <View style={styles.privateIcon}>
@@ -825,7 +815,9 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.privateContent}>
-            <Text style={styles.privateTitle}>Dự án riêng tư</Text>
+            <Text style={styles.privateTitle}>
+              {isPrivate ? "Dự án riêng tư" : "Dự án công khai"}
+            </Text>
             <Text style={styles.privateDescription}>
               {isPrivate
                 ? "Dự án chỉ dành cho những người được mời."
@@ -853,11 +845,11 @@ export function ProjectCreateScreen() {
         ) : null}
 
         {/* ACTIONS */}
-        <View style={styles.actions}>
+        <View style={[styles.actions, compact && { flexDirection: "column" }]}>
           <Button
             title="Hủy bỏ"
             variant="outline"
-            onPress={() => router.back()}
+            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
             style={styles.cancelButton}
           />
 
@@ -890,8 +882,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 20,
     paddingBottom: 48,
-    gap: 18,
-    maxWidth: 780,
+    gap: 24,
+    maxWidth: 1080,
     width: "100%",
     alignSelf: "center",
   },
@@ -901,17 +893,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    marginBottom: 4,
+    marginBottom: 0,
   },
 
   headerText: {
     flex: 1,
+    minWidth: 0,
   },
 
   backButton: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -999,9 +992,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 18,
-    padding: 16,
-    gap: 16,
+    borderRadius: 20,
+    padding: 20,
+    gap: 24,
   },
 
   /* INPUT */
@@ -1032,11 +1025,11 @@ const styles = StyleSheet.create({
 
   /* DROPDOWN */
   dropdownButton: {
-    minHeight: 50,
+    minHeight: 52,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -1113,17 +1106,18 @@ const styles = StyleSheet.create({
   /* TECHNOLOGY */
   customTechInputRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: 8,
     marginVertical: 4,
   },
 
   customTechInputContainer: {
     flex: 1,
+    minWidth: 0,
   },
 
   addTechButton: {
-    height: 50,
+    height: 52,
     paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: "#EEF5FF",
@@ -1131,7 +1125,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20, // cân chỉnh alignment với Input có label
+
   },
 
   addTechButtonPressed: {
@@ -1152,19 +1146,21 @@ const styles = StyleSheet.create({
   },
 
   techChip: {
-    minHeight: 38,
-    paddingHorizontal: 13,
-    borderRadius: 19,
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 7,
+    maxWidth: "100%",
   },
 
   techChipSelected: {
-    backgroundColor: "#E8F1FF",
-    borderColor: colors.primary,
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
   },
 
   techChipText: {
@@ -1174,7 +1170,7 @@ const styles = StyleSheet.create({
   },
 
   techChipTextSelected: {
-    color: colors.primary,
+    color: "#FFFFFF",
     fontWeight: "700",
   },
 
@@ -1184,6 +1180,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    flexWrap: "wrap",
   },
 
   addRoleButton: {

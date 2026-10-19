@@ -1,2 +1,5 @@
-import { ComingSoon } from '@/components/ui/ComingSoon';
-export default function SettingsScreen() { return <ComingSoon title="Cài đặt" />; }
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
+
+export default function SettingsScreen() {
+  return <SettingsPanel />;
+}

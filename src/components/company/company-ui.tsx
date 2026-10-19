@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -33,8 +33,8 @@ export function CompanyPage({ children }: { children: ReactNode }) {
   return <View style={styles.page}>{children}</View>;
 }
 
-export function PageScroll({ children, contentStyle }: { children: ReactNode; contentStyle?: StyleProp<ViewStyle> }) {
-  return <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, contentStyle]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>;
+export function PageScroll({ children, contentStyle, scrollRef }: { children: ReactNode; contentStyle?: StyleProp<ViewStyle>; scrollRef?: Ref<ScrollView> }) {
+  return <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={[styles.scrollContent, contentStyle]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>;
 }
 
 export function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -49,7 +49,7 @@ export function SectionTitle({ title, action, onAction }: { title: string; actio
   return <View style={styles.sectionTitleRow}><Text style={styles.sectionTitle}>{title}</Text>{action && onAction ? <Pressable onPress={onAction} style={styles.inlineAction}><Text style={styles.inlineActionText}>{action}</Text><CompanyIcon name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} size={13} /></Pressable> : null}</View>;
 }
 
-export function Tag({ children, tone = 'purple' }: { children: ReactNode; tone?: 'purple' | 'green' | 'amber' | 'gray' | 'rose' }) {
+export function Tag({ children, tone = 'purple', icon }: { children: ReactNode; tone?: 'purple' | 'green' | 'amber' | 'gray' | 'rose'; icon?: IconName }) {
   const tones = {
     purple: [companyColors.purpleSoft, companyColors.purple],
     green: [companyColors.greenSoft, companyColors.green],
@@ -57,7 +57,7 @@ export function Tag({ children, tone = 'purple' }: { children: ReactNode; tone?:
     gray: [companyColors.page, appColors.textSecondary],
     rose: ['#FCEBED', companyColors.rose],
   } as const;
-  return <View style={[styles.tag, { backgroundColor: tones[tone][0] }]}><Text style={[styles.tagText, { color: tones[tone][1] }]}>{children}</Text></View>;
+  return <View style={[styles.tag, { backgroundColor: tones[tone][0] }]}><View style={styles.tagInner}>{icon && <CompanyIcon name={icon} size={12} color={tones[tone][1]} />}<Text style={[styles.tagText, { color: tones[tone][1] }]}>{children}</Text></View></View>;
 }
 
 export function ActionButton({ title, onPress, icon, variant = 'primary', style }: { title: string; onPress: () => void; icon?: IconName; variant?: 'primary' | 'outline' | 'soft'; style?: StyleProp<ViewStyle> }) {
@@ -71,7 +71,7 @@ const tabs = [
   { label: 'Tổng quan', route: '/(company)', icon: { ios: 'square.grid.2x2', android: 'dashboard', web: 'dashboard' }, active: { ios: 'square.grid.2x2.fill', android: 'dashboard', web: 'dashboard' } },
   { label: 'Bài đăng', route: '/(company)/jobs', icon: { ios: 'briefcase', android: 'work_outline', web: 'work_outline' }, active: { ios: 'briefcase.fill', android: 'work', web: 'work' } },
   { label: 'Ứng viên', route: '/(company)/applicants', icon: { ios: 'person.2', android: 'groups', web: 'groups' }, active: { ios: 'person.2.fill', android: 'groups', web: 'groups' } },
-  { label: 'Công ty', route: '/(company)/profile', icon: { ios: 'building.2', android: 'business', web: 'business' }, active: { ios: 'building.2.fill', android: 'business', web: 'business' } },
+  { label: 'Đối tác', route: '/(company)/profile', icon: { ios: 'building.2', android: 'business', web: 'business' }, active: { ios: 'building.2.fill', android: 'business', web: 'business' } },
 ] as const;
 
 export function CompanyTabBar() {
@@ -102,6 +102,7 @@ const styles = StyleSheet.create({
   inlineAction: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   inlineActionText: { color: companyColors.purple, fontSize: 11, fontWeight: '700' },
   tag: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  tagInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tagText: { fontSize: 10, lineHeight: 13, fontWeight: '700' },
   actionButton: { minHeight: 42, borderRadius: 11, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   actionPrimary: { backgroundColor: companyColors.purple },

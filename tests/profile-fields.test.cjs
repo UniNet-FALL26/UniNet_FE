@@ -40,7 +40,9 @@ test('derived technology count deduplicates canonical skills; legacy years/GPA r
 });
 test('editor API whitelists presentation fields and saves them with content', async () => {
   const exports = {}; let captured;
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/services/portfolio.service.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: () => ({ apiRequest: async (url, options) => { captured = { url, options }; return fixture(); } }) });
+  const payloadExports = {};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/utils/profile-draft.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: payloadExports, require: () => ({}) });
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/services/portfolio.service.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: name => name === '@/utils/profile-draft' ? payloadExports : ({ apiRequest: async (url, options) => { captured = { url, options }; return fixture(); } }) });
   const data = fixture(); data.profile.studentCode = 'private'; data.profile.isVerified = true;
   await exports.portfolioService.saveEditor(data);
   const body = JSON.parse(captured.options.body);

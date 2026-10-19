@@ -8,6 +8,7 @@ import { ACCOUNT_ROLE } from '@/constants/roles';
 export default function CompanyLayout() {
   const { isLoading, isAuthenticated, account } = useAuthStore();
   if (isLoading) return <Loading />;
+  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
   if (isAuthenticated && account?.role !== ACCOUNT_ROLE.PARTNER) return <Redirect href="/(tabs)" />;
   return <SafeAreaView edges={['top']} style={{ flex: 1 }}><Slot /><CompanyTabBar /></SafeAreaView>;
 }

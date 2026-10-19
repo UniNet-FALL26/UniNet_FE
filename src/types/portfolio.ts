@@ -13,7 +13,7 @@ export type PortfolioContent = {
   yearsOfExperience?: number | null; gpa?: string | null;
   headline: string | null; careerObjective: string | null; location: string | null; availability: string | null;
   contactEmail: string | null; cvUrl: string | null; isPublic: boolean;
-  appearance: { profile: { template: string; theme: string; font: string; sectionOrder: string[]; hiddenSections: string[] } };
+  appearance: { profile: { template: string; theme: string; font: string; sectionOrder: string[]; hiddenSections: string[]; showPortfolio?: boolean | null } };
   skills: PortfolioSkill[]; projects: PortfolioProject[]; experience: PortfolioMilestone[]; education: PortfolioMilestone[];
   certificates: PortfolioCertificate[]; articles: PortfolioArticle[]; socialLinks: { label: string; url: string }[];
   activities?: { title: string; organization?: string | null; description?: string | null; date?: string | null }[] | null;

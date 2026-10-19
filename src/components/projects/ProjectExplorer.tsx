@@ -2,33 +2,50 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import type { Project } from "@/types/project";
+import { skillService } from "@/services/skill.service";
+import { projectFields } from "@/constants/project-fields";
+import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { Image as DecorativeImage } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
 const tabs = [
   "Đang tuyển",
   "Dự án của tôi",
-  "Yêu cầu tham gia",
-  "Lời mời đã gửi",
-  "Lời mời nhận được",
-  "Đã đóng tuyển",
+  "Dự án chờ duyệt",
+  "Dự án hoàn thành",
+  "Dự án bị từ chối",
 ] as const;
 
 type Tab = (typeof tabs)[number];
 
 export function ProjectExplorerScreen() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const insets = useSafeAreaInsets();
+  const compactHero = useWindowDimensions().width < 768;
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [retry, setRetry] = useState(0);
+  const [keyword, setKeyword] = useState("");
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogRetry, setCatalogRetry] = useState(0);
 
   const [activeTab, setActiveTab] = useState<Tab>("Đang tuyển");
 
@@ -47,10 +64,10 @@ export function ProjectExplorerScreen() {
   const [filterVisible, setFilterVisible] = useState(false);
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
   const [draftSkills, setDraftSkills] = useState<string[]>([]);
-  const [draftRoles, setDraftRoles] = useState<string[]>([]);
+  const [draftFields, setDraftFields] = useState<string[]>([]);
 
   const [filterSearch, setFilterSearch] = useState("");
 
@@ -59,57 +76,47 @@ export function ProjectExplorerScreen() {
   // =========================
 
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
+    setCatalogLoading(true);
+    setCatalogError(null);
+    skillService.getSkills(controller.signal).then((catalog) => {
+      if (!controller.signal.aborted) setAvailableSkills(Array.from(new Set(catalog.map((skill) => skill.name))));
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setCatalogError(cause instanceof Error ? cause.message : "Không thể tải danh mục kỹ năng.");
+    }).finally(() => { if (!controller.signal.aborted) setCatalogLoading(false); });
+    return () => controller.abort();
+  }, [catalogRetry]);
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = await projectService.listProjects();
-
-        if (mounted) {
-          setProjects(data);
-        }
-      } catch {
-        if (mounted) {
-          setError("Không thể tải danh sách dự án. Vui lòng thử lại sau.");
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // =========================
-  // AVAILABLE FILTER OPTIONS
-  // =========================
-
-  const availableSkills = useMemo(() => {
-    const skills = projects.flatMap((project) => project.technologies ?? []);
-
-    return Array.from(new Set(skills))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  }, [projects]);
-
-  const availableRoles = useMemo(() => {
-    const roles = projects.flatMap((project) =>
-      (project.roles ?? []).map((role) => role.role),
-    );
-
-    return Array.from(new Set(roles))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  }, [projects]);
+  useEffect(() => {
+    const timer = setTimeout(() => { setKeyword(searchQuery.trim()); setPage(1); }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  const statusTab = activeTab === "Dự án hoàn thành" ? ApiProjectStatus.Completed
+    : activeTab === "Dự án chờ duyệt" ? ApiProjectStatus.Pending
+    : activeTab === "Dự án bị từ chối" ? ApiProjectStatus.Rejected : undefined;
+  const personalTab = activeTab !== "Đang tuyển";
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError(null); setProjects([]);
+    const request = statusTab !== undefined
+      ? projectService.listProjectsByStatus(statusTab, page, 10, controller.signal)
+      : personalTab
+      ? projectService.listMyProjects({ page, pageSize: 10 }, controller.signal)
+      : projectService.listProjects({ page, pageSize: 10, keyword, field: selectedFields[0], skillnames: selectedSkills,
+      recruitmentStatus: activeTab === "Đang tuyển" ? ApiRecruitmentStatus.Open : undefined,
+    }, controller.signal);
+    request.then((data) => {
+      if (controller.signal.aborted) return;
+      setProjects(data.projects); setTotalPages(data.totalPages); setTotalItems(data.totalItems);
+    }).catch((cause) => {
+      if (controller.signal.aborted) return;
+      if (cause?.status === 404 || (cause instanceof Error && /^projects? not found\.?$/i.test(cause.message.trim()))) {
+        setProjects([]); setTotalPages(0); setTotalItems(0); setError(null);
+      } else setError(cause instanceof Error ? cause.message : "Không thể tải danh sách dự án.");
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [page, keyword, selectedFields, selectedSkills, activeTab, retry, statusTab, personalTab]);
+  const availableFields = projectFields;
 
   // =========================
   // FILTER OPTIONS SEARCH
@@ -127,17 +134,17 @@ export function ProjectExplorerScreen() {
     );
   }, [availableSkills, filterSearch]);
 
-  const filteredAvailableRoles = useMemo(() => {
+  const filteredAvailableFields = useMemo(() => {
     const keyword = filterSearch.trim().toLowerCase();
 
     if (!keyword) {
-      return availableRoles;
+      return availableFields;
     }
 
-    return availableRoles.filter((role) =>
+    return availableFields.filter((role) =>
       role.toLowerCase().includes(keyword),
     );
-  }, [availableRoles, filterSearch]);
+  }, [availableFields, filterSearch]);
 
   // =========================
   // OPEN FILTER MODAL
@@ -145,7 +152,7 @@ export function ProjectExplorerScreen() {
 
   const openFilter = () => {
     setDraftSkills(selectedSkills);
-    setDraftRoles(selectedRoles);
+    setDraftFields(selectedFields);
     setFilterSearch("");
     setFilterVisible(true);
   };
@@ -168,14 +175,8 @@ export function ProjectExplorerScreen() {
   // TOGGLE ROLE
   // =========================
 
-  const toggleRole = (role: string) => {
-    setDraftRoles((current) => {
-      if (current.includes(role)) {
-        return current.filter((item) => item !== role);
-      }
-
-      return [...current, role];
-    });
+  const toggleField = (field: string) => {
+    setDraftFields((current) => current.includes(field) ? [] : [field]);
   };
 
   // =========================
@@ -183,8 +184,9 @@ export function ProjectExplorerScreen() {
   // =========================
 
   const applyFilter = () => {
+    setPage(1);
     setSelectedSkills(draftSkills);
-    setSelectedRoles(draftRoles);
+    setSelectedFields(draftFields);
     setFilterVisible(false);
   };
 
@@ -194,191 +196,90 @@ export function ProjectExplorerScreen() {
 
   const clearFilter = () => {
     setDraftSkills([]);
-    setDraftRoles([]);
+    setDraftFields([]);
   };
 
   const clearAppliedFilter = () => {
+    setPage(1);
     setSelectedSkills([]);
-    setSelectedRoles([]);
+    setSelectedFields([]);
   };
 
   // =========================
   // ACTIVE FILTER COUNT
   // =========================
 
-  const activeFilterCount = selectedSkills.length + selectedRoles.length;
+  const activeFilterCount = selectedSkills.length + selectedFields.length;
 
   // =========================
   // PROJECT FILTERING
   // =========================
 
-  const filteredProjects = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
-
-    return projects.filter((project) => {
-      // =========================
-      // TAB FILTER
-      // =========================
-
-      let matchesTab = true;
-
-      switch (activeTab) {
-        case "Dự án của tôi":
-          matchesTab = project.creator.id === "current-user";
-          break;
-
-        case "Yêu cầu tham gia":
-          matchesTab = project.recruitmentStatus === "Open";
-          break;
-
-        case "Lời mời đã gửi":
-          matchesTab = project.creator.id === "current-user";
-          break;
-
-        case "Lời mời nhận được":
-          matchesTab = project.recruitmentStatus === "Open";
-          break;
-
-        case "Đã đóng tuyển":
-          matchesTab =
-            project.recruitmentStatus === "Closed" ||
-            project.recruitmentStatus === "Expired";
-          break;
-
-        case "Đang tuyển":
-        default:
-          matchesTab = project.recruitmentStatus === "Open";
-          break;
-      }
-
-      if (!matchesTab) {
-        return false;
-      }
-
-      // =========================
-      // SEARCH FILTER
-      // =========================
-
-      if (keyword) {
-        const title = project.title?.toLowerCase() ?? "";
-
-        const creator = project.creator?.displayName?.toLowerCase() ?? "";
-
-        const technologies = (project.technologies ?? [])
-          .join(" ")
-          .toLowerCase();
-
-        const roles = (project.roles ?? [])
-          .map((role) => role.role)
-          .join(" ")
-          .toLowerCase();
-
-        const matchesSearch =
-          title.includes(keyword) ||
-          creator.includes(keyword) ||
-          technologies.includes(keyword) ||
-          roles.includes(keyword);
-
-        if (!matchesSearch) {
-          return false;
-        }
-      }
-
-      // =========================
-      // SKILL FILTER
-      // =========================
-
-      if (selectedSkills.length > 0) {
-        const projectTechnologies = (project.technologies ?? []).map(
-          (technology) => technology.toLowerCase(),
-        );
-
-        const matchesSkills = selectedSkills.every((skill) =>
-          projectTechnologies.includes(skill.toLowerCase()),
-        );
-
-        if (!matchesSkills) {
-          return false;
-        }
-      }
-
-      // =========================
-      // ROLE FILTER
-      // =========================
-
-      if (selectedRoles.length > 0) {
-        const projectRoles = (project.roles ?? []).map((role) =>
-          role.role.toLowerCase(),
-        );
-
-        const matchesRoles = selectedRoles.some((role) =>
-          projectRoles.includes(role.toLowerCase()),
-        );
-
-        if (!matchesRoles) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [projects, activeTab, searchQuery, selectedSkills, selectedRoles]);
-
-  // =========================
-  // LOADING
-  // =========================
-
-  if (loading) {
-    return <Loading />;
-  }
+  const filteredProjects = projects.filter((project) => {
+    return true;
+  });
 
   // =========================
   // RENDER
   // =========================
 
   return (
-    <>
+    <View style={[styles.container, { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.screenContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {/* =========================
             HEADER
         ========================= */}
 
-        <View style={styles.header}>
+        <View style={[styles.header, compactHero && styles.headerCompact]}>
+          <View pointerEvents="none" style={StyleSheet.absoluteFill} accessible={false} importantForAccessibility="no-hide-descendants">
+            <DecorativeImage source={require("../../../assets/images/project-explorer-hero.svg")} contentFit="cover" style={StyleSheet.absoluteFill} />
+            <DecorativeImage source={require("../../../assets/images/project-explorer-team.svg")} contentFit="contain" style={[styles.heroArtwork, compactHero && styles.heroArtworkCompact]} />
+          </View>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Khám phá các dự án</Text>
-
+            <View style={styles.eyebrowBadge}>
+              <Text style={styles.eyebrow}>KẾT NỐI ĐỂ CÙNG TẠO NÊN GIÁ TRỊ</Text>
+            </View>
+            <Text style={[styles.title, compactHero && styles.titleCompact]}>Khám phá các dự án</Text>
+            <Text style={styles.heroDescription}>Ý tưởng lớn bắt đầu từ một đội ngũ phù hợp.</Text>
+          </View>
+          <View style={styles.heroFooter}>
             <Text style={styles.subtitle}>
               {filteredProjects.length > 0
-                ? `${filteredProjects.length} dự án đang hiển thị`
+                ? `${filteredProjects.length} dự án tiềm năng / ${totalItems} kết quả`
                 : "Tìm đồng đội phù hợp cho ý tưởng của bạn"}
             </Text>
+            <Button
+              title="＋ Tạo dự án"
+              variant="primary"
+              onPress={() => router.navigate("/group/create" as never)}
+              style={styles.ctaButton}
+              textStyle={styles.ctaButtonText}
+            />
           </View>
-
-          <Button
-            title="Tạo dự án"
-            variant="primary"
-            onPress={() => router.push("/group/create" as never)}
-            style={styles.ctaButton}
-          />
         </View>
 
         {/* =========================
             SEARCH + FILTER
         ========================= */}
 
-        <View style={styles.searchSection}>
+        {!personalTab && <View style={styles.searchSection}>
           <View style={styles.searchRow}>
-            <View style={styles.searchContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
+            <View style={[styles.searchContainer, (searchFocused || searchQuery.length > 0) && styles.searchContainerFocused]}>
+              <View accessible={false} style={styles.searchLens}><View style={styles.searchLensHandle} /></View>
 
               <TextInput
+                accessibilityLabel="Tìm kiếm dự án"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Tìm kiếm dự án, kỹ năng, vai trò..."
+                placeholder="Tìm kiếm dự án..."
                 placeholderTextColor={colors.textSecondary}
                 style={styles.searchInput}
                 returnKeyType="search"
@@ -396,19 +297,20 @@ export function ProjectExplorerScreen() {
 
             <Pressable
               onPress={openFilter}
-              style={[
+              accessibilityRole="button"
+              accessibilityLabel="Lọc dự án"
+              style={({ pressed }) => [
                 styles.filterButton,
                 activeFilterCount > 0 && styles.filterButtonActive,
+                pressed && styles.filterButtonPressed,
               ]}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  activeFilterCount > 0 && styles.filterButtonTextActive,
-                ]}
-              >
-                ☷
-              </Text>
+              <View accessible={false} style={styles.filterIcon}>
+                {[0, 1, 2].map((row) => <View key={row} style={styles.filterIconRow}>
+                  <View style={[styles.filterIconDot, activeFilterCount > 0 && styles.filterIconActive]} />
+                  <View style={[styles.filterIconLine, activeFilterCount > 0 && styles.filterIconActive]} />
+                </View>)}
+              </View>
 
               <Text
                 style={[
@@ -443,7 +345,7 @@ export function ProjectExplorerScreen() {
                 </View>
               ))}
 
-              {selectedRoles.map((role) => (
+              {selectedFields.map((role) => (
                 <View key={`role-${role}`} style={styles.activeFilterChip}>
                   <Text style={styles.activeFilterChipText}>{role}</Text>
                 </View>
@@ -457,7 +359,7 @@ export function ProjectExplorerScreen() {
               </Pressable>
             </ScrollView>
           )}
-        </View>
+        </View>}
 
         {/* =========================
             TABS
@@ -475,7 +377,9 @@ export function ProjectExplorerScreen() {
             return (
               <Pressable
                 key={tab}
-                onPress={() => setActiveTab(tab)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+                onPress={() => { setPage(1); setActiveTab(tab); }}
                 style={({ pressed }) => [
                   styles.tabButton,
                   isActive && styles.activeTabButton,
@@ -483,7 +387,6 @@ export function ProjectExplorerScreen() {
                 ]}
               >
                 <Text
-                  numberOfLines={1}
                   style={[styles.tabText, isActive && styles.activeTabText]}
                 >
                   {tab}
@@ -497,11 +400,20 @@ export function ProjectExplorerScreen() {
             ERROR
         ========================= */}
 
+        <View style={styles.resultsHeader}>
+          <View style={styles.resultsHeading}>
+            <View style={styles.sectionMarker} />
+            <Text style={styles.resultsTitle}>{activeTab}</Text>
+          </View>
+          <Text style={styles.resultsCount}>{loading ? "Đang tải…" : `${totalItems} dự án`}</Text>
+        </View>
+
         {error ? (
           <View style={styles.messageCard}>
             <Text style={styles.messageIcon}>!</Text>
 
             <Text style={styles.messageText}>{error}</Text>
+            <Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} />
           </View>
         ) : null}
 
@@ -510,19 +422,15 @@ export function ProjectExplorerScreen() {
         ========================= */}
 
         <View style={styles.content}>
-          {filteredProjects.length === 0 ? (
+          {loading ? <Loading /> : error ? null : filteredProjects.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyBadge}>
                 <View style={styles.emptyBadgeDot} />
               </View>
 
-              <Text style={styles.emptyTitle}>Chưa có dự án nào phù hợp</Text>
+              <Text style={styles.emptyTitle}>Không có dự án nào, vui lòng tạo dự án.</Text>
 
-              <Text style={styles.emptyText}>
-                Thử thay đổi từ khóa hoặc bộ lọc để tìm dự án phù hợp hơn.
-              </Text>
-
-              {(searchQuery.length > 0 || activeFilterCount > 0) && (
+              {activeTab !== "Dự án của tôi" && (searchQuery.length > 0 || activeFilterCount > 0) && (
                 <Pressable
                   onPress={() => {
                     setSearchQuery("");
@@ -539,18 +447,22 @@ export function ProjectExplorerScreen() {
               <Button
                 title="Tạo dự án mới"
                 variant="primary"
-                onPress={() => router.push("/group/create" as never)}
+                onPress={() => router.navigate("/group/create" as never)}
                 style={styles.emptyCta}
               />
             </View>
           ) : (
             filteredProjects.map((project) => {
-              const isOpen = project.recruitmentStatus === "Open";
+              // Some list endpoints omit status; these tabs already identify the project status.
+              const projectStatus = project.status ?? statusTab ?? (activeTab === "Đang tuyển" ? ApiProjectStatus.Active : undefined);
+              const isOpen = projectStatus === ApiProjectStatus.Active;
+              // The API count excludes the project creator.
+              const memberCount = project.currentMemberCount;
 
               const progress =
                 project.memberTarget > 0
                   ? Math.min(
-                      project.currentMemberCount / project.memberTarget,
+                      memberCount / project.memberTarget,
                       1,
                     )
                   : 0;
@@ -558,6 +470,8 @@ export function ProjectExplorerScreen() {
               return (
                 <Pressable
                   key={project.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xem chi tiết dự án ${project.title}`}
                   onPress={() =>
                     router.push({
                       pathname: "/group/[id]" as never,
@@ -566,8 +480,9 @@ export function ProjectExplorerScreen() {
                       },
                     } as never)
                   }
-                  style={({ pressed }) => [
+                  style={({ pressed, hovered }) => [
                     styles.card,
+                    hovered && styles.cardHovered,
                     pressed && styles.cardPressed,
                   ]}
                 >
@@ -585,9 +500,13 @@ export function ProjectExplorerScreen() {
 
                     <View style={styles.cardHeader}>
                       <View style={styles.creatorAvatar}>
+                        {project.creator.avatarUrl ? (
+                          <Image source={{ uri: project.creator.avatarUrl }} style={{ width: "100%", height: "100%", borderRadius: 24 }} />
+                        ) : (
                         <Text style={styles.creatorAvatarText}>
-                          {getInitials(project.creator.displayName)}
+                          {getInitials((project.creator.fullName || project.creator.nickname || "Người tạo"))}
                         </Text>
+                        )}
                       </View>
 
                       <View style={styles.projectInfo}>
@@ -596,34 +515,44 @@ export function ProjectExplorerScreen() {
                         </Text>
 
                         <Text style={styles.metaText}>
-                          {project.creator.displayName}
+                          {(project.creator.fullName || project.creator.nickname || "Người tạo")}
                         </Text>
                       </View>
 
                       <View
                         style={[
                           styles.statusBadge,
-                          isOpen ? styles.statusOpen : styles.statusClosed,
+                          projectStatus === ApiProjectStatus.Completed ? styles.statusCompleted : isOpen ? styles.statusOpen : styles.statusClosed,
                         ]}
                       >
                         <View
                           style={[
                             styles.statusDot,
-                            isOpen
+                            projectStatus === ApiProjectStatus.Completed ? styles.statusDotCompleted : isOpen
                               ? styles.statusDotOpen
                               : styles.statusDotClosed,
                           ]}
                         />
 
-                        <Text style={styles.statusText}>
-                          {project.recruitmentStatus}
+                        <Text style={[styles.statusText, projectStatus === ApiProjectStatus.Completed && styles.statusTextCompleted]}>
+                          {projectStatus !== undefined ? API_PROJECT_STATUS_LABEL[projectStatus] ?? "Chưa cập nhật" : "Chưa cập nhật"}
                         </Text>
                       </View>
                     </View>
 
-                    {/* MEMBER PROGRESS */}
+                    {/* MEMBER METADATA & PROGRESS */}
 
                     <View style={styles.progressSection}>
+                      <View style={styles.progressLabels}>
+                        <Text style={styles.progressText}>
+                          {memberCount}/{project.memberTarget}{" "}
+                          thành viên
+                        </Text>
+
+                        <Text style={styles.progressText}>
+                          Hạn: {formatDate(project.recruitmentDeadline)}
+                        </Text>
+                      </View>
                       <View style={styles.progressTrack}>
                         <View
                           style={[
@@ -636,41 +565,27 @@ export function ProjectExplorerScreen() {
                         />
                       </View>
 
-                      <View style={styles.progressLabels}>
-                        <Text style={styles.progressText}>
-                          {project.currentMemberCount}/{project.memberTarget}{" "}
-                          thành viên
-                        </Text>
 
-                        <Text style={styles.progressText}>
-                          Hạn: {formatDate(project.recruitmentDeadline)}
-                        </Text>
-                      </View>
                     </View>
 
-                    {/* ROLES */}
-
-                    {project.roles.length > 0 && (
-                      <View style={styles.roleRow}>
-                        {project.roles.slice(0, 3).map((role) => (
-                          <View key={role.id} style={styles.rolePill}>
-                            <Text numberOfLines={1} style={styles.roleText}>
-                              {role.role}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
+                    <Text style={styles.fieldText}>{project.projectField}</Text>
+                    <Text style={styles.descriptionText} numberOfLines={2} ellipsizeMode="tail">{project.description}</Text>
 
                     {/* TECHNOLOGIES */}
 
-                    {project.technologies.length > 0 && (
+                    {(project.skills ?? []).length > 0 && (
                       <View style={styles.techRow}>
-                        {project.technologies.slice(0, 3).map((tech) => (
-                          <View key={tech} style={styles.techPill}>
-                            <Text numberOfLines={1} style={styles.techText}>
-                              {tech}
-                            </Text>
+                        {(project.skills ?? []).map((skill) => (
+                          <View key={skill.skillId} style={styles.techPill}>
+                            {skill.iconUrl ? (
+                              <Image source={{ uri: skill.iconUrl }} style={styles.skillIcon} accessibilityLabel={skill.skillName} />
+                            ) : null}
+                            <View style={styles.skillInfo}>
+                              <Text style={styles.techText}>{skill.skillName}
+                                {skill.category ? <Text style={styles.skillMeta}> · {skill.category === "ToolsAndOther" ? "Công cụ và khác" : skill.category}</Text> : null}
+                                {skill.minLevel != null ? <Text style={styles.skillMeta}> · Cấp độ tối thiểu: {skill.minLevel}</Text> : null}
+                              </Text>
+                            </View>
                           </View>
                         ))}
                       </View>
@@ -691,6 +606,13 @@ export function ProjectExplorerScreen() {
             })
           )}
         </View>
+        {!loading && !error && totalPages > 1 && (
+          <View style={styles.footerRow}>
+            <Button title="Trang trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
+            <Text style={styles.metaText}>Trang {page}/{totalPages}</Text>
+            <Button title="Trang sau" disabled={page >= totalPages} onPress={() => setPage((value) => value + 1)} />
+          </View>
+        )}
       </ScrollView>
 
       {/* =========================
@@ -717,7 +639,7 @@ export function ProjectExplorerScreen() {
                 <Text style={styles.filterTitle}>Bộ lọc dự án</Text>
 
                 <Text style={styles.filterSubtitle}>
-                  Chọn kỹ năng và vai trò bạn quan tâm
+                  Chọn kỹ năng và lĩnh vực bạn quan tâm
                 </Text>
               </View>
 
@@ -737,7 +659,7 @@ export function ProjectExplorerScreen() {
               <TextInput
                 value={filterSearch}
                 onChangeText={setFilterSearch}
-                placeholder="Tìm kỹ năng hoặc vai trò..."
+                placeholder="Tìm kỹ năng hoặc lĩnh vực..."
                 placeholderTextColor={colors.textSecondary}
                 style={styles.filterSearchInput}
               />
@@ -771,7 +693,12 @@ export function ProjectExplorerScreen() {
                   )}
                 </View>
 
-                {filteredAvailableSkills.length === 0 ? (
+                {catalogLoading ? <Text style={styles.noOptionText}>Đang tải kỹ năng…</Text> : catalogError ? (
+                  <View>
+                    <Text accessibilityRole="alert" style={styles.noOptionText}>{catalogError}</Text>
+                    <Button title="Thử tải lại kỹ năng" variant="outline" onPress={() => setCatalogRetry((value) => value + 1)} />
+                  </View>
+                ) : filteredAvailableSkills.length === 0 ? (
                   <Text style={styles.noOptionText}>
                     Không tìm thấy kỹ năng phù hợp.
                   </Text>
@@ -820,28 +747,28 @@ export function ProjectExplorerScreen() {
 
               <View style={styles.filterGroup}>
                 <View style={styles.filterGroupHeader}>
-                  <Text style={styles.filterGroupTitle}>Vai trò</Text>
+                  <Text style={styles.filterGroupTitle}>Lĩnh vực</Text>
 
-                  {draftRoles.length > 0 && (
+                  {draftFields.length > 0 && (
                     <Text style={styles.filterGroupCount}>
-                      {draftRoles.length} đã chọn
+                      {draftFields.length} đã chọn
                     </Text>
                   )}
                 </View>
 
-                {filteredAvailableRoles.length === 0 ? (
+                {filteredAvailableFields.length === 0 ? (
                   <Text style={styles.noOptionText}>
-                    Không tìm thấy vai trò phù hợp.
+                    Không tìm thấy lĩnh vực phù hợp.
                   </Text>
                 ) : (
                   <View style={styles.optionGrid}>
-                    {filteredAvailableRoles.map((role) => {
-                      const selected = draftRoles.includes(role);
+                    {filteredAvailableFields.map((role) => {
+                      const selected = draftFields.includes(role);
 
                       return (
                         <Pressable
                           key={role}
-                          onPress={() => toggleRole(role)}
+                          onPress={() => toggleField(role)}
                           style={[
                             styles.optionChip,
                             selected && styles.optionChipSelected,
@@ -889,7 +816,7 @@ export function ProjectExplorerScreen() {
           </View>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
@@ -934,11 +861,15 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#F2F5FC",
   },
 
   screenContent: {
-    paddingBottom: 32,
+    paddingTop: 16,
+    paddingBottom: 24,
+    width: "100%",
+    maxWidth: 1000,
+    alignSelf: "center",
   },
 
   // =========================
@@ -946,14 +877,31 @@ const styles = StyleSheet.create({
   // =========================
 
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+    minHeight: 156,
+    backgroundColor: "#102D62",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#AEC9F4",
+    overflow: "hidden",
+    gap: 0,
   },
+
+  headerCompact: { padding: 18, minHeight: 200, gap: 12 },
+  heroArtwork: { position: "absolute", width: 340, height: 176, right: 100, top: -4 },
+  heroArtworkCompact: { right: -100, opacity: 0.22 },
+  eyebrowBadge: { marginBottom: 10 },
+  heroDescription: { color: "#CCDCF5", fontSize: 13, lineHeight: 20, marginTop: 8 },
+  heroFooter: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14 },
+  resultsHeader: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  resultsHeading: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  sectionMarker: { width: 4, height: 18, borderRadius: 2, backgroundColor: colors.primary },
+  resultsTitle: { fontSize: 17, fontWeight: "800", color: colors.navy, flexShrink: 1 },
+  resultsCount: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
 
   headerText: {
     flex: 1,
@@ -961,29 +909,36 @@ const styles = StyleSheet.create({
   },
 
   eyebrow: {
-    color: colors.primary,
-    fontSize: 12,
+    color: "#6DCCFF",
+    fontSize: 10,
+    letterSpacing: 1.2,
     fontWeight: "700",
-    marginBottom: 4,
   },
 
   title: {
-    color: colors.navy,
-    fontSize: 23,
+    color: "#FFFFFF",
+    fontSize: 34,
     fontWeight: "800",
-    lineHeight: 29,
+    lineHeight: 42,
   },
+  titleCompact: { fontSize: 27, lineHeight: 34 },
 
   subtitle: {
     marginTop: 3,
-    color: colors.textSecondary,
+    color: "#CCDCF5",
     fontSize: 12,
     lineHeight: 17,
   },
 
   ctaButton: {
-    minWidth: 104,
+    backgroundColor: "#287AF0",
+    minWidth: 96,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    flexShrink: 0,
+    borderRadius: 8,
   },
+  ctaButtonText: { fontSize: 12, fontWeight: "700" },
 
   // =========================
   // SEARCH
@@ -998,33 +953,45 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     width: "100%",
   },
 
   searchContainer: {
     flex: 1,
     minWidth: 0,
-    height: 44,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: "#DCE4F0",
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: "#D7E6FF",
+    borderRadius: 13,
+    paddingHorizontal: 16,
   },
+
+  searchContainerFocused: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  filterButtonPressed: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  fieldText: { color: colors.primaryDark, fontSize: 12, fontWeight: "600", lineHeight: 17, marginBottom: 3 },
+  descriptionText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
 
   searchIcon: {
     fontSize: 15,
     marginRight: 8,
   },
+  searchLens: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: colors.primary, marginRight: 14 },
+  searchLensHandle: { position: "absolute", width: 6, height: 2, borderRadius: 1, backgroundColor: colors.primary, right: -5, bottom: -2, transform: [{ rotate: "45deg" }] },
+  filterIcon: { gap: 2 },
+  filterIconRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+  filterIconDot: { width: 3, height: 3, borderRadius: 1, backgroundColor: colors.textSecondary },
+  filterIconLine: { width: 10, height: 2, borderRadius: 1, backgroundColor: colors.textSecondary },
+  filterIconActive: { backgroundColor: colors.primary },
 
   searchInput: {
     flex: 1,
     minWidth: 0,
     color: colors.textPrimary,
-    fontSize: 13,
+    fontSize: 12,
     paddingVertical: 10,
   },
 
@@ -1042,28 +1009,23 @@ const styles = StyleSheet.create({
   },
 
   filterButton: {
-    width: 76,
-    height: 44,
-    paddingHorizontal: 8,
+    minWidth: 72,
+    height: 40,
+    paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: colors.border,
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
+    boxShadow: "0 2px 6px #16366B12",
   },
 
   filterButtonActive: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
-  },
-
-  filterButtonText: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    lineHeight: 20,
   },
 
   filterButtonLabel: {
@@ -1131,26 +1093,28 @@ const styles = StyleSheet.create({
 
   tabsContainer: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 10,
     gap: 8,
     alignItems: "center",
   },
 
   tabButton: {
-    height: 40,
-    paddingHorizontal: 15,
-    borderRadius: 20,
+    minHeight: 44,
+    flexShrink: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: colors.border,
   },
 
   activeTabButton: {
-    backgroundColor: "#EEF5FF",
-    borderColor: colors.primary,
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
   },
 
   tabPressed: {
@@ -1166,7 +1130,7 @@ const styles = StyleSheet.create({
   },
 
   activeTabText: {
-    color: colors.primary,
+    color: colors.surface,
   },
 
   // =========================
@@ -1176,9 +1140,9 @@ const styles = StyleSheet.create({
   content: {
     width: "100%",
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 28,
-    gap: 12,
+    paddingTop: 2,
+    paddingBottom: 12,
+    gap: 18,
   },
 
   // =========================
@@ -1189,14 +1153,14 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#DCE4F0",
+    borderColor: "#E1E8F5",
     overflow: "hidden",
 
     shadowColor: "#0B3E9C",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -1205,12 +1169,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
+  cardHovered: { borderColor: colors.primary, shadowOpacity: 0.13, shadowRadius: 18 },
+
   cardPressed: {
-    opacity: 0.92,
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
   },
 
   accentBar: {
-    width: 3,
+    width: 4,
   },
 
   accentOpen: {
@@ -1224,22 +1191,24 @@ const styles = StyleSheet.create({
   cardBody: {
     flex: 1,
     minWidth: 0,
-    paddingHorizontal: 14,
-    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingTop: 18,
     paddingBottom: 12,
   },
 
   cardHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: 9,
+    gap: 8,
     width: "100%",
   },
 
   creatorAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primaryLight,
@@ -1254,21 +1223,22 @@ const styles = StyleSheet.create({
 
   projectInfo: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 110,
   },
 
   projectTitle: {
     color: colors.navy,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
-    lineHeight: 21,
-    marginBottom: 1,
+    lineHeight: 24,
+    marginBottom: 2,
   },
 
   metaText: {
-    color: colors.textSecondary,
+    color: colors.navy,
     fontSize: 13,
     lineHeight: 18,
+    fontWeight: "600",
   },
 
   // =========================
@@ -1298,6 +1268,14 @@ const styles = StyleSheet.create({
     borderColor: "#F0C2C8",
   },
 
+  statusCompleted: {
+    backgroundColor: colors.projectCompletedBackground,
+    borderWidth: 1,
+    borderColor: colors.projectCompletedBorder,
+  },
+  statusDotCompleted: { backgroundColor: colors.projectCompleted },
+  statusTextCompleted: { color: colors.projectCompleted },
+
   statusDot: {
     width: 6,
     height: 6,
@@ -1314,9 +1292,9 @@ const styles = StyleSheet.create({
 
   statusText: {
     color: colors.textPrimary,
-    fontSize: 10,
-    fontWeight: "800",
-    lineHeight: 14,
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 15,
   },
 
   // =========================
@@ -1324,13 +1302,18 @@ const styles = StyleSheet.create({
   // =========================
 
   progressSection: {
-    marginTop: 12,
+    marginTop: 16,
+    marginBottom: 14,
+    padding: 12,
+    backgroundColor: "#F4F7FD",
+    borderRadius: 12,
+    gap: 7,
   },
 
   progressTrack: {
-    height: 5,
+    height: 7,
     borderRadius: 3,
-    backgroundColor: "#E9EEF6",
+    backgroundColor: colors.border,
     overflow: "hidden",
   },
 
@@ -1345,18 +1328,18 @@ const styles = StyleSheet.create({
   },
 
   progressLabels: {
-    marginTop: 6,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    gap: 6,
   },
 
   progressText: {
     flexShrink: 1,
     color: colors.textSecondary,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   // =========================
@@ -1390,41 +1373,49 @@ const styles = StyleSheet.create({
   // =========================
 
   techRow: {
-    marginTop: 7,
+    marginTop: 8,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 6,
   },
 
   techPill: {
     maxWidth: "100%",
-    borderRadius: 999,
-    backgroundColor: "#FBFCFE",
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: "#EEF5FF",
     borderWidth: 1,
-    borderColor: "#DCE4F0",
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderColor: "#D3E4FF",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
 
   techText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 15,
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
   },
+  skillIcon: { width: 18, height: 18, borderRadius: 4 },
+  skillInfo: { flexShrink: 1, gap: 2 },
+  skillMeta: { color: colors.textSecondary, fontSize: 11, lineHeight: 17 },
 
   // =========================
   // CARD FOOTER
   // =========================
 
   footerRow: {
-    marginTop: 13,
+    marginTop: 16,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: "#E7ECF3",
-    paddingTop: 10,
+    borderTopColor: colors.border,
+    paddingTop: 6,
   },
 
   detailHint: {
@@ -1434,9 +1425,9 @@ const styles = StyleSheet.create({
   },
 
   arrowCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primaryLight,

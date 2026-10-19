@@ -2,38 +2,50 @@ import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
 import { projectService } from "@/services/project.service";
-import { getDisplayName } from "@/utils/display-name";
-import type { Project, ProjectRecommendation } from "@/types/project";
+import { RecommendedMemberCard } from "@/components/projects/RecommendedMemberCard";
+import type { CreateProjectRequest, ProjectDetail, ProjectRecommendation } from "@/types/project";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export function ProjectRecommendationScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId?: string }>();
-  const [project, setProject] = useState<Project | null>(null);
+  const { projectId, draft: draftParam } = useLocalSearchParams<{ projectId?: string; draft?: string }>();
+  const draft = useMemo(() => {
+    try { return draftParam ? JSON.parse(draftParam) as CreateProjectRequest : null; }
+    catch { return null; }
+  }, [draftParam]);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
+  const effectiveId = createdId ?? projectId;
+  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [recommendations, setRecommendations] = useState<
     ProjectRecommendation[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    const id = projectId ?? "project-1";
+    const id = effectiveId;
+    if (!id && draft) { setLoading(false); return; }
+    const controller = new AbortController();
     let mounted = true;
     async function load() {
-      setLoading(true);
+      setLoading(true); setError(null); setProject(null); setRecommendations([]); setInvitedIds([]);
       try {
+        if (!id) throw new Error("Không tìm thấy mã dự án.");
         const [detail, items] = await Promise.all([
-          projectService.getProjectById(id),
-          projectService.fetchRecommendations(id),
+          projectService.getProjectById(id, controller.signal),
+          projectService.fetchRecommendations(id, controller.signal),
         ]);
         if (mounted) {
           setProject(detail);
           setRecommendations(items);
         }
-      } catch {
-        if (mounted) setError("Không thể tải đề xuất thành viên.");
+      } catch (cause) {
+        if (mounted) setError(cause instanceof Error ? cause.message : "Không thể tải đề xuất thành viên.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -41,23 +53,68 @@ export function ProjectRecommendationScreen() {
     load();
     return () => {
       mounted = false;
+      controller.abort();
     };
-  }, [projectId]);
+  }, [effectiveId, draft, retry]);
 
-  const handleInvite = async (recommendation: ProjectRecommendation) => {
+  const handleCreate = async () => {
+    if (!draft || creatingRef.current || createdId) return;
+    creatingRef.current = true;
+    setCreating(true);
+    setError(null);
+    try {
+      const created = await projectService.createProject(draft);
+      setProject(created);
+      setCreatedId(created.id);
+      router.setParams({ projectId: created.id, draft: undefined });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể tạo dự án. Vui lòng thử lại.");
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
+    }
+  };
+
+  const handleInvite = async (recommendation: ProjectRecommendation, role: string) => {
     if (!project) return;
     try {
       await projectService.sendInvitation({
         projectId: project.id,
-        inviteeId: recommendation.id,
-        role: recommendation.recommendedRole,
+        inviteeId: recommendation.userId,
+        role,
         message: "Mời tham gia dự án dựa trên đề xuất phù hợp.",
       });
-      setInvitedIds((current) => [...current, recommendation.id]);
-    } catch {
-      setError("Không thể gửi lời mời. Vui lòng thử lại sau.");
+      setInvitedIds((current) => [...current, recommendation.userId]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể gửi lời mời. Vui lòng thử lại sau.");
     }
   };
+
+  if (draft && !effectiveId) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.kicker}>UNINET</Text>
+        <Text style={styles.title}>Xác nhận tạo dự án</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>{draft.title}</Text>
+          <Text>{draft.projectField}</Text>
+          <Text>{draft.description}</Text>
+          <Text>Số thành viên: {draft.memberTarget}</Text>
+          <Text>Hạn tuyển: {new Date(draft.recruitmentDeadline).toLocaleString("vi-VN")}</Text>
+          <Text>Dự kiến hoàn thành: {new Date(draft.expectedOutput).toLocaleDateString("vi-VN")}</Text>
+          <Text>{draft.visibility === 0 ? "Riêng tư" : "Công khai"}</Text>
+          {draft.roleRequirements.map((role, index) => <View key={index} style={styles.roleRow}>
+            <View style={{ flex: 1 }}><Text style={styles.roleName}>{role.role}</Text><Text>{role.requirements}</Text></View>
+            <Text style={styles.roleMeta}>{role.quantity} chỗ</Text>
+          </View>)}
+        </View>
+        <Text style={styles.subtitle}>Đề xuất thành viên sẽ được tải sau khi dự án được tạo.</Text>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <Button title="Tạo dự án" loading={creating} disabled={creating} onPress={handleCreate} />
+        <Button title="Quay lại chỉnh sửa" variant="outline" disabled={creating} onPress={() => router.canGoBack() ? router.back() : router.replace("/group/create" as never)} />
+      </ScrollView>
+    );
+  }
 
   if (loading) return <Loading />;
 
@@ -79,17 +136,17 @@ export function ProjectRecommendationScreen() {
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Các vai trò đang tuyển</Text>
-        {project?.roles.map((role) => (
+        {project?.roleRequirements.map((role) => (
           <View key={role.id} style={styles.roleRow}>
-            <Text style={styles.roleName}>{role.role}</Text>
+            <Text style={styles.roleName}>{role.roleName}</Text>
             <Text style={styles.roleMeta}>Còn {role.quantity} chỗ</Text>
           </View>
         ))}
       </View>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <View><Text style={styles.errorText}>{error}</Text><Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} /></View> : null}
 
-      {recommendations.length === 0 ? (
+      {error ? null : recommendations.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>Chưa có đề xuất nào</Text>
           <Text style={styles.emptyText}>
@@ -98,51 +155,14 @@ export function ProjectRecommendationScreen() {
         </View>
       ) : (
         recommendations.map((recommendation) => (
-          <View key={recommendation.id} style={styles.card}>
-            <View style={styles.profileRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {initials(getDisplayName(recommendation))}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{getDisplayName(recommendation)}</Text>
-                <Text style={styles.role}>
-                  {recommendation.recommendedRole}
-                </Text>
-                <Text style={styles.skills}>{recommendation.skills}</Text>
-                {recommendation.reason ? (
-                  <Text style={styles.reason}>{recommendation.reason}</Text>
-                ) : null}
-              </View>
-            </View>
-            <View style={styles.actionRow}>
-              <Button
-                title="Xem hồ sơ"
-                variant="outline"
-                onPress={() => router.push("/(tabs)/groups" as never)}
-                style={styles.flexButton}
-              />
-              <Button
-                title={
-                  invitedIds.includes(recommendation.id)
-                    ? "Đã gửi lời mời"
-                    : "Mời"
-                }
-                variant="primary"
-                disabled={invitedIds.includes(recommendation.id)}
-                onPress={() => handleInvite(recommendation)}
-                style={styles.flexButton}
-              />
-            </View>
-          </View>
+          <RecommendedMemberCard key={recommendation.userId} member={recommendation} roles={project?.roleRequirements ?? []} invited={invitedIds.includes(recommendation.userId)} onInvite={handleInvite} />
         ))
       )}
 
       <Button
         title="Bỏ qua"
         variant="outline"
-        onPress={() => router.push("/(tabs)/groups" as never)}
+        onPress={() => router.dismissTo("/(tabs)/groups" as never)}
         style={styles.skipButton}
       />
     </ScrollView>

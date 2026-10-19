@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="850" viewBox="0 0 600 850" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7fbff" stop-opacity=".98"/>
+      <stop offset=".28" stop-color="#f7fbff" stop-opacity=".96"/>
+      <stop offset=".39" stop-color="#f7fbff" stop-opacity=".86"/>
+      <stop offset=".49" stop-color="#f7fbff" stop-opacity=".44"/>
+      <stop offset=".60" stop-color="#f7fbff" stop-opacity="0"/>
+      <stop offset=".91" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#veil)" d="M0 0H600V850H0Z"/>
+</svg>

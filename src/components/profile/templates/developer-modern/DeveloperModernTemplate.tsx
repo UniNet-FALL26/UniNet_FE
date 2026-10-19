@@ -3,7 +3,7 @@ import type { PortfolioResponse, ProfileTheme } from '@/types/portfolio';
 import { DeveloperHero } from './DeveloperHero';
 import { ArticleSection, CertificateSection, ExtraSection, JourneySection, ProjectSection, SkillSection, Statistics } from './PortfolioSections';
 import { PortfolioLink, ui } from './PortfolioPrimitives';
-import { EditField, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 
 export type DeveloperModernTemplateProps = { data: PortfolioResponse; theme: ProfileTheme; width: number; thumbnail?: boolean; onNavigate?: (id: string) => void; onSectionLayout?: (id: string, y: number) => void };
 const defaultOrder = ['stats', 'skills', 'journey', 'other-projects', 'certificates', 'activities', 'articles'];
@@ -28,7 +28,7 @@ export function DeveloperModernTemplate({ data, theme, width, thumbnail, onNavig
         <Text style={[s.footerName, { color: theme.heroText }]}>{data.profile.fullName}</Text>
         <Text style={[ui.small, { color: theme.heroMuted, marginTop: 4 }]}>{data.profile.nickname} · {data.portfolio.headline}</Text>
       </View>
-      <View style={ui.chips}>{data.portfolio.socialLinks.map(link => <PortfolioLink key={link.label} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /><EditField field="contactEmail" label="Email liên hệ" color={theme.heroText}><Text style={{ color: theme.heroMuted }}>{data.portfolio.contactEmail || (editing ? 'Email liên hệ' : '')}</Text></EditField></View>
+      <View style={ui.chips}>{data.portfolio.socialLinks.map(link => <PortfolioLink key={link.label} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View>
     </View>
     <View style={s.copyright}><Text style={[ui.small, { color: theme.muted }]}>© {new Date().getFullYear()} {data.profile.fullName}</Text><Text style={[ui.small, { color: theme.muted }]}>Build · Learn · Grow · Together</Text></View>
   </View>;

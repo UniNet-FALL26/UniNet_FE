@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="1000" viewBox="0 0 600 1000" preserveAspectRatio="none">
+  <defs><linearGradient id="veil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef8ff"/><stop offset=".15" stop-color="#eef8ff"/><stop offset=".47" stop-color="#eef8ff" stop-opacity=".82"/><stop offset=".69" stop-color="#eef8ff" stop-opacity="0"/></linearGradient></defs>
+  <path fill="url(#veil)" d="M0 0H600V1000H0Z"/>
+  <path fill="#fff" fill-opacity=".2" d="M350 0H600V180Z"/>
+</svg>

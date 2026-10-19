@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="220" viewBox="0 0 380 220" fill="none">
+  <defs>
+    <linearGradient id="edge" x1="110" y1="10" x2="295" y2="195" gradientUnits="userSpaceOnUse"><stop stop-color="#E4EEFF"/><stop offset=".45" stop-color="#8BACFF"/><stop offset="1" stop-color="#3455EE"/></linearGradient>
+    <linearGradient id="glass" x1="115" y1="10" x2="270" y2="192" gradientUnits="userSpaceOnUse"><stop stop-color="#CADCFF"/><stop offset=".48" stop-color="#84A6FF"/><stop offset="1" stop-color="#496BFA"/></linearGradient>
+    <linearGradient id="person" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#FFFFFF"/><stop offset=".5" stop-color="#EFF4FF"/><stop offset="1" stop-color="#ABC8FF"/></linearGradient>
+    <linearGradient id="badge" x1="230" y1="145" x2="285" y2="214" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#B2CAFF"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#FFFFFF"/><stop offset=".2" stop-color="#BAE3FF" stop-opacity=".8"/><stop offset="1" stop-color="#74B7FF" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-30%" y="-20%" width="170%" height="170%"><feDropShadow dx="6" dy="12" stdDeviation="7" flood-color="#143CBC" flood-opacity=".45"/></filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M133 8L273 43Q291 48 291 68L285 185Q284 208 264 203L123 170Q109 166 110 148L115 30Q116 4 133 8Z" fill="url(#edge)"/>
+    <path d="M129 8L268 42Q285 46 284 65L279 184Q278 202 262 198L121 165Q107 162 108 144L113 29Q114 5 129 8Z" fill="url(#glass)" stroke="#C1D6FF" stroke-opacity=".7" stroke-width="2"/>
+    <g transform="matrix(1 .23 -.04 1 0 -35)" fill="url(#person)">
+      <path d="M132 129Q132 109 150 109Q168 109 168 129v15q-18 6-36 0Z"/>
+      <ellipse cx="150" cy="90" rx="17" ry="22"/>
+      <path d="M213 130Q213 110 231 110Q249 110 249 130v16q-18 6-36 0Z"/>
+      <ellipse cx="231" cy="91" rx="17" ry="22"/>
+      <path d="M170 143Q170 122 191 122Q212 122 212 143v17q-21 7-42 0Z"/>
+      <ellipse cx="191" cy="104" rx="18" ry="22"/>
+    </g>
+    <ellipse cx="260" cy="176" rx="32" ry="37" transform="rotate(-20 260 176)" fill="#8EACFF"/>
+    <ellipse cx="255" cy="173" rx="31" ry="37" transform="rotate(-20 255 173)" fill="url(#badge)" stroke="#DBE7FF" stroke-width="1.5"/>
+    <path d="M254 158v29m-14-18 28 8" stroke="#5279F5" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g><circle cx="26" cy="49" r="15" fill="url(#glow)"/><path d="m26 42 1.5 5.5L33 49l-5.5 1.5L26 56l-1.5-5.5L19 49l5.5-1.5Z" fill="#E7F6FF"/></g>
+  <g><circle cx="353" cy="71" r="12" fill="url(#glow)"/><path d="m353 66 1 4 4 1-4 1-1 4-1-4-4-1 4-1Z" fill="#DDEEFF"/></g>
+</svg>

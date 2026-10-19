@@ -36,6 +36,10 @@ export function PortfolioLink({ label, url, theme, thumbnail, subtle = false }: 
   </Pressable>;
 }
 export function SectionTitle({ title, name, theme }: { title: string; name: keyof typeof symbols; theme: ProfileTheme }) {
+  if (name === 'journey') return <View style={ui.journeyHeading}>
+    <View style={[ui.sectionHeading, { marginBottom: 0 }]}><PortfolioIcon name={name} color={theme.accent} /><Text role="heading" aria-level={2} style={[ui.sectionTitle, { color: theme.text, flexShrink: 1 }]}>{title}</Text></View>
+    <SectionAdd title={title} theme={theme} />
+  </View>;
   return <View style={ui.sectionHeading}><PortfolioIcon name={name} color={theme.accent} /><Text role="heading" aria-level={2} style={[ui.sectionTitle, { color: theme.text }]}>{title}</Text><SectionAdd title={title} theme={theme} /></View>;
 }
 export const ui = StyleSheet.create({
@@ -43,6 +47,7 @@ export const ui = StyleSheet.create({
   small: { fontSize: 12, lineHeight: 19 },
   section: { marginBottom: 24 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  journeyHeading: { gap: 8, marginBottom: 14 },
   sectionTitle: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },

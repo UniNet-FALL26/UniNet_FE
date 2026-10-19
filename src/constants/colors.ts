@@ -11,5 +11,8 @@ export const colors = {
   border: '#DCE5F1',
   error: '#C73542',
   success: '#21845A',
+  projectCompleted: '#166534',
+  projectCompletedBackground: '#ECFDF3',
+  projectCompletedBorder: '#BBE4CA',
   warning: '#C27A15',
 } as const;

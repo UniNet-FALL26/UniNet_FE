@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <defs>
+    <clipPath id="panel"><path d="M0 0H700L940 565L870 640L1000 1000H0Z"/></clipPath>
+  </defs>
+  <path d="M0 0H735L975 565L905 640L1000 1000H0Z" fill="#fff" fill-opacity=".45"/>
+  <path d="M0 0H700L940 565L870 640L1000 1000H0Z" fill="#fcfeff"/>
+  <g clip-path="url(#panel)">
+    <ellipse cx="140" cy="940" rx="620" ry="340" fill="#f3f9ff" transform="rotate(20 140 940)"/>
+  </g>
+</svg>

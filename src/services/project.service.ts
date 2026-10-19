@@ -1,229 +1,141 @@
 import { apiRequest } from "@/services/api";
+import { API_URL } from "@/constants/config";
+import { completedProjectPage, completedProjects, USE_COMPLETED_PROJECT_MOCK } from './project-completed.mock';
 import type {
   CreateProjectRequest,
+  UpdateProjectRequest,
   InvitationPayload,
   JoinRequestPayload,
-  Project,
+  ProjectMemberResponse,
   ProjectInvitation,
   ProjectJoinRequest,
   ProjectRecommendation,
+  ProjectListParams,
+  ProjectListResponse,
+  ProjectDetail,
+  ApiProjectStatus,
 } from "@/types/project";
 
-const mockProjects: Project[] = [
-  {
-    id: "project-1",
-    title: "Hệ thống hỗ trợ nghiên cứu sinh viên",
-    projectField: "Edtech",
-    description:
-      "Dự án nhằm xây dựng giải pháp hỗ trợ sinh viên kết nối mentor, lên kế hoạch nghiên cứu và theo dõi tiến độ.",
-    technologies: ["React Native", "TypeScript", "Node.js", "PostgreSQL"],
-    memberTarget: 5,
-    currentMemberCount: 2,
-    creator: { id: "student-creator", displayName: "Nguyễn Hữu Tân" },
-    roles: [
-      {
-        id: "role-1",
-        role: "Frontend",
-        quantity: 1,
-        requirements: "Có kinh nghiệm React Native hoặc React web.",
-      },
-      {
-        id: "role-2",
-        role: "Backend",
-        quantity: 1,
-        requirements: "Có hiểu biết API, cơ sở dữ liệu và dịch vụ cloud.",
-      },
-      {
-        id: "role-3",
-        role: "UI/UX",
-        quantity: 1,
-        requirements: "Thiết kế trải nghiệm dễ dùng cho người học.",
-      },
-    ],
-    recruitmentDeadline: "2026-10-15",
-
-    expectedOutput: "MVP hỗ trợ tìm mentor và quản lý tiến độ.",
-    status: "Public",
-    recruitmentStatus: "Open",
-    createdAt: "2026-09-15T08:00:00.000Z",
-  },
-  {
-    id: "project-2",
-    title: "Ứng dụng học tập cộng đồng",
-    projectField: "Ecommerce",
-    description:
-      "Dự án này tập trung vào một ứng dụng hỗ trợ học tập cộng đồng với nhóm hội thảo và tài liệu.",
-    technologies: ["Expo", "Firebase", "TypeScript", "AI"],
-    memberTarget: 4,
-    currentMemberCount: 3,
-    creator: { id: "student-creator-2", displayName: "Phạm Thị Lan" },
-    roles: [
-      {
-        id: "role-4",
-        role: "Frontend",
-        quantity: 1,
-        requirements: "Hiểu Expo và giao diện mobile.",
-      },
-      {
-        id: "role-5",
-        role: "Backend",
-        quantity: 1,
-        requirements: "Có kinh nghiệm API và Firebase.",
-      },
-    ],
-    recruitmentDeadline: "2026-09-30",
-    expectedOutput: "Phiên bản beta ứng dụng học tập cộng đồng.",
-    status: "Public",
-    recruitmentStatus: "Open",
-    createdAt: "2026-09-10T08:00:00.000Z",
-  },
-];
-
-const mockRecommendations: ProjectRecommendation[] = [
-  {
-    id: "student-1",
-    fullName: "Lê Minh Khôi",
-    recommendedRole: "Frontend",
-    skills: "React Native, UI/UX, TypeScript",
-    shortBio: "Sinh viên năm 3, từng làm 2 dự án mobile.",
-    reason:
-      "Phù hợp với mục tiêu xây dựng giao diện và trải nghiệm người dùng.",
-  },
-  {
-    id: "student-2",
-    fullName: "Nguyễn Thảo Vy",
-    recommendedRole: "Backend",
-    skills: "Node.js, PostgreSQL, API",
-    shortBio: "Tốt nghiệp thực tập tại startup sản phẩm.",
-    reason: "Đã có kinh nghiệm thiết kế API và xử lý dữ liệu.",
-  },
-  {
-    id: "student-3",
-    fullName: "Trần Quang An",
-    recommendedRole: "UI/UX",
-    skills: "Figma, wireframe, prototyping",
-    shortBio: "Tích cực trong thiết kế trải nghiệm người dùng.",
-    reason:
-      "Phù hợp với nhu cầu tối ưu trải nghiệm và trải nghiệm cuộc sống người dùng.",
-  },
-];
+const projectsPath = () => API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+const requiredId = (id: string) => {
+  if (!id.trim()) throw new Error("Không tìm thấy mã định danh.");
+  return encodeURIComponent(id);
+};
+async function projectMutation<T extends { id: string; status: number }>(path: string, method: "POST" | "PATCH", body?: unknown): Promise<T> {
+  const response = await apiRequest<T>(`${projectsPath()}${path}`, { method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  if (!response || typeof response.id !== "string" || !response.id || typeof response.status !== "number") throw new Error("Phản hồi thao tác dự án không hợp lệ.");
+  return response;
+}
 
 export const projectService = {
-  async listProjects(): Promise<Project[]> {
-    try {
-      return await apiRequest<Project[]>("/api/projects");
-    } catch {
-      return mockProjects;
+  async updateProject(projectId: string, payload: UpdateProjectRequest): Promise<ProjectDetail> {
+    const response = await apiRequest<ProjectDetail>(`${projectsPath()}/${requiredId(projectId)}`, { method: "PUT", body: JSON.stringify(payload) });
+    if (!response || response.id !== projectId || !response.creator || !Array.isArray(response.roleRequirements) || !Array.isArray(response.skills) || !Array.isArray(response.members) || typeof response.isCreator !== "boolean" || typeof response.isMember !== "boolean") {
+      throw new Error("Phản hồi cập nhật dự án không hợp lệ.");
     }
+    return response;
+  },
+  async deleteProject(projectId: string): Promise<void> {
+    await apiRequest<void>(`${projectsPath()}/${requiredId(projectId)}`, { method: "DELETE" });
+  },
+  async listProjects(params: ProjectListParams = {}, signal?: AbortSignal): Promise<ProjectListResponse> {
+    const query = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 10) });
+    if (params.keyword?.trim()) query.set("keyword", params.keyword.trim());
+    if (params.field?.trim()) query.set("field", params.field.trim());
+    for (const skill of params.skillnames ?? []) {
+      if (skill.trim()) query.append("skillnames", skill.trim());
+    }
+    if (params.recruitmentStatus !== undefined) query.set("recruitmentStatus", String(params.recruitmentStatus));
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectListResponse>(`${path}?${query}`, { method: "GET", signal });
+    if (!response || !Array.isArray(response.projects) || !Number.isInteger(response.page) || !Number.isInteger(response.pageSize) || !Number.isInteger(response.totalItems) || !Number.isInteger(response.totalPages)) {
+      throw new Error("Phản hồi danh sách dự án không hợp lệ.");
+    }
+    return response;
   },
 
-  async getProjectById(projectId: string): Promise<Project> {
-    try {
-      return await apiRequest<Project>(`/api/projects/${projectId}`);
-    } catch {
-      return (
-        mockProjects.find((project) => project.id === projectId) ??
-        mockProjects[0]
-      );
+  async listMyProjects(params: Pick<ProjectListParams, "page" | "pageSize"> = {}, signal?: AbortSignal): Promise<ProjectListResponse> {
+    const query = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 10) });
+    const path = API_URL.endsWith("/api") ? "/projects/me" : "/api/projects/me";
+    const response = await apiRequest<ProjectListResponse>(`${path}?${query}`, { method: "GET", signal });
+    if (!response || !Array.isArray(response.projects) || !Number.isInteger(response.page) || !Number.isInteger(response.pageSize) || !Number.isInteger(response.totalItems) || !Number.isInteger(response.totalPages)) {
+      throw new Error("Phản hồi danh sách dự án của tôi không hợp lệ.");
     }
+    return response;
   },
 
-  async createProject(payload: CreateProjectRequest): Promise<Project> {
-    try {
-      return await apiRequest<Project>("/api/projects", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      const created: Project = {
-        id: `project-${Date.now()}`,
-        title: payload.title,
-        projectField: payload.projectField,
-        description: payload.description,
-        technologies: payload.technologies,
-        memberTarget: payload.memberTarget,
-        currentMemberCount: 1,
-        creator: { id: "current-user", displayName: "Bạn" },
-        roles: payload.roles.map((role, index) => ({
-          id: `role-${Date.now()}-${index}`,
-          role: role.role,
-          quantity: role.quantity,
-          requirements: role.requirements,
-        })),
-        recruitmentDeadline: payload.recruitmentDeadline,
-        expectedOutput: payload.expectedOutput,
-        status: payload.status ?? "Public",
-        recruitmentStatus: payload.recruitmentStatus ?? "Open",
-        createdAt: new Date().toISOString(),
-      };
-      mockProjects.unshift(created);
-      return created;
+  async listProjectsByStatus(status: ApiProjectStatus, page = 1, pageSize = 10, signal?: AbortSignal): Promise<ProjectListResponse> {
+    if (USE_COMPLETED_PROJECT_MOCK && status === 2) return completedProjectPage(page, pageSize);
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectListResponse>(`${path}/status/${status}?${query}`, { method: "GET", signal });
+    if (!response || !Array.isArray(response.projects) || !Number.isInteger(response.page) || !Number.isInteger(response.pageSize) || !Number.isInteger(response.totalItems) || !Number.isInteger(response.totalPages)) {
+      throw new Error("Phản hồi danh sách dự án không hợp lệ.");
     }
+    return response;
   },
 
-  async submitJoinRequest(
-    payload: JoinRequestPayload,
-  ): Promise<ProjectJoinRequest> {
-    try {
-      return await apiRequest<ProjectJoinRequest>(
-        `/api/projects/${payload.projectId}/join-requests`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            role: payload.role,
-            message: payload.message,
-          }),
-        },
-      );
-    } catch {
-      return {
-        id: `join-${Date.now()}`,
-        projectId: payload.projectId,
-        userId: "current-user",
-        role: payload.role,
-        message: payload.message,
-        status: "Pending",
-        createdAt: new Date().toISOString(),
-      };
+  async getProjectById(projectId: string, signal?: AbortSignal): Promise<ProjectDetail> {
+    const mock = USE_COMPLETED_PROJECT_MOCK && completedProjects.find(project => project.id === projectId);
+    if (mock) return mock;
+    if (!projectId.trim()) throw new Error("Không tìm thấy mã dự án.");
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectDetail>(`${path}/${encodeURIComponent(projectId)}`, { method: "GET", signal });
+    if (!response || response.id !== projectId || !response.creator || !Array.isArray(response.roleRequirements) || !Array.isArray(response.skills) || !Array.isArray(response.members) || typeof response.isCreator !== "boolean" || typeof response.isMember !== "boolean") {
+      throw new Error("Phản hồi chi tiết dự án không hợp lệ.");
     }
+    return response;
   },
 
-  async sendInvitation(payload: InvitationPayload): Promise<ProjectInvitation> {
-    try {
-      return await apiRequest<ProjectInvitation>(
-        `/api/projects/${payload.projectId}/invitations`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            inviteeId: payload.inviteeId,
-            role: payload.role,
-            message: payload.message,
-          }),
-        },
-      );
-    } catch {
-      return {
-        id: `invite-${Date.now()}`,
-        projectId: payload.projectId,
-        inviteeId: payload.inviteeId,
-        inviterId: "current-user",
-        role: payload.role,
-        message: payload.message,
-        status: "Sent",
-        createdAt: new Date().toISOString(),
-      };
+  async createProject(payload: CreateProjectRequest): Promise<ProjectDetail> {
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectDetail>(path, { method: "POST", body: JSON.stringify(payload) });
+    if (!response || typeof response.id !== "string" || !response.id || !response.creator || !Array.isArray(response.roleRequirements) || !Array.isArray(response.skills) || !Array.isArray(response.members)) {
+      throw new Error("Phản hồi tạo dự án không hợp lệ.");
     }
+    return response;
   },
 
-  async fetchRecommendations(
-    projectId: string,
-  ): Promise<ProjectRecommendation[]> {
-    try {
-      return await apiRequest<ProjectRecommendation[]>(
-        `/api/projects/${projectId}/recommendations`,
-      );
-    } catch {
-      return mockRecommendations;
-    }
+  submitJoinRequest(payload: JoinRequestPayload): Promise<ProjectJoinRequest> {
+    return projectMutation(`/${requiredId(payload.projectId)}/join-requests`, "POST", { role: payload.role, message: payload.message });
+  },
+  sendInvitation(payload: InvitationPayload): Promise<ProjectInvitation> {
+    return projectMutation(`/${requiredId(payload.projectId)}/invitations`, "POST", { inviteeId: payload.inviteeId, role: payload.role, message: payload.message });
+  },
+  kickMember(projectId: string, userId: string): Promise<ProjectMemberResponse> {
+    return projectMutation(`/${requiredId(projectId)}/members/${requiredId(userId)}/kick`, "PATCH");
+  },
+  leaveProject(projectId: string): Promise<ProjectMemberResponse> {
+    return projectMutation(`/${requiredId(projectId)}/leave`, "PATCH");
+  },
+  cancelInvitation(invitationId: string): Promise<ProjectInvitation> {
+    return projectMutation(`/invitations/${requiredId(invitationId)}/cancel`, "PATCH");
+  },
+  acceptInvitation(invitationId: string): Promise<ProjectInvitation> {
+    return projectMutation(`/invitations/${requiredId(invitationId)}/accept`, "PATCH");
+  },
+  rejectInvitation(invitationId: string): Promise<ProjectInvitation> {
+    return projectMutation(`/invitations/${requiredId(invitationId)}/reject`, "PATCH");
+  },
+  acceptJoinRequest(requestId: string): Promise<ProjectJoinRequest> {
+    return projectMutation(`/join-requests/${requiredId(requestId)}/accept`, "PATCH");
+  },
+  rejectJoinRequest(requestId: string): Promise<ProjectJoinRequest> {
+    return projectMutation(`/join-requests/${requiredId(requestId)}/reject`, "PATCH");
+  },
+  cancelJoinRequest(requestId: string): Promise<ProjectJoinRequest> {
+    return projectMutation(`/join-requests/${requiredId(requestId)}/cancel`, "PATCH");
+  },
+
+  async fetchRecommendations(projectId: string, signal?: AbortSignal): Promise<ProjectRecommendation[]> {
+    if (!projectId.trim()) throw new Error("Không tìm thấy mã dự án.");
+    const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
+    const response = await apiRequest<ProjectRecommendation[]>(`${path}/${encodeURIComponent(projectId)}/recommended-members`, { method: "GET", signal });
+    if (!Array.isArray(response) || response.some((member) =>
+      !member || typeof member.userId !== "string" || typeof member.fullName !== "string" ||
+      !Array.isArray(member.matchedSkills) || !Array.isArray(member.missingSkills) ||
+      ![member.matchScore, member.skillMatch, member.diversityScore, member.collaborationCount, member.finalScore].every((score) => typeof score === "number" && Number.isFinite(score))
+    )) throw new Error("Phản hồi gợi ý thành viên không hợp lệ.");
+    return response;
   },
 };

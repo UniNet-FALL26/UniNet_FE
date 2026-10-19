@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { router, Slot, usePathname, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Animated, BackHandler, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, BackHandler, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
+import { useAuthStore } from '@/store/auth.store';
+import { portfolioService } from '@/services/portfolio.service';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type TabItem = { label: string; href: Href; paths: string[]; icon: SymbolName; activeIcon: SymbolName; unread?: number };
@@ -19,12 +21,7 @@ const tabs: TabItem[] = [
 const shortcuts: Shortcut[] = [
   { label: 'Không gian\nlàm việc', href: '/(tabs)/workspace', icon: { ios: 'briefcase.fill', android: 'work', web: 'work' }, tint: '#1476DA', background: '#E8F3FF' },
   { label: 'Cơ hội', href: '/(tabs)/opportunities', icon: { ios: 'briefcase', android: 'business_center', web: 'business_center' }, tint: '#E34B66', background: '#FFF0F3' },
-  { label: 'Học tập', href: '/(tabs)/learning', icon: { ios: 'graduationcap.fill', android: 'school', web: 'school' }, tint: '#8650DD', background: '#F3EEFF' },
-  { label: 'Sự kiện', href: '/(tabs)/events', icon: { ios: 'calendar', android: 'event', web: 'event' }, tint: '#ED7B22', background: '#FFF2E9' },
-  { label: 'Nhóm', href: '/(tabs)/groups', icon: { ios: 'person.3.fill', android: 'groups', web: 'groups' }, tint: '#15A882', background: '#E8FAF4' },
-  { label: 'Tài liệu', href: '/(tabs)/documents', icon: { ios: 'folder.fill', android: 'folder', web: 'folder' }, tint: '#159DD0', background: '#E8F7FD' },
-  { label: 'Kỹ năng', href: '/(tabs)/skills', icon: { ios: 'chart.bar.fill', android: 'bar_chart', web: 'bar_chart' }, tint: '#7654D5', background: '#F2EEFF' },
-  { label: 'Khác', href: '/(tabs)/more', icon: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }, tint: '#697891', background: '#F2F4F8' },
+  { label: 'Dự án', href: '/(tabs)/projects', icon: { ios: 'square.grid.2x2.fill', android: 'grid_view', web: 'grid_view' }, tint: '#8054D9', background: '#F2EBFF' },
 ];
 
 export function badgeLabel(count: number | undefined) {
@@ -45,15 +42,33 @@ function FooterTab({ item, active, onPress }: { item: TabItem; active: boolean; 
 }
 
 export default function AppTabs() {
+  const { account } = useAuthStore();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const desktop = Platform.OS === 'web' && width >= 1024;
+  const [avatar, setAvatar] = useState<{ accountId: string; url: string | null } | null>(null);
+  const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
+  const avatarUrl = avatar?.accountId === account?.id && avatar?.url !== failedAvatar ? avatar?.url : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const bottomInset = Math.max(insets.bottom, 8);
   const columns = width < 350 ? 2 : 4;
 
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!desktop || !account?.id) return;
+    const accountId = account.id;
+    const controller = new AbortController();
+    portfolioService.getMine(controller.signal).then(data => {
+      if (!controller.signal.aborted && data.isOwner) {
+        setAvatar({ accountId, url: data.profile.avatarUrl || null });
+        setFailedAvatar(null);
+      }
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [account?.id, desktop, pathname]);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname, desktop]);
   useEffect(() => {
     if (!menuOpen) return;
     progress.setValue(0);
@@ -62,9 +77,44 @@ export default function AppTabs() {
     return () => back.remove();
   }, [menuOpen, progress]);
 
+  const desktopShortcuts: TabItem[] = shortcuts.map(item => ({ ...item, label: item.label.replace('\n', ' '), paths: [String(item.href).replace('/(tabs)', '')], activeIcon: item.icon }));
+  const desktopItems: TabItem[] = [
+    tabs[0],
+    desktopShortcuts[0],
+    { label: 'Dự án', href: '/(tabs)/projects', paths: ['/projects'], icon: { ios: 'square.grid.2x2', android: 'grid_view', web: 'grid_view' }, activeIcon: { ios: 'square.grid.2x2.fill', android: 'grid_view', web: 'grid_view' } },
+    desktopShortcuts[1],
+    tabs[1],
+  ];
   return <View style={styles.root}>
+    {desktop && <View testID="desktop-app-header" style={[styles.desktopHeader, { paddingTop: insets.top }]}>
+      <View style={[styles.headerInner, width < 1200 && styles.compactHeader]}>
+        <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => router.navigate('/(tabs)')} style={({ pressed }) => [styles.brand, pressed && styles.pressed]}>
+          <Image source={require('@/assets/images/uninet-mark.png')} resizeMode="contain" style={styles.brandMark} />
+          <Text style={styles.brandName}>UniNet</Text>
+        </Pressable>
+        <View accessibilityRole="tablist" accessibilityLabel="Điều hướng chính" style={styles.desktopNav}>
+          {desktopItems.map(item => {
+            const active = item.paths.some(path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)));
+            return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => router.navigate(item.href)} style={({ pressed, hovered }) => [styles.desktopLink, width < 1200 && styles.compactLink, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
+              <SymbolView name={active ? item.activeIcon : item.icon} size={width < 1200 ? 17 : 19} tintColor={active ? colors.primary : colors.textSecondary} />
+              <Text numberOfLines={1} style={[styles.desktopLabel, width < 1200 && styles.compactLabel, active && styles.activeLabel]}>{item.label}</Text>
+            </Pressable>;
+          })}
+        </View>
+        <View accessibilityRole="tablist" accessibilityLabel="Tài khoản và thông báo" style={styles.headerActions}>
+          {[tabs[2], tabs[3]].map(item => {
+            const active = item.paths.some(path => pathname === path || pathname.startsWith(`${path}/`));
+            const profile = item === tabs[3];
+            return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => router.navigate(item.href)} style={({ hovered, pressed }) => [styles.actionButton, profile && styles.profileAction, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
+              {profile && avatarUrl ? <Image testID="header-profile-avatar" accessibilityLabel="Ảnh đại diện của bạn" source={{ uri: avatarUrl }} onError={() => setFailedAvatar(avatarUrl)} style={styles.headerAvatar} /> : <SymbolView name={active ? item.activeIcon : item.icon} size={24} tintColor={active ? colors.primary : colors.textSecondary} />}
+              {profile && <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={colors.textSecondary} />}
+            </Pressable>;
+          })}
+        </View>
+      </View>
+    </View>}
     <View style={styles.page}><Slot /></View>
-    {menuOpen && <View style={[styles.menuLayer, { bottom: 70 + bottomInset }]}>
+    {!desktop && menuOpen && <View style={[styles.menuLayer, { bottom: 70 + bottomInset }]}>
       <Pressable style={styles.scrim} onPress={() => setMenuOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng menu" />
       <Animated.View accessibilityViewIsModal style={[styles.sheet, { maxHeight: height * 0.68, opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) }] }]}>
         <View style={styles.handle} />
@@ -77,19 +127,32 @@ export default function AppTabs() {
         </ScrollView>
       </Animated.View>
     </View>}
-    <View style={[styles.footer, { paddingBottom: bottomInset }]} accessibilityRole="tablist">
+    {!desktop && <View testID="mobile-app-footer" style={[styles.footer, { paddingBottom: bottomInset }]} accessibilityRole="tablist">
       <FooterTab item={tabs[0]} active={tabs[0].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[0].href); }} />
       <FooterTab item={tabs[1]} active={tabs[1].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[1].href); }} />
       <Pressable onPress={() => setMenuOpen(open => !open)} hitSlop={{ top: 20, left: 6, right: 6 }} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Đóng menu' : 'Mở menu'} accessibilityState={{ expanded: menuOpen }} style={styles.menuSlot}>
-        <View style={styles.menuButton}><SymbolView name={menuOpen ? { ios: 'xmark', android: 'close', web: 'close' } : { ios: 'square.grid.2x2.fill', android: 'grid_view', web: 'grid_view' }} size={25} tintColor="#FFFFFF" /></View>
+        <View style={styles.menuButton}><SymbolView name={menuOpen ? { ios: 'xmark', android: 'close', web: 'close' } : { ios: 'line.3.horizontal', android: 'menu', web: 'menu' }} size={25} tintColor="#FFFFFF" /></View>
       </Pressable>
       <FooterTab item={tabs[2]} active={tabs[2].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[2].href); }} />
       <FooterTab item={tabs[3]} active={tabs[3].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[3].href); }} />
-    </View>
+    </View>}
   </View>;
 }
 
 const styles = StyleSheet.create({
+  desktopHeader: { marginHorizontal: 16, marginTop: 14, marginBottom: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E0EDFD', borderRadius: 18, zIndex: 2, boxShadow: '0 5px 22px rgba(39, 110, 190, 0.07)', experimental_backgroundImage: 'linear-gradient(115deg, #F0F7FF 0%, #FFFFFF 22%, #FFFFFF 80%, #F0F7FF 100%)' },
+  headerInner: { width: '100%', maxWidth: 1600, alignSelf: 'center', minHeight: 68, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flexShrink: 0 },
+  brandMark: { width: 30, height: 34 }, brandName: { color: colors.navy, fontSize: 23, fontWeight: '800', letterSpacing: -0.8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: '#E7EDF6' },
+  actionButton: { minWidth: 50, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  profileAction: { flexDirection: 'row', gap: 9, paddingHorizontal: 10, marginLeft: 4 },
+  headerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EAF3FF', borderWidth: 2, borderColor: '#DEEEFF' },
+  compactHeader: { paddingHorizontal: 16, gap: 16 }, compactLink: { paddingHorizontal: 6, gap: 4 }, compactLabel: { fontSize: 11 },
+  desktopNav: { flex: 1, paddingLeft: 24, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 },
+  desktopLink: { minHeight: 44, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 11 },
+  desktopLinkActive: { backgroundColor: '#EAF3FF' }, desktopLinkHovered: { backgroundColor: '#F0F6FD' },
+  desktopLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   root: { flex: 1, backgroundColor: colors.background },
   page: { flex: 1 },
   footer: { minHeight: 70, flexDirection: 'row', alignItems: 'flex-start', paddingTop: 7, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8EDF5', shadowColor: '#0B3E9C', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 8, zIndex: 2 },

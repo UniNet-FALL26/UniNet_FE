@@ -1,21 +1,9 @@
 import { Image } from 'expo-image';
-import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import type { DeveloperModernTemplateProps } from '../developer-modern/DeveloperModernTemplate';
-import { PortfolioControl, PortfolioIcon, ui } from '../developer-modern/PortfolioPrimitives';
 import { ProfilePortrait } from './ProfilePortrait';
 import { EditField, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { portfolioMetrics, type ProfileEditField } from '@/utils/profile-fields';
-
-export function ShowcaseContact({ data, theme, thumbnail }: Pick<DeveloperModernTemplateProps, 'data' | 'theme' | 'thumbnail'>) {
-  const editing = useProfileEditing();
-  const email = data.portfolio.contactEmail;
-  const hasContact = !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !/@example\.(com|org|net)$/i.test(email);
-  if (editing) return hasContact
-    ? <EditField overlay field="contactEmail" label="Email liên hệ" color={theme.accent}><View style={[s.button, { backgroundColor: theme.accent }]}><Text style={[s.buttonText, { color: theme.onAccent }]}>Liên hệ ngay</Text><PortfolioIcon name="mail" color={theme.onAccent} size={18} /></View></EditField>
-    : <View style={s.contactPlaceholder}><EditField overlay field="contactEmail" label="Email liên hệ" color={theme.accent}><Text style={[s.buttonText, { color: theme.heroMuted }]}>{email || 'Thêm email liên hệ'}</Text></EditField></View>;
-  if (!hasContact) return null;
-  return <PortfolioControl thumbnail={thumbnail} accessibilityRole="link" accessibilityLabel="Liên hệ qua email" onPress={() => { void Linking.openURL(`mailto:${encodeURIComponent(email)}`).catch(() => {}); }} style={({ pressed }) => [s.button, { backgroundColor: theme.accent }, pressed && ui.pressed]}><Text style={[s.buttonText, { color: theme.onAccent }]}>Liên hệ ngay</Text><PortfolioIcon name="mail" color={theme.onAccent} size={18} /></PortfolioControl>;
-}
 
 export function ShowcaseHero({ data, theme, width, thumbnail }: DeveloperModernTemplateProps) {
   const editing = useProfileEditing();
@@ -30,16 +18,14 @@ export function ShowcaseHero({ data, theme, width, thumbnail }: DeveloperModernT
   </View>;
   const details = <View style={s.details}>
     {(profile.bio || portfolio.careerObjective || editing) && <EditField overlay field="bio" label="Giới thiệu" color={theme.heroMuted}><Text style={[s.bio, { color: theme.heroMuted }]}>{profile.bio || portfolio.careerObjective || 'Thêm giới thiệu về bạn'}</Text></EditField>}
-    <View style={[s.actions, compact && { flexDirection: 'column', alignItems: 'stretch' }]}>
-      <ShowcaseContact data={data} theme={theme} thumbnail={thumbnail} />
-    </View>
   </View>;
   const metrics = portfolioMetrics(portfolio);
-  const stats: { value: string; label: string; field?: ProfileEditField }[] = [
-    { value: `${metrics.years}+`, label: 'Năm kinh nghiệm', field: 'yearsOfExperience' },
-    { value: `${metrics.projects}+`, label: 'Dự án đã xây dựng' },
-    { value: metrics.gpa || (editing ? 'Nhập GPA' : `${metrics.technologies}`), label: metrics.gpa || editing ? 'GPA tại trường' : 'Kỹ năng', field: metrics.gpa || editing ? 'gpa' : undefined },
+  const stats: { value: string; label: string; hasData: boolean; field?: ProfileEditField }[] = [
+    { value: `${metrics.years}+`, label: 'Năm kinh nghiệm', hasData: metrics.years > 0, field: 'yearsOfExperience' },
+    { value: `${metrics.projects}+`, label: 'Dự án đã xây dựng', hasData: metrics.projects > 0 },
+    { value: metrics.gpa || (editing ? 'Nhập GPA' : `${metrics.technologies}`), label: metrics.gpa || editing ? 'GPA tại trường' : 'Kỹ năng', hasData: !!metrics.gpa || metrics.technologies > 0, field: metrics.gpa || editing ? 'gpa' : undefined },
   ];
+  const visibleStats = stats.filter(item => editing || item.hasData);
   return <View testID="showcase-hero" style={[s.hero, { backgroundColor: thumbnail ? theme.page : theme.heroBackground, paddingHorizontal: compact ? 22 : 40 }]}>
     {/* Keep the scaled thumbnail edge light so the dark background cannot bleed below the curve. */}
     {thumbnail && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: 4, backgroundColor: theme.heroBackground }]} />}
@@ -55,20 +41,18 @@ export function ShowcaseHero({ data, theme, width, thumbnail }: DeveloperModernT
         <Text accessible={false} style={[s.handwriting, { color: theme.accent }]}>Build · Learn{'\n'}Grow · Together ↗</Text>
       </View>}
     </View>
-    <View testID="showcase-stats" style={[s.stats, { borderColor: theme.heroBorder }]}>
+    {!!visibleStats.length && (editing || !portfolio.appearance.profile.hiddenSections.includes('stats')) && <View testID="showcase-stats" style={[s.stats, { borderColor: theme.heroBorder }]}>
       {!compact && <Image testID="showcase-stats-arch" accessible={false} pointerEvents="none" contentFit="fill" source={{ uri: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 136" preserveAspectRatio="none"><path fill="${theme.page}" d="M0 136 C18 136 28 130 38 114 L94 22 C104 6 114 0 132 0 H600 V136 Z"/></svg>`)}` }} style={s.statsArch} />}
-      <View style={[s.statsItems, { width: compact ? '100%' : '48%' }]}>{stats.map(item => <View key={item.label} style={s.stat}>{item.field ? <EditField field={item.field} label={item.label} color={theme.accent}><Text style={[s.statValue, { color: theme.accent }]}>{item.value}</Text></EditField> : <Text style={[s.statValue, { color: theme.accent }]}>{item.value}</Text>}<Text style={[s.statLabel, { color: theme.heroMuted }]}>{item.label}</Text></View>)}</View>
-    </View>
+      <View style={[s.statsItems, { width: compact ? '100%' : '48%' }]}>{visibleStats.map(item => <View key={item.label} style={s.stat}>{item.field ? <EditField field={item.field} label={item.label} color={theme.accent}><Text style={[s.statValue, { color: theme.accent }]}>{item.value}</Text></EditField> : <Text style={[s.statValue, { color: theme.accent }]}>{item.value}</Text>}<Text style={[s.statLabel, { color: theme.heroMuted }]}>{item.label}</Text></View>)}</View>
+    </View>}
   </View>;
 }
 const s = StyleSheet.create({
-  contactPlaceholder: { position: 'absolute', left: 0, right: 0, top: -16 },
   hero: { paddingTop: 24, paddingBottom: 22, overflow: 'hidden' },
   dot: { width: 6, height: 6, borderRadius: 3 },
   composition: { justifyContent: 'space-between', alignItems: 'center', gap: 16 }, titles: { gap: 5 },
   name: { fontWeight: '800', letterSpacing: -1, paddingVertical: 4 }, headline: { fontSize: 22, lineHeight: 30, fontWeight: '600' }, nickname: { fontSize: 13, lineHeight: 21 },
-  details: { width: '100%' }, bio: { fontSize: 15, lineHeight: 24, marginTop: 12 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 22 },
-  button: { minHeight: 48, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 }, buttonText: { fontSize: 13, lineHeight: 20, fontWeight: '700' },
+  details: { width: '100%' }, bio: { fontSize: 15, lineHeight: 24, marginTop: 12 },
   code: { padding: 14, borderWidth: 1, borderRadius: 8 }, windowDots: { flexDirection: 'row', gap: 5, marginBottom: 14 }, codeText: { fontFamily: Platform.OS === 'web' ? 'monospace' : Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 11, lineHeight: 20 },
   handwriting: { fontSize: 22, lineHeight: 32, fontStyle: 'italic', textAlign: 'right', padding: 8 },
   stats: { borderTopWidth: 1, marginTop: 20, paddingTop: 18 },

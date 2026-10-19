@@ -1,28 +1,63 @@
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, PageTitle, Tag } from '@/components/company/company-ui';
-import { companyApplicants as sampleApplicants } from '@/components/company/company-data';
-
-const statusTone = { 'Chờ xem': 'amber', 'Đã xem': 'gray', 'Phỏng vấn': 'purple', 'Chấp nhận': 'green', 'Từ chối': 'rose' } as const;
-const statuses = ['Tất cả', 'Chờ xem', 'Đã xem', 'Phỏng vấn', 'Chấp nhận', 'Từ chối'];
+import { companyJobStatusLabel, companyJobWorkTypeLabel, formatCompanyDate, companyService, type CompanyJob } from '@/services/company.service';
 
 export default function CompanyApplicants() {
-  const [filter, setFilter] = useState('Tất cả');
-  const [query, setQuery] = useState('');
-  const [applicants, setApplicants] = useState(sampleApplicants);
-  const visible = useMemo(() => applicants.filter((person) => (filter === 'Tất cả' || person.status === filter) && `${person.name} ${person.school} ${person.skills.join(' ')}`.toLowerCase().includes(query.toLowerCase())), [applicants, filter, query]);
-  const cycleStatus = (name: string) => setApplicants((current) => current.map((person) => person.name === name ? { ...person, status: statuses[(statuses.indexOf(person.status) + 1) % statuses.length] } : person));
+  const { jobId } = useLocalSearchParams<{ jobId?: string }>();
+  const [jobs, setJobs] = useState<CompanyJob[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState(typeof jobId === 'string' ? jobId : '');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    void companyService.listJobs({ page: 1, pageSize: 100 }, controller.signal)
+      .then(result => {
+        const publishedJobs = result.jobs.filter(job => job.status === 1);
+        setJobs(publishedJobs);
+        setSelectedJobId(current => {
+          const requestedId = typeof jobId === 'string' ? jobId : current;
+          return publishedJobs.some(job => job.id === requestedId) ? requestedId : publishedJobs[0]?.id ?? '';
+        });
+      })
+      .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Không tải được bài đăng.'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [jobId, reload]));
+
+  const selectedJob = useMemo(() => jobs.find(job => job.id === selectedJobId) ?? null, [jobs, selectedJobId]);
+
   return <CompanyPage><PageScroll>
-    <View style={s.topline}><View style={s.brandMark}><CompanyIcon name={{ ios: 'building.2.fill', android: 'business', web: 'business' }} color="#FFF" size={17} /></View><Text style={s.brand}>UniNet <Text style={s.caption}>CAREER HUB</Text></Text><View style={s.topActions}><CompanyIcon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} color={c.muted} /><CompanyIcon name={{ ios: 'bell', android: 'notifications_none', web: 'notifications_none' }} color={c.muted} /><View style={s.avatar}><Text style={s.avatarText}>N</Text></View></View></View>
-    <PageTitle title="Ứng viên của bài đăng" subtitle="Xem hồ sơ đã gửi, tìm hiểu đóng góp và chủ động trao đổi với sinh viên." />
-    <Pressable style={s.jobPicker} onPress={() => Alert.alert('Chọn bài đăng', 'Danh sách bài đăng sẽ được kết nối sau.')}><View style={s.codeIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>Thực tập sinh Frontend React</Text><Text style={s.jobSub}>Nexora Studio · Sản phẩm & Kỹ thuật · Kết hợp · TP. Hồ Chí Minh</Text><View style={s.jobInfo}><Tag tone="green">Đã đăng</Tag><Text style={s.meta}>Hạn ứng tuyển: 20/10/2026</Text></View></View><CompanyIcon name={{ ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }} size={16} color={c.muted} /></Pressable>
-    <View style={s.stats}>{[{n:'18',l:'Tất cả'}, {n:'6',l:'Chờ xem'}, {n:'5',l:'Đã xem'}, {n:'4',l:'Phỏng vấn'}, {n:'2',l:'Chấp nhận'}, {n:'1',l:'Từ chối'}].map((stat) => <Pressable key={stat.l} onPress={() => setFilter(stat.l === 'Tất cả' ? 'Tất cả' : stat.l === 'Chờ xem' || stat.l === 'Đã xem' || stat.l === 'Phỏng vấn' || stat.l === 'Chấp nhận' || stat.l === 'Từ chối' ? stat.l : 'Tất cả')} style={[s.stat, filter === stat.l && s.statActive]}><Text style={[s.statValue, filter === stat.l && s.statValueActive]}>{stat.n}</Text><Text style={[s.statLabel, filter === stat.l && s.statLabelActive]}>{stat.l}</Text></Pressable>)}</View>
-    <View style={s.filters}>{statuses.map((item) => <Pressable key={item} onPress={() => setFilter(item)} style={[s.filter, filter === item && s.filterActive]}><Text style={[s.filterText, filter === item && s.filterTextActive]}>{item}</Text></Pressable>)}</View>
-    <View style={s.search}><CompanyIcon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} color={c.muted} size={15} /><TextInput value={query} onChangeText={setQuery} placeholder="Tên sinh viên, trường..." placeholderTextColor={c.muted} style={s.searchInput} /></View>
-    <View style={s.filters}>{['Kỹ năng: Tất cả', 'Lĩnh vực dự án: Tất cả', 'Trạng thái: Tất cả', 'Nhóm công nghệ: Tất cả'].map((item) => <Pressable key={item} style={s.filter} onPress={() => Alert.alert('Bộ lọc', 'Bộ lọc nâng cao sẽ được kết nối sau.')}><Text style={s.filterText}>{item}⌄</Text></Pressable>)}</View>
-    <Text style={s.count}>{visible.length} hồ sơ · Chưa áp dụng bộ lọc · Gần kết hợp tạm dừng đến 11:55 hôm nay</Text>
-    {visible.map((person) => <Card key={person.name} style={s.personCard}><View style={s.personTop}><View style={s.initials}><Text style={s.initialsText}>{person.initials}</Text></View><View style={{ flex: 1 }}><Text style={s.personName}>{person.name}</Text><Text style={s.personMeta}>{person.school}</Text><Text style={s.personMeta}>{person.date}</Text></View></View><View style={s.filters}>{person.skills.map((skill) => <Tag key={skill} tone="purple">{skill}</Tag>)}</View><Text style={s.projectTitle}>{person.project}</Text><Text style={s.personMeta}>{person.note}</Text><Text style={s.personMeta}>Mình chứng cho sinh viên cung cấp</Text><View style={s.cardButtons}><ActionButton title="Mở hồ sơ đã gửi" onPress={() => Alert.alert(person.name, 'Chi tiết hồ sơ sẽ được kết nối sau.')} /><Pressable onPress={() => Alert.alert('Đã lưu', `Đã lưu hồ sơ của ${person.name}.`)} style={s.saveButton}><CompanyIcon name={{ ios: 'bookmark', android: 'bookmark_border', web: 'bookmark_border' }} /></Pressable></View><View style={s.statusRow}><Tag tone={statusTone[person.status as keyof typeof statusTone]}>{person.status}</Tag><Pressable onPress={() => cycleStatus(person.name)}><Text style={s.changeStatus}>Đổi trạng thái⌄</Text></Pressable></View></Card>)}
+    <View style={s.topline}><View style={s.brandMark}><CompanyIcon name={{ ios: 'building.2.fill', android: 'business', web: 'business' }} color="#FFF" size={17} /></View><Text style={s.brand}>UniNet <Text style={s.caption}>CAREER HUB</Text></Text></View>
+    <PageTitle title="Ứng viên của bài đăng" subtitle="Xem và quản lý hồ sơ ứng tuyển theo từng bài đăng." />
+
+    {loading ? <Card style={s.stateCard}><ActivityIndicator color={c.blue} /><Text style={s.stateText}>Đang tải bài đăng…</Text></Card> : null}
+    {!!error && <Card style={s.stateCard}><Text style={s.error}>{error}</Text><ActionButton title="Thử lại" variant="outline" onPress={() => setReload(value => value + 1)} /></Card>}
+    {!loading && !error && jobs.length === 0 && <Card style={s.stateCard}><View style={s.emptyIcon}><CompanyIcon name={{ ios: 'briefcase', android: 'work_outline', web: 'work_outline' }} size={22} color={c.blue} /></View><Text style={s.emptyTitle}>Chưa có bài đăng tuyển dụng</Text><Text style={s.stateText}>Khi bạn đăng bài, bài đăng sẽ xuất hiện tại đây để xem ứng viên.</Text><ActionButton title="Tạo bài đăng" onPress={() => router.push('/(company)/create')} /></Card>}
+
+    {!loading && !error && selectedJob && <>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickerOpen }} onPress={() => setPickerOpen(value => !value)} style={s.jobPicker}>
+        <View style={s.codeIcon}><CompanyIcon name={{ ios: 'briefcase.fill', android: 'work', web: 'work' }} color={c.blue} /></View>
+        <View style={s.jobInfo}><Text style={s.jobTitle}>{selectedJob.title}</Text><Text style={s.jobSub}>{companyJobWorkTypeLabel[selectedJob.workType]} · {selectedJob.location || 'Chưa có địa điểm'}</Text><View style={s.metaRow}><Tag tone="green">{companyJobStatusLabel[selectedJob.status]}</Tag><Text style={s.meta}>Hạn ứng tuyển: {formatCompanyDate(selectedJob.deadline)}</Text></View></View>
+        <CompanyIcon name={{ ios: pickerOpen ? 'chevron.up' : 'chevron.down', android: pickerOpen ? 'expand_less' : 'expand_more', web: pickerOpen ? 'expand_less' : 'expand_more' }} size={17} color={c.muted} />
+      </Pressable>
+      {pickerOpen && <Card style={s.jobOptions}>{jobs.map(job => <Pressable key={job.id} onPress={() => { setSelectedJobId(job.id); setPickerOpen(false); }} style={[s.jobOption, job.id === selectedJob.id && s.jobOptionActive]}><View style={s.jobOptionText}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.jobSub}>{job.applicantCount} ứng viên · {formatCompanyDate(job.deadline)}</Text></View>{job.id === selectedJob.id && <CompanyIcon name={{ ios: 'checkmark', android: 'check', web: 'check' }} color={c.blue} size={18} />}</Pressable>)}</Card>}
+
+      <View style={s.stats}><View style={s.stat}><Text style={s.statValue}>{selectedJob.applicantCount}</Text><Text style={s.statLabel}>Ứng viên</Text></View><View style={s.stat}><Text style={s.statValue}>—</Text><Text style={s.statLabel}>Đang xử lý</Text></View><View style={s.stat}><Text style={s.statValue}>—</Text><Text style={s.statLabel}>Đã xem</Text></View></View>
+
+      {selectedJob.applicantCount === 0 ? <Card style={s.stateCard}><View style={s.emptyIcon}><CompanyIcon name={{ ios: 'person.2', android: 'groups', web: 'groups' }} size={22} color={c.blue} /></View><Text style={s.emptyTitle}>Chưa có ứng viên</Text><Text style={s.stateText}>Bài đăng này chưa nhận được hồ sơ ứng tuyển. Hồ sơ sẽ xuất hiện tại đây khi có người ứng tuyển.</Text></Card> : <Card style={s.stateCard}><Text style={s.emptyTitle}>Chưa tải được danh sách ứng viên</Text><Text style={s.stateText}>BE hiện chưa công khai API danh sách và trạng thái hồ sơ ứng tuyển trong Swagger. Tổng số hồ sơ của bài đăng là {selectedJob.applicantCount}.</Text></Card>}
+    </>}
   </PageScroll></CompanyPage>;
 }
 
-const s = StyleSheet.create({ topline: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 7 }, brandMark: { width: 27, height: 27, borderRadius: 8, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, brand: { color: c.ink, fontSize: 13, fontWeight: '900', flex: 1 }, caption: { color: c.purple, fontSize: 7 }, topActions: { flexDirection: 'row', gap: 11, alignItems: 'center' }, avatar: { backgroundColor: c.purpleSoft, borderRadius: 14, width: 27, height: 27, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: c.purple, fontSize: 10, fontWeight: '900' }, jobPicker: { backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 }, codeIcon: { width: 36, height: 36, backgroundColor: c.purpleSoft, borderRadius: 11, justifyContent: 'center', alignItems: 'center' }, jobTitle: { color: c.ink, fontSize: 11, fontWeight: '900' }, jobSub: { color: c.muted, fontSize: 9, lineHeight: 14, marginTop: 2 }, jobInfo: { flexDirection: 'row', gap: 7, alignItems: 'center', marginTop: 6 }, meta: { color: c.muted, fontSize: 8 }, stats: { flexDirection: 'row', gap: 5 }, stat: { flex: 1, minHeight: 54, backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 11, alignItems: 'center', justifyContent: 'center', gap: 3 }, statActive: { backgroundColor: c.purpleSoft, borderColor: c.purpleSoft }, statValue: { color: c.ink, fontSize: 14, fontWeight: '900' }, statValueActive: { color: c.purple }, statLabel: { color: c.muted, fontSize: 7 }, statLabelActive: { color: c.purple }, filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 }, filter: { backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 18, paddingHorizontal: 9, paddingVertical: 7 }, filterActive: { backgroundColor: c.purpleSoft, borderColor: c.purpleSoft }, filterText: { color: c.muted, fontSize: 9, fontWeight: '700' }, filterTextActive: { color: c.purple }, search: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 40, paddingHorizontal: 10, backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 11 }, searchInput: { flex: 1, color: c.ink, fontSize: 10, paddingVertical: 7 }, count: { color: c.muted, fontSize: 8, lineHeight: 12 }, personCard: { gap: 8 }, personTop: { flexDirection: 'row', gap: 9, alignItems: 'center' }, initials: { width: 34, height: 34, borderRadius: 18, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' }, initialsText: { color: c.purple, fontWeight: '900', fontSize: 10 }, personName: { color: c.ink, fontSize: 11, fontWeight: '900' }, personMeta: { color: c.muted, fontSize: 9, lineHeight: 14 }, projectTitle: { color: c.ink, fontSize: 10, fontWeight: '800' }, cardButtons: { flexDirection: 'row', gap: 7 }, saveButton: { borderColor: c.line, borderWidth: 1, borderRadius: 11, width: 42, alignItems: 'center', justifyContent: 'center' }, statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, changeStatus: { color: c.purple, fontSize: 9, fontWeight: '700' }, });
+const s = StyleSheet.create({
+  topline: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 7 }, brandMark: { width: 27, height: 27, borderRadius: 8, backgroundColor: c.blue, alignItems: 'center', justifyContent: 'center' }, brand: { color: c.ink, fontSize: 13, fontWeight: '900', flex: 1 }, caption: { color: c.blue, fontSize: 7 },
+  jobPicker: { backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 }, codeIcon: { width: 36, height: 36, backgroundColor: '#EAF3FF', borderRadius: 11, justifyContent: 'center', alignItems: 'center' }, jobInfo: { flex: 1, gap: 3 }, jobTitle: { color: c.ink, fontSize: 11, fontWeight: '900' }, jobSub: { color: c.muted, fontSize: 9, lineHeight: 14 }, metaRow: { flexDirection: 'row', gap: 7, alignItems: 'center', marginTop: 3 }, meta: { color: c.muted, fontSize: 8 }, jobOptions: { paddingVertical: 4, gap: 0 }, jobOption: { minHeight: 52, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, jobOptionActive: { backgroundColor: '#F4F8FF' }, jobOptionText: { flex: 1, gap: 2 },
+  stats: { flexDirection: 'row', gap: 7 }, stat: { flex: 1, minHeight: 58, backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 11, alignItems: 'center', justifyContent: 'center', gap: 3 }, statValue: { color: c.ink, fontSize: 16, fontWeight: '900' }, statLabel: { color: c.muted, fontSize: 8 }, stateCard: { alignItems: 'center', gap: 8, paddingVertical: 20 }, emptyIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#EAF3FF', alignItems: 'center', justifyContent: 'center' }, emptyTitle: { color: c.ink, fontSize: 12, fontWeight: '900', textAlign: 'center' }, stateText: { color: c.muted, fontSize: 10, lineHeight: 15, textAlign: 'center' }, error: { color: c.rose, fontSize: 11, textAlign: 'center' },
+});
