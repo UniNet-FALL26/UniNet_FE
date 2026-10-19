@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
+import { projectFields } from "@/constants/project-fields";
 import { projectService } from "@/services/project.service";
 import { skillService } from "@/services/skill.service";
-import { projectFields } from "@/constants/project-fields";
 import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
 import { Image as DecorativeImage } from "expo-image";
+import { router } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { useEffect, useMemo, useState } from "react";
 import {
   Image,
@@ -20,6 +20,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const tabs = [
   "Đang tuyển",
@@ -468,24 +469,7 @@ export function ProjectExplorerScreen() {
                   : 0;
 
               return (
-                <Pressable
-                  key={project.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Xem chi tiết dự án ${project.title}`}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/group/[id]" as never,
-                      params: {
-                        id: project.id,
-                      },
-                    } as never)
-                  }
-                  style={({ pressed, hovered }) => [
-                    styles.card,
-                    hovered && styles.cardHovered,
-                    pressed && styles.cardPressed,
-                  ]}
-                >
+                <View key={project.id} style={styles.card}>
                   {/* STATUS ACCENT */}
 
                   <View
@@ -594,27 +578,62 @@ export function ProjectExplorerScreen() {
                     {/* FOOTER */}
 
                     <View style={styles.footerRow}>
-                      <Text style={styles.detailHint}>Xem chi tiết</Text>
+                      {/* Nút Xem chi tiết */}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Xem chi tiết dự án ${project.title}`}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/group/[id]" as never,
+                            params: { id: project.id },
+                          } as never)
+                        }
+                        style={({ pressed }) => [
+                          styles.detailAction,
+                          pressed && styles.cardPressed,
+                        ]}
+                      >
+                        <Text style={styles.detailHint}>Xem chi tiết</Text>
+                        <View style={styles.arrowCircle}>
+                          <Text style={styles.arrow}>›</Text>
+                        </View>
+                      </Pressable>
 
-                      <View style={styles.arrowCircle}>
-                        <Text style={styles.arrow}>›</Text>
-                      </View>
+                      {/* Nút Workspace */}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Mở Workspace của dự án ${project.title}`}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/workspace/[projectId]" as never,
+                            params: { projectId: project.id },
+                          } as never)
+                        }
+                        style={({ pressed }) => [
+                          styles.workspaceButton,
+                          pressed && styles.workspaceButtonPressed,
+                        ]}
+                      >
+                        <SymbolView
+                          name={{
+                            ios: "briefcase.fill",
+                            android: "work",
+                            web: "work",
+                          }}
+                          size={17}
+                          tintColor={colors.surface}
+                        />
+                        <Text style={styles.workspaceButtonText}>
+                          Workspace
+                        </Text>
+                      </Pressable>
                     </View>
                   </View>
-                </Pressable>
+                </View>
               );
             })
           )}
         </View>
-        {!loading && !error && totalPages > 1 && (
-          <View style={styles.footerRow}>
-            <Button title="Trang trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
-            <Text style={styles.metaText}>Trang {page}/{totalPages}</Text>
-            <Button title="Trang sau" disabled={page >= totalPages} onPress={() => setPage((value) => value + 1)} />
-          </View>
-        )}
-      </ScrollView>
-
       {/* =========================
           FILTER MODAL
       ========================= */}
@@ -816,6 +835,7 @@ export function ProjectExplorerScreen() {
           </View>
         </View>
       </Modal>
+      </ScrollView>
     </View>
   );
 }
@@ -1439,6 +1459,35 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 15,
     marginLeft: 1,
+  },
+
+  detailAction: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+
+  workspaceButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 10,
+    paddingHorizontal: 13,
+    backgroundColor: colors.primary,
+  },
+
+  workspaceButtonPressed: {
+    opacity: 0.8,
+  },
+
+  workspaceButtonText: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: "700",
   },
 
   // =========================
