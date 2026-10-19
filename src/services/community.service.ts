@@ -49,6 +49,7 @@ export interface CommentResponse {
   authorAvatarUrl?: string | null;
   content: string;
   replyToUserId?: string | null;
+  replyToUserName?: string | null;
   createdAt: string;
   updatedAt: string;
   replies?: CommentResponse[];

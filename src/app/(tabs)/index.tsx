@@ -1,14 +1,16 @@
-import { CommunityComposer } from '@/components/community/CommunityComposer';
+import { PostCommentsModal } from "@/components/community/CommunityCommentsModal";
+import { CommunityComposer } from "@/components/community/CommunityComposer";
 import { Button } from "@/components/ui/Button";
 import { colors } from "@/constants/colors";
-import type {
-  AdCampaignFeedItem,
-  PostResponse,
+import {
+  communityService,
+  type AdCampaignFeedItem,
+  type PostResponse,
 } from "@/services/community.service";
 import { useAuthStore } from "@/store/auth.store";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -24,106 +26,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// ==========================================
-// MOCK DATA
-// ==========================================
-
-const MOCK_POSTS: PostResponse[] = [
-  {
-    id: "post-1",
-    authorUserId: "user-1",
-    authorName: "Nguyễn Văn A",
-    authorActorType: 0,
-    description:
-      "Hôm nay mình vừa hoàn thành xong đồ án React Native với Expo! Cảm giác rất tuyệt vời. Có bạn nào đang tìm hiểu về Expo Symbols không?",
-    mediaUrls: ["https://picsum.photos/seed/post1/600/400"],
-    favoriteCount: 15,
-    commentCount: 4,
-    isFavorited: true,
-    isSaved: false,
-    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "post-2",
-    authorUserId: "user-2",
-    authorName: "CLB Lập Trình UniNet",
-    authorActorType: 0,
-    description:
-      "Thông báo: Workshop 'Chinh phục Docker & CI/CD cho Sinh viên' sẽ diễn ra vào cuối tuần này. Đăng ký ngay để nhận tư vấn trực tiếp từ các Senior Engineer nhé!",
-    mediaUrls: [],
-    favoriteCount: 42,
-    commentCount: 12,
-    isFavorited: false,
-    isSaved: true,
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "post-3",
-    authorUserId: "user-3",
-    authorName: "Trần Thị B",
-    authorActorType: 0,
-    description:
-      "Cần tìm bạn làm chung đồ án tốt nghiệp mảng Mobile / React Native. Yêu cầu có kiến thức cơ bản về TypeScript và REST API ạ.",
-    mediaUrls: ["https://picsum.photos/seed/post3/600/400"],
-    favoriteCount: 8,
-    commentCount: 2,
-    isFavorited: false,
-    isSaved: false,
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "post-4",
-    authorUserId: "user-4",
-    authorName: "Lê Minh C",
-    authorActorType: 0,
-    description:
-      "Góc chia sẻ tài liệu ôn thi môn Kiến trúc máy tính & Hệ điều hành. Mọi người thả tim để mình gửi link Drive nhé!",
-    mediaUrls: [],
-    favoriteCount: 89,
-    commentCount: 35,
-    isFavorited: true,
-    isSaved: true,
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "post-5",
-    authorUserId: "user-5",
-    authorName: "Phạm Quốc D",
-    authorActorType: 0,
-    description: "Chiều thu ở khuôn viên trường, không khí bình yên quá!",
-    mediaUrls: ["https://picsum.photos/seed/post5/600/400"],
-    favoriteCount: 24,
-    commentCount: 6,
-    isFavorited: false,
-    isSaved: false,
-    createdAt: new Date(Date.now() - 3600000 * 30).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const MOCK_ADS: AdCampaignFeedItem[] = [
-  {
-    id: "ad-1",
-    title: "Khóa học Fullstack Web & Mobile 2026",
-    content:
-      "Giảm 50% học phí cho sinh viên UniNet khi đăng ký ngay hôm nay. Cam kết hỗ trợ việc làm sau tốt nghiệp!",
-    destinationUrl: "https://google.com",
-    mediaUrl: "https://picsum.photos/seed/ad1/600/300",
-  },
-  {
-    id: "ad-2",
-    title: "Tuyển dụng Thực tập sinh IT - FPT Software",
-    content:
-      "Cơ hội làm việc tại môi trường chuyên nghiệp, nhận trợ cấp lên đến 10 triệu/tháng.",
-    destinationUrl: "https://google.com",
-    mediaUrl: "https://picsum.photos/seed/ad2/600/300",
-  },
-];
-
 type FeedItem =
   | { id: string; type: "post"; data: PostResponse }
   | { id: string; type: "ad"; data: AdCampaignFeedItem };
@@ -132,7 +34,6 @@ export default function CommunityScreen() {
   const { isAuthenticated } = useAuthStore();
 
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
-  const [createdPosts, setCreatedPosts] = useState<PostResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -143,7 +44,15 @@ export default function CommunityScreen() {
   const [reportReason, setReportReason] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportError, setReportError] = useState("");
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(
+    null,
+  );
 
+  const trackedImpressions = useRef<Set<string>>(new Set());
+  const abortController = useRef<AbortController | null>(null);
+  const cachedAds = useRef<AdCampaignFeedItem[]>([]);
+
+  // Trộn bài đăng và quảng cáo với key độc nhất cho cả Post và Ad
   const mergePostsAndAds = (
     posts: PostResponse[],
     ads: AdCampaignFeedItem[],
@@ -152,11 +61,14 @@ export default function CommunityScreen() {
     const result: FeedItem[] = [];
     let adIndex = 0;
 
-    posts.forEach((post, index) => {
+    const safePosts = Array.isArray(posts) ? posts : [];
+    const safeAds = Array.isArray(ads) ? ads : [];
+
+    safePosts.forEach((post, index) => {
       result.push({ id: `post-${post.id}`, type: "post", data: post });
 
-      if ((index + 1) % 4 === 0 && ads.length > 0) {
-        const ad = ads[adIndex % ads.length];
+      if ((index + 1) % 4 === 0 && safeAds.length > 0) {
+        const ad = safeAds[adIndex % safeAds.length];
         result.push({
           id: `ad-${ad.id}-p${currentPage}-${index}`,
           type: "ad",
@@ -169,7 +81,12 @@ export default function CommunityScreen() {
     return result;
   };
 
+  // Tải Bảng tin từ Backend API
   const fetchFeed = useCallback(async (pageNum: number, isRefresh = false) => {
+    abortController.current?.abort();
+    const controller = new AbortController();
+    abortController.current = controller;
+
     if (isRefresh) {
       setRefreshing(true);
     } else if (pageNum === 1) {
@@ -178,45 +95,86 @@ export default function CommunityScreen() {
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const [postsResponse, adsData] = await Promise.all([
+        communityService.getPosts(
+          { page: pageNum, pageSize: 10 },
+          controller.signal,
+        ),
+        pageNum === 1 || cachedAds.current.length === 0
+          ? communityService.getAdFeed(controller.signal).catch(() => [])
+          : Promise.resolve(cachedAds.current),
+      ]);
 
-      const mockPosts =
-        pageNum === 1
-          ? MOCK_POSTS
-          : MOCK_POSTS.slice(0, 2).map((post) => ({
-              ...post,
-              id: `${post.id}-p${pageNum}`,
-            }));
+      if (!controller.signal.aborted) {
+        const fetchedPosts: PostResponse[] = Array.isArray(postsResponse)
+          ? postsResponse
+          : (postsResponse?.data ?? []);
 
-      const newFeedItems = mergePostsAndAds(mockPosts, MOCK_ADS, pageNum);
+        const fetchedAds: AdCampaignFeedItem[] = Array.isArray(adsData)
+          ? adsData
+          : [];
 
-      if (isRefresh || pageNum === 1) {
-        setFeedItems(newFeedItems);
-      } else {
-        setFeedItems((prev) => [...prev, ...newFeedItems]);
+        if (pageNum === 1) {
+          cachedAds.current = fetchedAds;
+        }
+
+        const newFeedItems = mergePostsAndAds(
+          fetchedPosts,
+          cachedAds.current,
+          pageNum,
+        );
+
+        if (isRefresh || pageNum === 1) {
+          setFeedItems(newFeedItems);
+        } else {
+          setFeedItems((prev) => [...prev, ...newFeedItems]);
+        }
+
+        setHasMore(fetchedPosts.length >= 10);
+        setPage(pageNum);
       }
-
-      setHasMore(pageNum < 3);
-      setPage(pageNum);
-    } catch {
-      setError("Chưa tải được bảng tin. Vui lòng thử lại.");
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Chưa tải được bảng tin. Vui lòng thử lại.",
+        );
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (controller === abortController.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchFeed(1);
+      return () => {
+        abortController.current?.abort();
+      };
     }, [fetchFeed]),
   );
 
-  const handleToggleLike = (postId: string) => {
-    setCreatedPosts(posts => posts.map(post => post.id === postId ? { ...post, isFavorited: !post.isFavorited, favoriteCount: post.isFavorited ? Math.max(0, post.favoriteCount - 1) : post.favoriteCount + 1 } : post));
+  // Thêm bài viết mới vừa đăng qua CommunityComposer lên đầu bảng tin
+  const handlePostCreated = (newPost: PostResponse) => {
+    setFeedItems((prev) => [
+      { id: `post-${newPost.id}`, type: "post", data: newPost },
+      ...prev,
+    ]);
+  };
+
+  // Thả tim API
+  const handleToggleLike = async (postId: string) => {
+    // 1. Lưu lại trạng thái cũ để Rollback nếu API lỗi
+    let previousItemState: PostResponse | null = null;
+
     setFeedItems((prev) =>
       prev.map((item) => {
         if (item.type === "post" && item.data.id === postId) {
+          previousItemState = { ...item.data }; // Lưu bản sao trạng thái cũ
           const isFavorited = !item.data.isFavorited;
           return {
             ...item,
@@ -232,13 +190,33 @@ export default function CommunityScreen() {
         return item;
       }),
     );
+
+    try {
+      // 2. Gọi API toggle like
+      await communityService.toggleReact(postId);
+    } catch {
+      // 3. Nếu API lỗi, hoàn tác về đúng trạng thái ban đầu thay vì refetch cả trang
+      if (previousItemState) {
+        setFeedItems((prev) =>
+          prev.map((item) =>
+            item.type === "post" && item.data.id === postId
+              ? { ...item, data: previousItemState! }
+              : item,
+          ),
+        );
+      }
+    }
   };
 
-  const handleToggleBookmark = (postId: string) => {
-    setCreatedPosts(posts => posts.map(post => post.id === postId ? { ...post, isSaved: !post.isSaved } : post));
+  // Lưu bài viết API
+  const handleToggleBookmark = async (postId: string) => {
+    // 1. Lưu lại bản sao trạng thái cũ để Rollback nếu API lỗi
+    let previousItemState: PostResponse | null = null;
+
     setFeedItems((prev) =>
       prev.map((item) => {
         if (item.type === "post" && item.data.id === postId) {
+          previousItemState = { ...item.data }; // Lưu snapshot
           return {
             ...item,
             data: {
@@ -250,8 +228,25 @@ export default function CommunityScreen() {
         return item;
       }),
     );
+
+    try {
+      // 2. Gọi API toggle lưu bài viết
+      await communityService.toggleBookmark(postId);
+    } catch {
+      // 3. Nếu API lỗi, hoàn tác về trạng thái ban đầu thay vì gọi lại fetchFeed(1)
+      if (previousItemState) {
+        setFeedItems((prev) =>
+          prev.map((item) =>
+            item.type === "post" && item.data.id === postId
+              ? { ...item, data: previousItemState! }
+              : item,
+          ),
+        );
+      }
+    }
   };
 
+  // Báo cáo bài viết API
   const handleSubmitReport = async () => {
     if (!reportPostId || !reportReason.trim()) {
       setReportError("Vui lòng nhập lý do báo cáo.");
@@ -262,21 +257,48 @@ export default function CommunityScreen() {
     setReportError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await communityService.reportPost(reportPostId, {
+        reason: reportReason.trim(),
+      });
       setReportPostId(null);
       setReportReason("");
-    } catch {
-      setReportError("Không thể gửi báo cáo. Vui lòng thử lại.");
+    } catch (cause) {
+      setReportError(
+        cause instanceof Error
+          ? cause.message
+          : "Không thể gửi báo cáo. Vui lòng thử lại.",
+      );
     } finally {
       setSubmittingReport(false);
     }
   };
 
+  // Click Quảng cáo
   const handleAdPress = async (ad: AdCampaignFeedItem) => {
-    if (ad.destinationUrl) {
-      await Linking.openURL(ad.destinationUrl).catch(() => {});
+    try {
+      void communityService.trackAdClick(ad.id);
+      if (ad.destinationUrl) {
+        await Linking.openURL(ad.destinationUrl);
+      }
+    } catch {
+      // Ignored
     }
   };
+
+  // Tracking Impression Quảng cáo
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item: FeedItem }> }) => {
+      viewableItems.forEach(({ item }) => {
+        if (
+          item.type === "ad" &&
+          !trackedImpressions.current.has(item.data.id)
+        ) {
+          trackedImpressions.current.add(item.data.id);
+          void communityService.trackAdImpression(item.data.id);
+        }
+      });
+    },
+  ).current;
 
   const renderPostCard = (post: PostResponse) => (
     <View style={styles.card}>
@@ -356,12 +378,7 @@ export default function CommunityScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Bình luận"
-          onPress={() =>
-            router.push({
-              pathname: "/community/posts/[id]" as any,
-              params: { id: post.id },
-            })
-          }
+          onPress={() => setActiveCommentPostId(post.id)}
           style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
         >
           <SymbolView
@@ -435,8 +452,7 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {isAuthenticated && <View style={styles.composerContainer}><CommunityComposer onCreated={post => setCreatedPosts(posts => [post, ...posts])} /></View>}
-
+      {/* Trạng thái tải & lỗi ban đầu */}
       {loading ? (
         <View style={styles.stateContainer}>
           <ActivityIndicator
@@ -454,18 +470,22 @@ export default function CommunityScreen() {
         </View>
       ) : (
         <FlatList
-          data={[
-            ...createdPosts.map(post => ({ id: `post-${post.id}`, type: 'post' as const, data: post })),
-            ...feedItems.filter(item => item.type !== 'post' || !createdPosts.some(post => post.id === item.data.id)),
-          ]}
+          data={feedItems}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) =>
             item.type === "post"
               ? renderPostCard(item.data)
               : renderAdCard(item.data)
           }
+          ListHeaderComponent={
+            isAuthenticated ? (
+              <CommunityComposer onCreated={handlePostCreated} />
+            ) : null
+          }
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -482,6 +502,7 @@ export default function CommunityScreen() {
         />
       )}
 
+      {/* Modal báo cáo bài viết */}
       <Modal
         visible={!!reportPostId}
         transparent
@@ -530,6 +551,31 @@ export default function CommunityScreen() {
           </View>
         </View>
       </Modal>
+      <PostCommentsModal
+        visible={!!activeCommentPostId}
+        postId={activeCommentPostId || ""}
+        onClose={() => setActiveCommentPostId(null)}
+        onCommentCountChange={(delta) => {
+          // Cập nhật tăng/giảm commentCount trực tiếp trên bài viết tương ứng
+          setFeedItems((prev) =>
+            prev.map((item) => {
+              if (
+                item.type === "post" &&
+                item.data.id === activeCommentPostId
+              ) {
+                return {
+                  ...item,
+                  data: {
+                    ...item.data,
+                    commentCount: Math.max(0, item.data.commentCount + delta),
+                  },
+                };
+              }
+              return item;
+            }),
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -539,7 +585,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  composerContainer: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border || "#E5E7EB",
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.textPrimary,
+  },
   pressed: {
     opacity: 0.65,
   },
