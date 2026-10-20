@@ -1,3 +1,21 @@
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { TaskEditorModal } from "@/components/workspace/TaskEditorModal";
+import ContributionTab from "@/components/workspace/tabs/ContributionTab";
+import MeetingsTab from "@/components/workspace/tabs/MeetingsTab";
+import ReportsTab from "@/components/workspace/tabs/ReportsTab";
+import RoomsTab from "@/components/workspace/tabs/RoomsTab";
+import { colors } from "@/constants/colors";
+import { projectService } from "@/services/project.service";
+import { workspaceService } from "@/services/workspace.service";
+import { useAuthStore } from "@/store/auth.store";
+import {
+  VerifiedProjectTaskStatus,
+  type ProjectTask,
+  type WorkspaceProjectMember,
+} from "@/types/workspace";
+import { router, useLocalSearchParams } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,20 +27,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
-import { SymbolView } from "expo-symbols";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { TaskEditorModal } from "@/components/workspace/TaskEditorModal";
-import { colors } from "@/constants/colors";
-import { projectService } from "@/services/project.service";
-import { workspaceService } from "@/services/workspace.service";
-import { useAuthStore } from "@/store/auth.store";
-import {
-  VerifiedProjectTaskStatus,
-  type ProjectTask,
-  type WorkspaceProjectMember,
-} from "@/types/workspace";
+
+type WorkspaceTab = "tasks" | "reports" | "meetings" | "rooms" | "contribution";
 
 type LoadedWorkspace = {
   projectTitle: string;
@@ -183,13 +189,14 @@ function TaskCard({
 
 export function WorkspaceProjectScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  const { account } = useAuthStore();
+  const { account, accessToken } = useAuthStore();
   const { width } = useWindowDimensions();
   const [loaded, setLoaded] = useState<LoadedWorkspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("tasks");
   const [editorTask, setEditorTask] = useState<
     ProjectTask | null | undefined
   >(undefined);
@@ -353,6 +360,47 @@ export function WorkspaceProjectScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabsContent}
+            style={styles.tabsScroller}
+          >
+            {([
+              { key: "tasks", label: "Quản lý task", icon: { ios: "checklist", android: "checklist", web: "checklist" } },
+              { key: "reports", label: "Báo cáo & minh chứng", icon: { ios: "doc.text", android: "description", web: "description" } },
+              { key: "meetings", label: "Cuộc họp", icon: { ios: "calendar", android: "event", web: "event" } },
+              { key: "rooms", label: "Phòng trao đổi", icon: { ios: "bubble.left.and.bubble.right", android: "forum", web: "forum" } },
+              { key: "contribution", label: "Contribution", icon: { ios: "chart.bar", android: "bar_chart", web: "bar_chart" } },
+            ] as const).map((tab) => {
+              const selected = activeTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={({ pressed }) => [
+                    styles.tabButton,
+                    selected && styles.tabButtonActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <SymbolView
+                    name={tab.icon}
+                    size={17}
+                    tintColor={selected ? colors.primary : colors.textSecondary}
+                  />
+                  <Text style={[styles.tabText, selected && styles.tabTextActive]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {activeTab === "tasks" ? (
+            <>
           <View style={styles.intro}>
             <View style={styles.introCopy}>
               <Text style={styles.title}>Tổng quan công việc</Text>
@@ -473,6 +521,22 @@ export function WorkspaceProjectScreen() {
               ))}
             </View>
           )}
+            </>
+          ) : activeTab === "reports" ? (
+            <ReportsTab
+              projectId={projectId ?? ""}
+              tasks={tasks}
+              userId={account?.profile?.id ?? account?.id ?? ""}
+              accessToken={accessToken ?? ""}
+              isProjectCreator={loaded?.isCreator ?? false}
+            />
+          ) : activeTab === "meetings" ? (
+            <MeetingsTab />
+          ) : activeTab === "rooms" ? (
+            <RoomsTab />
+          ) : (
+            <ContributionTab />
+          )}
         </ScrollView>
       )}
       {loaded?.isCreator && projectId ? (
@@ -528,6 +592,72 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 42,
     gap: 20,
+  },
+  tabsScroller: { flexGrow: 0, marginBottom: 2 },
+  tabsContent: { gap: 8, paddingBottom: 2 },
+  tabButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  tabButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  tabText: { color: colors.textSecondary, fontSize: 13, fontWeight: "700" },
+  tabTextActive: { color: colors.primaryDark },
+  tabPlaceholder: {
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 42,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  tabPlaceholderIcon: {
+    width: 62,
+    height: 62,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 19,
+    backgroundColor: colors.primaryLight,
+  },
+  tabPlaceholderTitle: {
+    color: colors.navy,
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  tabPlaceholderText: {
+    maxWidth: 560,
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  comingSoonNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    maxWidth: 560,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+  },
+  comingSoonText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   intro: {
     flexDirection: "row",
