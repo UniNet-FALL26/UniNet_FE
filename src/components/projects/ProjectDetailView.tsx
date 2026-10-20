@@ -12,7 +12,7 @@ import {
   type ProjectRecommendation,
 } from "@/types/project";
 import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
-import { ProjectVerificationFlow } from "@/components/projects/ProjectVerificationFlow";
+import { CompletedDetailView } from "@/components/projects/CompletedDetailView";
 import { RecommendedMemberCard } from "@/components/projects/RecommendedMemberCard";
 import { useAuthStore } from "@/store/auth.store";
 import { router, useLocalSearchParams } from "expo-router";
@@ -30,7 +30,7 @@ import {
 
 export function ProjectDetailScreen() {
   const compact = useWindowDimensions().width < 600;
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [recommendations, setRecommendations] = useState<
     ProjectRecommendation[]
@@ -42,7 +42,7 @@ export function ProjectDetailScreen() {
   const [joinMessage, setJoinMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { account } = useAuthStore();
-  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; preview?: boolean; deleted?: boolean } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; deleted?: boolean } | null>(null);
   const [acting, setActing] = useState(false);
   const actingRef = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -103,10 +103,10 @@ export function ProjectDetailScreen() {
   const myJoinRequest = joinRequests.find((item) => item.userId === account?.id && item.status === 0);
   const invitedIds = invitations.filter((item) => item.status === 0).map((item) => item.inviteeId);
 
-  const askConfirmation = (title: string, message: string, operation: () => Promise<unknown>, preview = false) => {
+  const askConfirmation = (title: string, message: string, operation: () => Promise<unknown>) => {
     if (actingRef.current) return;
     setError(null);
-    setConfirmation({ title, message, operation, preview });
+    setConfirmation({ title, message, operation });
   };
   const confirmAction = async () => {
     if (!confirmation || actingRef.current) return;
@@ -116,9 +116,9 @@ export function ProjectDetailScreen() {
     try {
       await confirmation.operation();
       setConfirmation(null);
-      setNotice(confirmation.preview ? "Chức năng gửi xác thực chưa kết nối API. Chưa có yêu cầu nào được gửi." : "Thao tác thành công.");
+      setNotice("Thao tác thành công.");
       if (confirmation.deleted) router.replace("/(tabs)/groups" as never);
-      else if (!confirmation.preview) setRetry((value) => value + 1);
+      else setRetry((value) => value + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Không thể thực hiện thao tác. Vui lòng thử lại.");
     } finally {
@@ -156,6 +156,8 @@ export function ProjectDetailScreen() {
         />
       </View>
     );
+
+  if (project.status === ApiProjectStatus.Completed) return <CompletedDetailView key={`${account?.id}:${project.id}:${tab ?? ''}`} project={project} initialTab={tab} />;
 
   const isRecruiting = isActive && project.recruitmentStatus === ApiRecruitmentStatus.Open;
   const isPublic = project.visibility === ProjectVisibility.Public;
@@ -226,13 +228,13 @@ export function ProjectDetailScreen() {
             <View
               style={[
                 styles.badge,
-                project.status === ApiProjectStatus.Completed ? styles.badgeCompleted : isRecruiting ? styles.badgeSuccess : styles.badgeMuted,
+                isRecruiting ? styles.badgeSuccess : styles.badgeMuted,
               ]}
             >
               <Text
                 style={[
                   styles.badgeText,
-                  project.status === ApiProjectStatus.Completed ? styles.badgeTextCompleted : isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
+                  isRecruiting ? styles.badgeTextSuccess : styles.badgeTextMuted,
                 ]}
               >
                 ●{" "}
@@ -408,7 +410,7 @@ export function ProjectDetailScreen() {
 
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Trạng thái dự án:</Text>
-          <Text style={[styles.detailValue, project.status === ApiProjectStatus.Completed && styles.badgeTextCompleted]}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật"}</Text>
+          <Text style={styles.detailValue}>{API_PROJECT_STATUS_LABEL[project.status] ?? "Chưa cập nhật"}</Text>
         </View>
 
         <View style={styles.detailRow}>
@@ -565,12 +567,6 @@ export function ProjectDetailScreen() {
         <Button title="Xóa dự án" variant="outline" disabled={acting} onPress={() => setConfirmation({ title: "Xóa dự án", message: `Bạn muốn xóa dự án “${project.title}”? Thao tác này không thể hoàn tác.`, operation: () => projectService.deleteProject(project.id), deleted: true })} />
       </View>}
       {editing && <ProjectEditForm project={project} onClose={() => setEditing(false)} onSaved={(updated) => { setProject(updated); setEditing(false); setError(null); setNotice("Đã cập nhật dự án."); }} />}
-
-      {isCreator && project.status === ApiProjectStatus.Completed && <View style={styles.actionCard}>
-        <Text style={styles.actionCardTitle}>Xác thực dự án hoàn thành</Text>
-        <Text style={styles.descriptionText}>Gửi dự án để xác thực kết quả thực hiện.</Text>
-        <ProjectVerificationFlow key={`${account?.id}:${project.id}`} projectId={project.id} projectTitle={project.title} accountId={account?.id} />
-      </View>}
 
       {/* RECOMMENDATIONS (CREATOR VIEW) */}
       {isCreator && isActive && (

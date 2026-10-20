@@ -32,6 +32,7 @@ function harness(project, operations = {}) {
     if (name === '@/components/ui/Input') return { Input: () => React.createElement('input') };
     if (name === '@/components/ui/Loading') return { Loading: () => React.createElement('span', null, 'Loading') };
     if (name === '@/components/projects/ProjectEditForm') return { ProjectEditForm: () => React.createElement('div', null, 'Edit form') };
+    if (name === '@/components/projects/CompletedDetailView') return { CompletedDetailView: () => React.createElement('div', null, 'Completed detail screen') };
     if (name === '@/components/projects/RecommendedMemberCard') return { RecommendedMemberCard: () => React.createElement('div', null, 'Recommendation') };
     return require(name);
   } });
@@ -59,12 +60,11 @@ test('member sees leave; invitee sees invitation decisions; applicant sees cance
   const guest = harness(detail()).render();
   assert.ok(guest.includes('Gửi đơn ứng tuyển'));
 });
-test('completed projects hide recruitment and only creator sees verification', () => {
+test('completed projects leave recruitment and verification to the dedicated screen', () => {
   for (const isCreator of [false, true]) {
     const html = harness(detail({ status: 2, isCreator, isMember: !isCreator })).render();
     for (const label of ['Gửi đơn ứng tuyển', 'Rời dự án', 'Xóa thành viên', 'Gợi ý thành viên', 'Hủy lời mời']) assert.ok(!html.includes(label));
-    assert.equal(html.includes('Gửi xác thực'), isCreator);
-    assert.ok(html.includes('Thành viên trong nhóm'));
+    assert.ok(html.includes('Completed detail screen'));
   }
 });
 test('pending and rejected projects expose no participation actions', () => {
@@ -109,11 +109,10 @@ test('failed actions retain modal and error; duplicate confirmation is blocked',
   assert.ok(h.state[8]);
   assert.equal(h.state[4], 0);
 });
-test('verification preview confirms without any API call or false success', async () => {
+test('completed detail does not expose the removed verification preview', () => {
   const h = harness(detail({ isCreator: true, status: 2 }));
-  h.render(); h.click('Gửi xác thực'); h.render(); await h.click('Xác nhận');
+  assert.ok(!h.render().includes('Gửi xác thực'));
   assert.equal(h.calls.length, 0);
-  assert.ok(h.render().includes('Chưa có yêu cầu nào được gửi'));
 });
 
 test('pending projects show information and members without recruitment controls', () => {
@@ -142,19 +141,27 @@ test('rejected projects show rejected badge and editing/deletion only for creato
 
 test('member total includes creator and member list inserts creator exactly once', () => {
   const missingCreator = harness(detail({ currentMemberCount: 1, members: [{ userId: 'member', fullName: 'Member', role: 'Dev' }] })).render();
-  assert.ok(missingCreator.includes('2 / 3'));
+  assert.ok(missingCreator.includes('1 / 3'));
   assert.ok(missingCreator.includes('2 thành viên'));
   assert.ok(missingCreator.includes('Người tạo dự án'));
   const includedCreator = harness(detail({ currentMemberCount: 1 })).render();
-  assert.ok(includedCreator.includes('2 / 3'));
+  assert.ok(includedCreator.includes('1 / 3'));
   assert.ok(includedCreator.includes('2 thành viên'));
   assert.ok(!includedCreator.includes('3 thành viên'));
 });
 
 test('project details show project status independently of recruitment status', () => {
-  for (const status of [0, 1, 2, 3]) {
+  for (const status of [0, 1, 3]) {
     const html = harness(detail({ status, recruitmentStatus: 2 })).render();
     assert.ok(html.includes('Trạng thái dự án:'));
     assert.ok(html.includes(types.API_PROJECT_STATUS_LABEL[status]));
+  }
+});
+
+test('completed projects use their dedicated detail screen for every viewer', () => {
+  for (const access of [{ isCreator: true }, { isMember: true }, {}]) {
+    const html = harness(detail({ status: 2, ...access })).render();
+    assert.ok(html.includes('Completed detail screen'));
+    assert.ok(!html.includes('Gửi đơn ứng tuyển'));
   }
 });
