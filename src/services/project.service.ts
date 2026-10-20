@@ -1,6 +1,5 @@
 import { apiRequest } from "@/services/api";
 import { API_URL } from "@/constants/config";
-import { completedProjectPage, completedProjects, USE_COMPLETED_PROJECT_MOCK } from './project-completed.mock';
 import type {
   CreateProjectRequest,
   UpdateProjectRequest,
@@ -65,7 +64,6 @@ export const projectService = {
   },
 
   async listProjectsByStatus(status: ApiProjectStatus, page = 1, pageSize = 10, signal?: AbortSignal): Promise<ProjectListResponse> {
-    if (USE_COMPLETED_PROJECT_MOCK && status === 2) return completedProjectPage(page, pageSize);
     const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
     const response = await apiRequest<ProjectListResponse>(`${path}/status/${status}?${query}`, { method: "GET", signal });
@@ -76,8 +74,6 @@ export const projectService = {
   },
 
   async getProjectById(projectId: string, signal?: AbortSignal): Promise<ProjectDetail> {
-    const mock = USE_COMPLETED_PROJECT_MOCK && completedProjects.find(project => project.id === projectId);
-    if (mock) return mock;
     if (!projectId.trim()) throw new Error("Không tìm thấy mã dự án.");
     const path = API_URL.endsWith("/api") ? "/projects" : "/api/projects";
     const response = await apiRequest<ProjectDetail>(`${path}/${encodeURIComponent(projectId)}`, { method: "GET", signal });
