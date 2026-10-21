@@ -1,4 +1,5 @@
 import { apiRequest } from '@/services/api';
+import type { PortfolioResponse } from '@/types/portfolio';
 
 export type OpportunityView = 'all' | 'saved' | 'applied';
 export type OpportunityWorkType = 0 | 1 | 2;
@@ -24,6 +25,11 @@ export type OpportunityJob = {
   companyAvatarUrl: string | null;
   companyIndustry: string | null;
   companyIsVerified: boolean;
+  companyBio: string | null;
+  companyAddress: string | null;
+  companyWebsite: string | null;
+  companyContactEmail: string | null;
+  companyPhone: string | null;
   applicantCount: number;
   isSaved: boolean;
   isApplied: boolean;
@@ -32,6 +38,7 @@ export type OpportunityJob = {
   createdAt: string;
 };
 export type OpportunityJobsPage = { page: number; pageSize: number; totalItems: number; totalPages: number; jobs: OpportunityJob[] };
+export type SubmittedApplication = { id: string; applicationRound: number; appliedAt: string; status: number; submittedPortfolio: PortfolioResponse | null };
 
 export const opportunitiesService = {
   list: (params: { view?: OpportunityView; keyword?: string; workType?: OpportunityWorkType; page?: number; pageSize?: number }, signal?: AbortSignal) => {
@@ -44,6 +51,7 @@ export const opportunitiesService = {
     return apiRequest<OpportunityJobsPage>(`/opportunities?${query.toString()}`, { signal });
   },
   get: (jobId: string, signal?: AbortSignal) => apiRequest<OpportunityJob>(`/opportunities/${encodeURIComponent(jobId)}`, { signal }),
+  getOwnApplications: (jobId: string, signal?: AbortSignal) => apiRequest<SubmittedApplication[]>(`/opportunities/${encodeURIComponent(jobId)}/applications`, { signal }),
   save: (jobId: string, signal?: AbortSignal) => apiRequest<void>(`/opportunities/${encodeURIComponent(jobId)}/saved`, { method: 'PUT', signal }),
   unsave: (jobId: string, signal?: AbortSignal) => apiRequest<void>(`/opportunities/${encodeURIComponent(jobId)}/saved`, { method: 'DELETE', signal }),
   apply: (jobId: string, coverMessage: string, signal?: AbortSignal) => apiRequest<void>(`/opportunities/${encodeURIComponent(jobId)}/applications`, { method: 'POST', body: JSON.stringify({ coverMessage: coverMessage.trim() || null }), signal }),
