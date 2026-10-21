@@ -19,7 +19,12 @@ export type Verification = {
 };
 export type VerificationPage = { page: number; pageSize: number; totalPages: number; totalItems: number; verifications: Verification[] };
 export type VerificationDetail = {
+  packageId?: string;
+  meetingStartAt?: string | null;
   verification: Verification; meetingEndAt: string | null;
   assignments: { id: string; status: number }[];
   payments: { status: number; requiresManualReview: boolean }[];
 };
+export type VerificationPackage = { id: string; name: string; code: string; type: number; role: number; price: number; durationInDays: number | null; isActive: boolean };
+export type MeetingSlot = { startAt: string; endAt: string; remainingCapacity: number };
+export type MeetingSlots = { timeZoneId: string; slots: MeetingSlot[] };
