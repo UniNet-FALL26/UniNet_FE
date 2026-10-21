@@ -1,6 +1,6 @@
 import { API_URL } from '@/constants/config';
 import { apiRequest } from '@/services/api';
-import type { EvidenceModeration, VerificationDetail, VerificationPage } from '@/types/project-verification';
+import type { EvidenceModeration, VerificationDetail, VerificationPage, VerificationPackage, MeetingSlots, MeetingSlot } from '@/types/project-verification';
 
 const base = () => `${API_URL.endsWith('/api') ? '' : '/api'}/projects`;
 const id = (value: string) => {
@@ -14,6 +14,18 @@ const review = (value: EvidenceModeration, projectId: string) => {
   return value;
 };
 export const projectVerificationService = {
+  packages(page = 1, signal?: AbortSignal) {
+    return apiRequest<{ packages: VerificationPackage[]; totalPages: number }>(`${API_URL.endsWith('/api') ? '' : '/api'}/packages?type=0&role=0&isActive=true&page=${page}&pageSize=20`, { signal });
+  },
+  create(projectId: string, packageId: string) {
+    return apiRequest<VerificationDetail>(`${base()}/${id(projectId)}/verifications`, { method: 'POST', body: JSON.stringify({ packageId }) });
+  },
+  slots(verificationId: string, from: string, to: string, signal?: AbortSignal) {
+    return apiRequest<MeetingSlots>(`${base()}/verifications/${id(verificationId)}/meeting-slots?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { signal });
+  },
+  hold(verificationId: string, slot: MeetingSlot) {
+    return apiRequest<VerificationDetail>(`${base()}/verifications/${id(verificationId)}/meeting`, { method: 'PUT', body: JSON.stringify({ startAt: slot.startAt, endAt: slot.endAt }) });
+  },
   async getLevel1(projectId: string, signal?: AbortSignal) {
     return review(await apiRequest<EvidenceModeration>(`${base()}/${id(projectId)}/evidence-moderation`, { signal }), projectId);
   },

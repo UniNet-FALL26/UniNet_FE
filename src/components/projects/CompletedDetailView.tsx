@@ -62,6 +62,8 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
   const nextMessage = !project.isCreator ? privateMessage : level1.error || (level1.loading && !review ? 'Đang tải kết quả xác minh để xác định bước tiếp theo.' : level1Message(review));
   const cta = level1Only
     ? { title: 'Xem minh chứng cần cập nhật', action: showEvidence }
+    : !level2.loading && !level2.error && (level2.data?.verification.status === 0 || eligible)
+    ? { title: level2.data?.verification.status === 0 ? 'Tiếp tục hồ sơ cấp 2' : 'Chọn gói xác minh cấp 2', action: () => router.push({ pathname: '/group/verification/[id]', params: { id: project.id } } as never) }
     : { title: 'Xem kết quả cấp 1', action: openLevel1 };
   const members = project.members.some(member => member.userId === project.creator.id) ? project.members
     : [{ userId: project.creator.id, fullName: project.creator.fullName, role: 'Người tạo dự án' }, ...project.members];
@@ -102,6 +104,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
           <Text style={s.body}>{!level1Only && level1.error ? 'Kết quả kiểm tra hiện chưa tải được. Bạn có thể mở chi tiết cấp 1 để xem trạng thái và thử lại.' : nextMessage}</Text>
           {level1.loading && <ActivityIndicator color={colors.primary} />}
           {!level1Only && <Button title={cta.title} onPress={cta.action} loading={retrying} />}
+          {!level1Only && cta.title !== 'Xem kết quả cấp 1' && <Button title="Xem kết quả cấp 1" variant="outline" onPress={openLevel1} />}
           {level1Only && <>
             <Text style={s.notice}>{limitation}</Text>
             {review && <>
@@ -136,7 +139,8 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
           <Text style={s.label}>Cấp 2 · Xác minh chuyên viên</Text>
           <Text style={s.body}>{level2.error || (level2.loading && !level2.data ? 'Đang tải…' : level2Label(level2.data, !!eligible))}</Text>
           {level2.data?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(level2.data.verification.scheduledStartAt)} — {date(level2.data.verification.scheduledEndAt)} (giờ thiết bị)</Text>}
-          <Text style={s.small}>Chọn gói, tiếp tục hồ sơ, lịch hẹn và thanh toán sẽ được triển khai trong S04–S09. Chưa thể thực hiện các thao tác này tại đây.</Text>
+          {!level2.loading && !level2.error && (eligible || level2.data?.verification.status === 0) && <Button title={level2.data?.verification.status === 0 ? 'Tiếp tục hồ sơ · Chọn lịch' : 'Chọn gói cấp 2'} onPress={() => router.push({ pathname: '/group/verification/[id]', params: { id: project.id } } as never)} />}
+          <Text style={s.small}>Chọn gói và giữ lịch trước khi thanh toán. Checkout, meeting và kết quả được tiếp nối ở các bước sau.</Text>
         </>}
       </Card>}
     </ScrollView>
