@@ -21,7 +21,6 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,8 +29,16 @@ type FeedItem =
   | { id: string; type: "post"; data: PostResponse }
   | { id: string; type: "ad"; data: AdCampaignFeedItem };
 
+const REPORT_REASONS = [
+  "Spam hoặc quảng cáo rác",
+  "Nội dung vi phạm tiêu chuẩn cộng đồng",
+  "Quấy rối, đe dọa hoặc ngôn từ thù hận",
+  "Thông tin giả mạo hoặc sai sự thật",
+  "Nội dung bạo lực hoặc nhạy cảm",
+];
+
 export default function CommunityScreen() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, account } = useAuthStore();
 
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +47,8 @@ export default function CommunityScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  // State menu tùy chọn 3 chấm & báo cáo bài viết
+  const [optionsPost, setOptionsPost] = useState<PostResponse | null>(null);
   const [reportPostId, setReportPostId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
@@ -67,7 +76,7 @@ export default function CommunityScreen() {
     safePosts.forEach((post, index) => {
       result.push({ id: `post-${post.id}`, type: "post", data: post });
 
-      if ((index + 1) % 4 === 0 && safeAds.length > 0) {
+      if ((index + 1) % 3 === 0 && safeAds.length > 0) {
         const ad = safeAds[adIndex % safeAds.length];
         result.push({
           id: `ad-${ad.id}-p${currentPage}-${index}`,
@@ -158,7 +167,7 @@ export default function CommunityScreen() {
     }, [fetchFeed]),
   );
 
-  // Thêm bài viết mới vừa đăng qua CommunityComposer lên đầu bảng tin
+  // Thêm bài viết mới vừa đăng lên đầu bảng tin
   const handlePostCreated = (newPost: PostResponse) => {
     setFeedItems((prev) => [
       { id: `post-${newPost.id}`, type: "post", data: newPost },
@@ -166,15 +175,28 @@ export default function CommunityScreen() {
     ]);
   };
 
+  // Xóa bài viết
+  const handleDeletePost = async (postId: string) => {
+    setOptionsPost(null);
+    setFeedItems((prev) =>
+      prev.filter((item) => !(item.type === "post" && item.data.id === postId)),
+    );
+
+    try {
+      await communityService.deletePost(postId);
+    } catch {
+      fetchFeed(1);
+    }
+  };
+
   // Thả tim API
   const handleToggleLike = async (postId: string) => {
-    // 1. Lưu lại trạng thái cũ để Rollback nếu API lỗi
     let previousItemState: PostResponse | null = null;
 
     setFeedItems((prev) =>
       prev.map((item) => {
         if (item.type === "post" && item.data.id === postId) {
-          previousItemState = { ...item.data }; // Lưu bản sao trạng thái cũ
+          previousItemState = { ...item.data };
           const isFavorited = !item.data.isFavorited;
           return {
             ...item,
@@ -192,10 +214,8 @@ export default function CommunityScreen() {
     );
 
     try {
-      // 2. Gọi API toggle like
       await communityService.toggleReact(postId);
     } catch {
-      // 3. Nếu API lỗi, hoàn tác về đúng trạng thái ban đầu thay vì refetch cả trang
       if (previousItemState) {
         setFeedItems((prev) =>
           prev.map((item) =>
@@ -210,13 +230,12 @@ export default function CommunityScreen() {
 
   // Lưu bài viết API
   const handleToggleBookmark = async (postId: string) => {
-    // 1. Lưu lại bản sao trạng thái cũ để Rollback nếu API lỗi
     let previousItemState: PostResponse | null = null;
 
     setFeedItems((prev) =>
       prev.map((item) => {
         if (item.type === "post" && item.data.id === postId) {
-          previousItemState = { ...item.data }; // Lưu snapshot
+          previousItemState = { ...item.data };
           return {
             ...item,
             data: {
@@ -230,10 +249,8 @@ export default function CommunityScreen() {
     );
 
     try {
-      // 2. Gọi API toggle lưu bài viết
       await communityService.toggleBookmark(postId);
     } catch {
-      // 3. Nếu API lỗi, hoàn tác về trạng thái ban đầu thay vì gọi lại fetchFeed(1)
       if (previousItemState) {
         setFeedItems((prev) =>
           prev.map((item) =>
@@ -249,7 +266,7 @@ export default function CommunityScreen() {
   // Báo cáo bài viết API
   const handleSubmitReport = async () => {
     if (!reportPostId || !reportReason.trim()) {
-      setReportError("Vui lòng nhập lý do báo cáo.");
+      setReportError("Vui lòng chọn lý do báo cáo.");
       return;
     }
 
@@ -300,118 +317,178 @@ export default function CommunityScreen() {
     },
   ).current;
 
-  const renderPostCard = (post: PostResponse) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.authorInfo}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>
-              {post.authorName?.charAt(0).toUpperCase() || "U"}
-            </Text>
+  const renderPostCard = (post: PostResponse) => {
+    const isMenuOpen = optionsPost?.id === post.id;
+
+    return (
+      <View style={[styles.card, isMenuOpen && styles.activeCard]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.authorInfo}>
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {post.authorName?.charAt(0).toUpperCase() || "U"}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.authorName}>{post.authorName}</Text>
+              <Text style={styles.postDate}>
+                {new Date(post.createdAt).toLocaleDateString("vi-VN")}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.authorName}>{post.authorName}</Text>
-            <Text style={styles.postDate}>
-              {new Date(post.createdAt).toLocaleDateString("vi-VN")}
-            </Text>
+
+          {/* Anchor chứa nút 3 chấm và Dropdown */}
+          <View style={styles.menuAnchor}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tùy chọn bài đăng"
+              onPress={() =>
+                setOptionsPost((prev) => (prev?.id === post.id ? null : post))
+              }
+              style={({ pressed }) => [
+                styles.iconBtn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <SymbolView
+                name={{
+                  ios: "ellipsis",
+                  android: "more_vert",
+                  web: "more_vert",
+                }}
+                size={20}
+                tintColor={colors.textSecondary}
+              />
+            </Pressable>
+
+            {/* Dropdown Menu thả xuống tại chỗ */}
+            {isMenuOpen && (
+              <View style={styles.dropdownMenu}>
+                {account?.id === post.authorUserId && (
+                  <Pressable
+                    onPress={() => handleDeletePost(post.id)}
+                    style={({ pressed }) => [
+                      styles.dropdownItem,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <SymbolView
+                      name={{ ios: "trash", android: "delete", web: "delete" }}
+                      size={16}
+                      tintColor={colors.error}
+                    />
+                    <Text style={styles.deleteOptionText}>Xóa bài viết</Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  onPress={() => {
+                    setReportPostId(post.id);
+                    setReportReason("");
+                    setReportError("");
+                    setOptionsPost(null);
+                  }}
+                  style={({ pressed }) => [
+                    styles.dropdownItem,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <SymbolView
+                    name={{
+                      ios: "exclamationmark.triangle",
+                      android: "report",
+                      web: "report",
+                    }}
+                    size={16}
+                    tintColor={colors.textPrimary}
+                  />
+                  <Text style={styles.optionText}>Báo cáo bài viết</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Báo cáo bài đăng"
-          onPress={() => {
-            setReportPostId(post.id);
-            setReportReason("");
-            setReportError("");
-          }}
-          style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-        >
-          <SymbolView
-            name={{
-              ios: "exclamationmark.triangle",
-              android: "report",
-              web: "report",
-            }}
-            size={18}
-            tintColor={colors.textSecondary}
+        <Text style={styles.description}>{post.description}</Text>
+
+        {post.mediaUrls && post.mediaUrls.length > 0 && (
+          <Image
+            source={{ uri: post.mediaUrls[0] }}
+            style={styles.mediaImage}
+            resizeMode="cover"
           />
-        </Pressable>
-      </View>
+        )}
 
-      <Text style={styles.description}>{post.description}</Text>
-
-      {post.mediaUrls && post.mediaUrls.length > 0 && (
-        <Image
-          source={{ uri: post.mediaUrls[0] }}
-          style={styles.mediaImage}
-          resizeMode="cover"
-        />
-      )}
-
-      <View style={styles.cardFooter}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Thả tim"
-          onPress={() => handleToggleLike(post.id)}
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
-        >
-          <SymbolView
-            name={{
-              ios: post.isFavorited ? "heart.fill" : "heart",
-              android: post.isFavorited ? "favorite" : "favorite_border",
-              web: post.isFavorited ? "favorite" : "favorite_border",
-            }}
-            size={18}
-            tintColor={post.isFavorited ? colors.error : colors.textSecondary}
-          />
-          <Text
-            style={[
-              styles.actionText,
-              post.isFavorited && { color: colors.error },
+        <View style={styles.cardFooter}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Thả tim"
+            onPress={() => handleToggleLike(post.id)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              pressed && styles.pressed,
             ]}
           >
-            {post.favoriteCount}
-          </Text>
-        </Pressable>
+            <SymbolView
+              name={{
+                ios: post.isFavorited ? "heart.fill" : "heart",
+                android: post.isFavorited ? "favorite" : "favorite_border",
+                web: post.isFavorited ? "favorite" : "favorite_border",
+              }}
+              size={18}
+              tintColor={post.isFavorited ? colors.error : colors.textSecondary}
+            />
+            <Text
+              style={[
+                styles.actionText,
+                post.isFavorited && { color: colors.error },
+              ]}
+            >
+              {post.favoriteCount}
+            </Text>
+          </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Bình luận"
-          onPress={() => setActiveCommentPostId(post.id)}
-          style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
-        >
-          <SymbolView
-            name={{ ios: "bubble.right", android: "comment", web: "comment" }}
-            size={18}
-            tintColor={colors.textSecondary}
-          />
-          <Text style={styles.actionText}>{post.commentCount}</Text>
-        </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Bình luận"
+            onPress={() => setActiveCommentPostId(post.id)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              pressed && styles.pressed,
+            ]}
+          >
+            <SymbolView
+              name={{ ios: "bubble.right", android: "comment", web: "comment" }}
+              size={18}
+              tintColor={colors.textSecondary}
+            />
+            <Text style={styles.actionText}>{post.commentCount}</Text>
+          </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Lưu bài viết"
-          onPress={() => handleToggleBookmark(post.id)}
-          style={({ pressed }) => [
-            styles.actionBtn,
-            pressed && styles.pressed,
-            { marginLeft: "auto" },
-          ]}
-        >
-          <SymbolView
-            name={{
-              ios: post.isSaved ? "bookmark.fill" : "bookmark",
-              android: post.isSaved ? "bookmark" : "bookmark_border",
-              web: post.isSaved ? "bookmark" : "bookmark_border",
-            }}
-            size={18}
-            tintColor={post.isSaved ? colors.primary : colors.textSecondary}
-          />
-        </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Lưu bài viết"
+            onPress={() => handleToggleBookmark(post.id)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              pressed && styles.pressed,
+              { marginLeft: "auto" },
+            ]}
+          >
+            <SymbolView
+              name={{
+                ios: post.isSaved ? "bookmark.fill" : "bookmark",
+                android: post.isSaved ? "bookmark" : "bookmark_border",
+                web: post.isSaved ? "bookmark" : "bookmark_border",
+              }}
+              size={18}
+              tintColor={post.isSaved ? colors.primary : colors.textSecondary}
+            />
+          </Pressable>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderAdCard = (ad: AdCampaignFeedItem) => (
     <Pressable
@@ -452,7 +529,14 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Trạng thái tải & lỗi ban đầu */}
+      {/* Overlay trong suốt đóng dropdown khi nhấp ra ngoài */}
+      {!!optionsPost && (
+        <Pressable
+          style={styles.backdropOverlay}
+          onPress={() => setOptionsPost(null)}
+        />
+      )}
+
       {loading ? (
         <View style={styles.stateContainer}>
           <ActivityIndicator
@@ -502,7 +586,7 @@ export default function CommunityScreen() {
         />
       )}
 
-      {/* Modal báo cáo bài viết */}
+      {/* Modal Báo cáo bài viết */}
       <Modal
         visible={!!reportPostId}
         transparent
@@ -513,18 +597,45 @@ export default function CommunityScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Báo cáo bài viết</Text>
             <Text style={styles.modalSubtitle}>
-              Cho chúng tôi biết vấn đề với bài viết này:
+              Chọn lý do bạn muốn báo cáo bài viết này:
             </Text>
 
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Nhập lý do báo cáo..."
-              placeholderTextColor={colors.textSecondary}
-              value={reportReason}
-              onChangeText={setReportReason}
-              multiline
-              numberOfLines={4}
-            />
+            <View style={styles.reasonsList}>
+              {REPORT_REASONS.map((reason) => {
+                const isSelected = reportReason === reason;
+                return (
+                  <Pressable
+                    key={reason}
+                    onPress={() => {
+                      setReportReason(reason);
+                      setReportError("");
+                    }}
+                    style={({ pressed }) => [
+                      styles.reasonOption,
+                      isSelected && styles.reasonOptionSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        isSelected && styles.radioCircleSelected,
+                      ]}
+                    >
+                      {isSelected && <View style={styles.radioInnerCircle} />}
+                    </View>
+                    <Text
+                      style={[
+                        styles.reasonOptionText,
+                        isSelected && styles.reasonOptionTextSelected,
+                      ]}
+                    >
+                      {reason}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
             {!!reportError && (
               <Text style={styles.errorText}>{reportError}</Text>
@@ -545,18 +656,19 @@ export default function CommunityScreen() {
               <Button
                 title={submittingReport ? "Đang gửi..." : "Gửi báo cáo"}
                 onPress={handleSubmitReport}
-                disabled={submittingReport || !reportReason.trim()}
+                disabled={submittingReport || !reportReason}
               />
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Modal Bình luận */}
       <PostCommentsModal
         visible={!!activeCommentPostId}
         postId={activeCommentPostId || ""}
         onClose={() => setActiveCommentPostId(null)}
         onCommentCountChange={(delta) => {
-          // Cập nhật tăng/giảm commentCount trực tiếp trên bài viết tương ứng
           setFeedItems((prev) =>
             prev.map((item) => {
               if (
@@ -585,19 +697,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border || "#E5E7EB",
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.textPrimary,
+  backdropOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 50,
+    backgroundColor: "transparent",
   },
   pressed: {
     opacity: 0.65,
@@ -632,6 +735,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    zIndex: 1,
+  },
+  activeCard: {
+    zIndex: 100,
+    elevation: 10,
   },
   adCard: {
     borderWidth: 1,
@@ -691,12 +799,50 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  menuAnchor: {
+    position: "relative",
+    zIndex: 101,
+  },
   iconBtn: {
     width: 36,
     height: 36,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: 38,
+    right: 0,
+    minWidth: 160,
+    backgroundColor: colors.surface || "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: colors.border || "#E5E7EB",
+    zIndex: 1000,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.textPrimary,
+  },
+  deleteOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.error,
   },
   description: {
     fontSize: 14,
@@ -750,15 +896,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-  reasonInput: {
-    borderWidth: 1,
-    borderColor: colors.border || "#D1D5DB",
+  reasonsList: {
+    gap: 8,
+    marginVertical: 4,
+  },
+  reasonOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 10,
-    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border || "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+  },
+  reasonOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight || "#EEF2FF",
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: colors.textSecondary || "#9CA3AF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioCircleSelected: {
+    borderColor: colors.primary,
+  },
+  radioInnerCircle: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  reasonOptionText: {
     fontSize: 14,
     color: colors.textPrimary,
-    textAlignVertical: "top",
-    minHeight: 100,
+    flex: 1,
+  },
+  reasonOptionTextSelected: {
+    fontWeight: "600",
+    color: colors.primary,
   },
   modalActions: {
     flexDirection: "row",

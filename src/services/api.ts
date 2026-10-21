@@ -1,8 +1,9 @@
-import { API_URL } from "@/constants/config";
+// import { API_URL } from "@/constants/config";
 import { localizeProjectError } from "@/services/project-errors";
 import type { LoginResponse } from "@/types/auth";
 import { tokenStorage, type AuthSession } from "@/utils/storage";
 
+const API_URL = "https://localhost:7201/api";
 export class ApiError extends Error {
   constructor(
     message: string,
