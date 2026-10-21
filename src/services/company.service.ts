@@ -4,6 +4,7 @@ export type { SkillCatalogItem } from '@/services/skill.service';
 
 export type CompanyJobStatus = 0 | 1 | 2 | 3;
 export type CompanyJobWorkType = 0 | 1 | 2;
+export type CompanyJobApplicationStatus = 0 | 1 | 2 | 3 | 4;
 export type JobSkillRequirementType = 0 | 1;
 export type PartnerType = 0 | 1 | 2 | 3 | 4;
 export type VerificationStatus = 0 | 1 | 2 | 3;
@@ -16,6 +17,11 @@ export type CompanyJob = {
   location: string | null; description: string | null; status: CompanyJobStatus; startAt: string | null; deadline: string | null;
   responsibilities: string[]; requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
   skills: CompanyJobSkill[]; benefits: CompanyJobBenefit[]; applicantCount: number; createdAt: string; updatedAt: string;
+};
+export type CompanyApplicant = {
+  id: string; jobId: string; studentUserId: string; fullName: string; nickname: string;
+  universityName: string | null; major: string | null; avatarUrl: string | null; coverMessage: string | null;
+  aiMatchScore: number | null; status: CompanyJobApplicationStatus; appliedAt: string; updatedAt: string;
 };
 export type CompanyJobInput = {
   title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
@@ -95,12 +101,15 @@ export const companyService = {
   updateJob: (jobId: string, input: CompanyJobInput, signal?: AbortSignal) => apiRequest<CompanyJob>(`/partner/jobs/${encodeURIComponent(jobId)}`, { method: 'PUT', body: JSON.stringify(input), signal }),
   updateJobStatus: (jobId: string, status: Exclude<CompanyJobStatus, 3>, signal?: AbortSignal) => apiRequest<CompanyJob>(`/partner/jobs/${encodeURIComponent(jobId)}/status`, { method: 'PATCH', body: JSON.stringify({ status }), signal }),
   deleteJob: (jobId: string, signal?: AbortSignal) => apiRequest<void>(`/partner/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE', signal }),
+  listApplicants: (jobId: string, signal?: AbortSignal) => apiRequest<CompanyApplicant[]>(`/partner/jobs/${encodeURIComponent(jobId)}/applications`, { signal }),
+  updateApplicantStatus: (jobId: string, applicationId: string, status: CompanyJobApplicationStatus, signal?: AbortSignal) => apiRequest<CompanyApplicant>(`/partner/jobs/${encodeURIComponent(jobId)}/applications/${encodeURIComponent(applicationId)}`, { method: 'PATCH', body: JSON.stringify({ status }), signal }),
   getSkills: skillService.getSkills,
   getVerificationStatus: (signal?: AbortSignal) => apiRequest<PartnerVerificationStatus>('/partner/verification/me', { signal }),
   submitVerification: (input: PartnerVerificationInput, signal?: AbortSignal) => apiRequest<PartnerVerificationStatus>('/partner/verification', { method: 'POST', body: JSON.stringify(input), signal }),
 };
 
 export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đã đăng', 2: 'Đã đóng', 3: 'Hết hạn' };
+export const companyJobApplicationStatusLabel: Record<CompanyJobApplicationStatus, string> = { 0: 'Chờ xem', 1: 'Đã xem', 2: 'Phỏng vấn', 3: 'Đã nhận', 4: 'Từ chối' };
 export const companyJobWorkTypeLabel: Record<CompanyJobWorkType, string> = { 0: 'Tại văn phòng', 1: 'Kết hợp', 2: 'Từ xa' };
 export function formatCompanyDate(value: string | null): string {
   if (!value) return 'Chưa đặt'; const date = new Date(value);
