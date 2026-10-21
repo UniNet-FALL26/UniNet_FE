@@ -23,8 +23,14 @@ export type VerificationDetail = {
   meetingStartAt?: string | null;
   verification: Verification; meetingEndAt: string | null;
   assignments: { id: string; status: number }[];
-  payments: { status: number; requiresManualReview: boolean }[];
+  payments: { transactionId?: string; amount?: number; status: number; requiresManualReview: boolean }[];
 };
+export type VerificationTransaction = {
+  id: string; verificationId: string; packageId: string; amountVnd: number; currency: string;
+  status: number; checkoutUrl: string | null; paidAt: string | null; expiredAt: string | null;
+  createdAt: string; updatedAt: string; reconciliationRequired: boolean; requiresReview: boolean;
+};
+export type VerificationTransactions = { page: number; totalPages: number; totalItems: number; transactions: VerificationTransaction[] };
 export type VerificationPackage = { id: string; name: string; code: string; type: number; role: number; price: number; durationInDays: number | null; isActive: boolean };
 export type MeetingSlot = { startAt: string; endAt: string; remainingCapacity: number };
 export type MeetingSlots = { timeZoneId: string; slots: MeetingSlot[] };

@@ -124,7 +124,8 @@ export function VerificationBookingScreen() {
       </>}
       {!loading && !error && detail && <>
         <View style={s.card}><Text style={s.heading}>{level2Label(detail, true)}</Text>{detail.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {new Date(detail.verification.scheduledStartAt).toLocaleString('vi-VN', { timeZone: slots?.timeZoneId || 'Asia/Ho_Chi_Minh' })}{'\n'}{slots?.timeZoneId || 'Asia/Ho_Chi_Minh'}</Text>}
-          {held && <><Text accessibilityLiveRegion="none" style={s.price}>{Math.floor(remaining / 60).toString().padStart(2, '0')}:{(remaining % 60).toString().padStart(2, '0')}</Text><Text style={s.small}>Thời gian giữ lịch còn lại. Giữ lịch chưa phải xác nhận thanh toán.</Text><Text style={s.notice}>Lịch đã được giữ. Thanh toán sẽ được tiếp nối tại màn hình checkout (S06).</Text></>}
+          {held && <><Text accessibilityLiveRegion="none" style={s.price}>{Math.floor(remaining / 60).toString().padStart(2, '0')}:{(remaining % 60).toString().padStart(2, '0')}</Text><Text style={s.small}>Thời gian giữ lịch còn lại. Giữ lịch chưa phải xác nhận thanh toán.</Text></>}
+          {(held || detail.payments.length > 0) && <Button title={detail.payments.length ? 'Xem thanh toán và kết quả' : 'Tiếp tục thanh toán'} onPress={() => router.push({ pathname: '/group/checkout/[id]', params: { id: detail.verification.id, projectId: id } } as never)} disabled={busy} />}
           {expired && <Text accessibilityRole="alert" style={s.error}>Đã hết thời gian giữ lịch. Chọn lại khung giờ khi hệ thống cho phép.</Text>}
           {!choosing && <Text style={s.small}>Hồ sơ hiện không cho phép chọn hoặc đổi lịch. Nếu giao dịch đang chờ, cần kiểm tra thanh toán trước khi đặt lại.</Text>}
           <Button title="Làm mới hồ sơ" variant="outline" onPress={reload} disabled={busy} />
