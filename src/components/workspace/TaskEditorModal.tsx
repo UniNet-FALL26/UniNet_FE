@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 18,
-    backgroundColor: colors.overlay,
+    backgroundColor: 'rgba(16, 40, 75, 0.4)',
   },
   dialog: {
     width: "100%",
