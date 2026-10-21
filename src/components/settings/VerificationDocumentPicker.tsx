@@ -8,9 +8,9 @@ import { colors } from '@/constants/colors';
 import { validateVerificationDocument } from '@/utils/student-verification';
 import type { VerificationDocument } from '@/types/student-verification';
 
-export function VerificationDocumentPicker({ value, onChange, error, onError, disabled }: {
+export function VerificationDocumentPicker({ value, onChange, error, onError, disabled, title = 'Ảnh thẻ sinh viên / giấy xác nhận đang học' }: {
   value: VerificationDocument | null; onChange: (value: VerificationDocument | null) => void;
-  error?: string; onError: (message: string) => void; disabled: boolean;
+  error?: string; onError: (message: string) => void; disabled: boolean; title?: string;
 }) {
   const input = useRef<HTMLInputElement | null>(null);
   const alive = useRef(true);
@@ -44,12 +44,12 @@ export function VerificationDocumentPicker({ value, onChange, error, onError, di
   const picker = <View style={[s.zone, !!error && s.invalid]}>
     <Pressable accessibilityRole="button" accessibilityLabel={value ? 'Thay giấy tờ' : 'Chọn giấy tờ xác minh'} disabled={disabled || choosing} onPress={() => { void choose(); }} style={({ pressed }) => [s.pick, pressed && s.pressed]}>
       {value && preview && value.mimeType.startsWith('image/') ? <Image source={{ uri: preview }} contentFit="contain" style={s.preview} accessibilityLabel="Xem trước giấy tờ đã chọn" /> : <View style={s.uploadIcon}><SymbolView name={{ ios: value ? 'doc.fill' : 'square.and.arrow.up', android: value ? 'description' : 'upload', web: value ? 'description' : 'upload' }} size={28} tintColor={colors.primary} /></View>}
-      <View style={s.copy}><Text style={s.pickTitle}>{choosing ? 'Đang mở bộ chọn…' : value ? value.name : Platform.OS === 'web' ? 'Kéo thả ảnh vào đây hoặc nhấn để chọn' : 'Chọn ảnh thẻ sinh viên hoặc giấy xác nhận'}</Text><Text style={s.hint}>{value ? `${value.mimeType === 'application/pdf' ? 'Tệp PDF · ' : ''}${(value.size / 1024).toFixed(0)} KB · Nhấn để thay tệp` : 'Hỗ trợ JPG, PNG, PDF (tối đa 5 MB)'}</Text></View>
+      <View style={s.copy}><Text style={s.pickTitle}>{choosing ? 'Đang mở bộ chọn…' : value ? value.name : Platform.OS === 'web' ? 'Kéo thả tệp vào đây hoặc nhấn để chọn' : 'Chọn ảnh hoặc tệp PDF'}</Text><Text style={s.hint}>{value ? `${value.mimeType === 'application/pdf' ? 'Tệp PDF · ' : ''}${(value.size / 1024).toFixed(0)} KB · Nhấn để thay tệp` : 'Hỗ trợ JPG, PNG, PDF (tối đa 5 MB)'}</Text></View>
     </Pressable>
     {value && <Pressable accessibilityRole="button" accessibilityLabel="Xóa giấy tờ" disabled={disabled} onPress={() => { onChange(null); onError(''); }} style={s.remove}><Text style={s.removeText}>Xóa tệp</Text></Pressable>}
   </View>;
   return <View style={s.field}>
-    <Text style={s.label}>Ảnh thẻ sinh viên / giấy xác nhận đang học</Text>
+    <Text style={s.label}>{title}</Text>
     {Platform.OS === 'web' ? createElement('div', { onDragOver: (event: React.DragEvent) => event.preventDefault(), onDrop: (event: React.DragEvent) => { event.preventDefault(); fileFromWeb(event.dataTransfer.files[0]); } }, picker, createElement('input', { ref: input, type: 'file', 'aria-label': 'Giấy tờ xác minh', accept: '.jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf', disabled, style: { display: 'none' }, onChange: (event: React.ChangeEvent<HTMLInputElement>) => { fileFromWeb(event.target.files?.[0]); event.target.value = ''; } })) : picker}
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
   </View>;

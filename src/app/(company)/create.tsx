@@ -43,7 +43,7 @@ function addDays(value: string, days: number): string {
 }
 
 function earliestStartBoundary(): { date: string; time: string } {
-  const result = new Date(Date.now() + 60 * 60 * 1000);
+  const result = new Date(Date.now() + 5 * 60 * 1000);
   let date = datePart(result.toISOString());
   let time = `${String(result.getHours()).padStart(2, '0')}:${String(result.getMinutes()).padStart(2, '0')}`;
   if (result.getHours() === 23 && result.getMinutes() > 45) {
@@ -90,10 +90,11 @@ const benefitIcons = [
 type BenefitIconKey = typeof benefitIcons[number]['key'];
 const getBenefitIcon = (key?: string) => benefitIcons.find(icon => icon.key === key) ?? benefitIcons[0];
 
-function DateTimeField({ label, value, mode, onChange, placeholder, onBlur, minDate, minTime }: { label: string; value: string; mode: 'date' | 'time'; onChange: (value: string) => void; placeholder: string; onBlur?: () => void; minDate?: string; minTime?: string }) {
+function DateTimeField({ label, value, mode, onChange, placeholder, onBlur, minDate, minTime, disabled = false }: { label: string; value: string; mode: 'date' | 'time'; onChange: (value: string) => void; placeholder: string; onBlur?: () => void; minDate?: string; minTime?: string; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [timeMenuPosition, setTimeMenuPosition] = useState({ top: 0, left: 0 });
   const timeFieldRef = useRef<View>(null);
+  useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
   const initial = new Date(`${value || datePart(new Date().toISOString())}T12:00:00`);
   if (mode === 'time') {
     const fallbackTime = firstQuarterAtOrAfter(minTime && minTime !== '00:00' ? minTime : '09:00');
@@ -113,13 +114,13 @@ function DateTimeField({ label, value, mode, onChange, placeholder, onBlur, minD
       if (!minTime || `${selectedHour}:${minute}` >= minTime) onChange(`${selectedHour}:${minute}`);
       setTimeout(() => onBlur?.(), 0);
     };
-    return <View ref={timeFieldRef} style={[s.field, s.timeField]}><Text style={s.label}>{label}</Text><Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => {
+    return <View ref={timeFieldRef} style={[s.field, s.timeField]}><Text style={s.label}>{label}</Text><Pressable disabled={disabled} accessibilityRole="button" accessibilityState={{ expanded: open, disabled }} onPress={() => {
       if (open) { setOpen(false); return; }
       timeFieldRef.current?.measureInWindow((x, y) => {
         setTimeMenuPosition({ top: y + 60, left: Math.max(0, x) });
         setOpen(true);
       });
-    }} style={s.dateButton}><Text style={value ? s.dateText : s.datePlaceholder}>{value || placeholder}</Text><CompanyIcon name={{ ios: 'clock', android: 'schedule', web: 'schedule' }} size={16} color={c.muted} /></Pressable>{open && <Modal transparent visible statusBarTranslucent animationType="none" onRequestClose={() => setOpen(false)}><View style={s.timeModalRoot}><Pressable style={s.timeModalBackdrop} onPress={() => setOpen(false)} /><View style={[s.timeDropdown, { top: timeMenuPosition.top, left: timeMenuPosition.left }]}><ScrollView style={s.timeWheel} nestedScrollEnabled showsVerticalScrollIndicator>{hours.map(hour => {
+    }} style={[s.dateButton, disabled && s.dateButtonDisabled]}><Text style={value ? s.dateText : s.datePlaceholder}>{value || placeholder}</Text><CompanyIcon name={{ ios: 'clock', android: 'schedule', web: 'schedule' }} size={16} color={c.muted} /></Pressable>{open && <Modal transparent visible statusBarTranslucent animationType="none" onRequestClose={() => setOpen(false)}><View style={s.timeModalRoot}><Pressable style={s.timeModalBackdrop} onPress={() => setOpen(false)} /><View style={[s.timeDropdown, { top: timeMenuPosition.top, left: timeMenuPosition.left }]}><ScrollView style={s.timeWheel} nestedScrollEnabled showsVerticalScrollIndicator>{hours.map(hour => {
       const enabled = minutes.some(minute => !minTime || `${hour}:${minute}` >= minTime);
       return <Pressable key={hour} disabled={!enabled} onPress={() => chooseHour(hour)} style={[s.timeWheelItem, hour === selectedHour && s.timeWheelItemSelected, !enabled && s.timeWheelItemDisabled]}><Text style={[s.timeWheelText, hour === selectedHour && s.timeWheelTextSelected, !enabled && s.timeWheelTextDisabled]}>{hour}</Text></Pressable>;
     })}</ScrollView><ScrollView style={s.timeWheel} nestedScrollEnabled showsVerticalScrollIndicator>{minutes.map(minute => {
@@ -129,12 +130,12 @@ function DateTimeField({ label, value, mode, onChange, placeholder, onBlur, minD
   }
   if (Platform.OS === 'web') {
     return <View style={s.field}><Text style={s.label}>{label}</Text>{createElement('input', {
-      type: 'date', value, ...(minDate ? { min: minDate } : {}), onChange: (event: ChangeEvent<HTMLInputElement>) => {
+      type: 'date', value, disabled, ...(minDate ? { min: minDate } : {}), onChange: (event: ChangeEvent<HTMLInputElement>) => {
         const next = event.target.value;
         if (minDate && next < minDate) return;
         onChange(next);
       },
-      'aria-label': label, onBlur, style: { boxSizing: 'border-box', width: '100%', height: 40, border: `1px solid ${c.line}`, borderRadius: 10, background: '#FFF', padding: '0 10px', color: c.ink, fontSize: 12, fontFamily: 'inherit' },
+      'aria-label': label, onBlur, style: { boxSizing: 'border-box', width: '100%', height: 40, border: `1px solid ${c.line}`, borderRadius: 10, background: disabled ? '#F4F6FA' : '#FFF', padding: '0 10px', color: c.ink, fontSize: 12, fontFamily: 'inherit', opacity: disabled ? 0.75 : 1 },
     })}<Text style={s.helper}>{value ? mode === 'date' ? formatDateLabel(value) : value : placeholder}</Text></View>;
   }
   const onPickerChange = (event: DateTimePickerEvent, selected?: Date) => {
@@ -144,7 +145,7 @@ function DateTimeField({ label, value, mode, onChange, placeholder, onBlur, minD
     onChange(`${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`);
     setTimeout(() => onBlur?.(), 0);
   };
-  return <View style={s.field}><Text style={s.label}>{label}</Text><Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={s.dateButton}><Text style={value ? s.dateText : s.datePlaceholder}>{value ? formatDateLabel(value) : placeholder}</Text><CompanyIcon name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} color={c.muted} /></Pressable>{open && <DateTimePicker value={initial} mode="date" display="default" minimumDate={minDate ? new Date(`${minDate}T00:00:00`) : undefined} is24Hour onChange={onPickerChange} />}</View>;
+  return <View style={s.field}><Text style={s.label}>{label}</Text><Pressable disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled }} onPress={() => setOpen(true)} style={[s.dateButton, disabled && s.dateButtonDisabled]}><Text style={value ? s.dateText : s.datePlaceholder}>{value ? formatDateLabel(value) : placeholder}</Text><CompanyIcon name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} color={c.muted} /></Pressable>{open && <DateTimePicker value={initial} mode="date" display="default" minimumDate={minDate ? new Date(`${minDate}T00:00:00`) : undefined} is24Hour onChange={onPickerChange} />}</View>;
 }
 
 const PillSelect = ({ values, value, onChange }: { values: string[]; value: string; onChange: (value: string) => void }) => <View style={s.pills}>{values.map((item) => <Pressable key={item} onPress={() => onChange(item)} style={[s.pill, value === item && s.pillActive]}><Text style={[s.pillText, value === item && s.pillTextActive]}>{item}</Text></Pressable>)}</View>;
@@ -198,10 +199,25 @@ export default function CompanyCreateJob() {
   const [formNotice, setFormNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showLeavePrompt, setShowLeavePrompt] = useState(false);
+  const [showPublishSuccess, setShowPublishSuccess] = useState(false);
   const savedSnapshot = useRef<string | null>(null);
+  const publishSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const errorTargets = useRef<Record<string, View | null>>({});
   const [jobStatus, setJobStatus] = useState<0 | 1 | 2 | 3 | null>(null);
+  const [lockCheckNow, setLockCheckNow] = useState(() => Date.now());
+  useEffect(() => () => {
+    if (publishSuccessTimer.current) clearTimeout(publishSuccessTimer.current);
+  }, []);
+  useEffect(() => {
+    if (!editing || jobStatus === null || jobStatus === 0 || !startDate) return;
+    const startAt = dateValue(startDate, startTime);
+    if (!startAt) return;
+    const wait = new Date(startAt).getTime() - Date.now() - 5 * 60 * 1000;
+    if (wait <= 0) { setLockCheckNow(Date.now()); return; }
+    const timer = setTimeout(() => setLockCheckNow(Date.now()), wait);
+    return () => clearTimeout(timer);
+  }, [editing, jobStatus, startDate, startTime]);
   const suggestedSkills = useMemo(() => {
     const query = skillQuery.trim().toLocaleLowerCase();
     if (!query) return [];
@@ -224,7 +240,7 @@ export default function CompanyCreateJob() {
     if (!parsedDeadline) errors.deadline = 'Vui lòng chọn hạn ứng tuyển hợp lệ.';
     const parsedStartAt = startDate ? dateValue(startDate, startTime) : null;
     if (startDate && !parsedStartAt) errors.startAt = 'Chọn đủ ngày và giờ bắt đầu nhận hồ sơ.';
-    if (parsedStartAt && (startDate < minimumStartDate || Number(startTime.split(':')[1]) % 15 !== 0 || (startDate === minimumStartDate && startTime < minimumStartTime))) errors.startAt = 'Vui lòng chọn ngày giờ trong tương lai, cách hiện tại ít nhất 1 tiếng.';
+    if (parsedStartAt && !startTimeLocked && (startDate < minimumStartDate || Number(startTime.split(':')[1]) % 15 !== 0 || (startDate === minimumStartDate && startTime < minimumStartTime))) errors.startAt = 'Vui lòng chọn ngày giờ bắt đầu cách hiện tại ít nhất 5 phút.';
     if (startDate && deadline && deadline <= startDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
     if (deadline && deadline < minimumDeadlineDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
     const parseSalary = (value: string) => {
@@ -259,6 +275,8 @@ export default function CompanyCreateJob() {
   const startBoundary = earliestStartBoundary();
   const minimumStartDate = startBoundary.date;
   const minimumStartTime = startDate === minimumStartDate ? startBoundary.time : '00:00';
+  const currentStartAt = startDate ? dateValue(startDate, startTime) : null;
+  const startTimeLocked = editing && jobStatus !== null && jobStatus !== 0 && (!currentStartAt || new Date(currentStartAt).getTime() <= lockCheckNow + 5 * 60 * 1000);
   const minimumDeadlineDate = startDate && addDays(startDate, 1) > addDays(today, 1) ? addDays(startDate, 1) : addDays(today, 1);
 
   const addCatalogSkill = (item: SkillCatalogItem, type: 0 | 1) => {
@@ -443,9 +461,11 @@ export default function CompanyCreateJob() {
         if (editing) await companyService.updateJob(jobId!, input);
         else await companyService.createJob(input);
         savedSnapshot.current = formSnapshot();
-        if (returnAfterSave) { router.back(); return; }
         setJobStatus(1);
-        setFormNotice({ type: 'success', title: 'Đăng bài thành công', message: 'Bài tuyển dụng đã được đăng công khai.' });
+        setShowPublishSuccess(true);
+        publishSuccessTimer.current = setTimeout(() => {
+          router.replace('/(company)/jobs');
+        }, 1400);
       }
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : 'Vui lòng thử lại.';
@@ -464,7 +484,8 @@ export default function CompanyCreateJob() {
 
   return <CompanyPage><PageScroll scrollRef={scrollRef}>
     <View style={s.nav}><Pressable onPress={() => formIsDirty ? setShowLeavePrompt(true) : router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={{ flex: 1 }}><Text style={s.navTitle}>{editing ? 'Chỉnh sửa bài tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.navSub}>{companyName || 'Tổ chức của bạn'}</Text></View><View style={s.avatar}><Text style={s.avatarText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View></View>
-    <Modal transparent visible={showLeavePrompt} animationType="fade" onRequestClose={() => setShowLeavePrompt(false)}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>Bài này chưa được lưu</Text><Text style={s.noticeMessage}>Bạn có muốn lưu nháp lại không?</Text><View style={s.leaveActions}><ActionButton title="Ở lại" variant="outline" onPress={() => setShowLeavePrompt(false)} /><ActionButton title="Bỏ qua" variant="soft" onPress={() => router.back()} /><ActionButton title="Lưu nháp" onPress={() => { setShowLeavePrompt(false); void saveJob(0, true); }} /></View></View></View></Modal>
+    <Modal transparent visible={showLeavePrompt} animationType="fade" onRequestClose={() => setShowLeavePrompt(false)}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>Bài này chưa được lưu</Text><Text style={s.noticeMessage}>{jobStatus === 1 ? 'Bạn có muốn lưu các thay đổi cho bài đã đăng không?' : 'Bạn có muốn lưu nháp lại không?'}</Text><View style={s.leaveActions}><ActionButton title="Ở lại" variant="outline" onPress={() => setShowLeavePrompt(false)} /><ActionButton title="Bỏ qua" variant="soft" onPress={() => router.back()} /><ActionButton title={jobStatus === 1 ? 'Lưu thay đổi' : 'Lưu nháp'} onPress={() => { setShowLeavePrompt(false); void saveJob(jobStatus === 1 ? 1 : 0, true); }} /></View></View></View></Modal>
+    <Modal transparent visible={showPublishSuccess} animationType="fade" onRequestClose={() => router.replace('/(company)/jobs')}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>{editing ? 'Cập nhật bài đăng thành công' : 'Đăng bài thành công'}</Text><Text style={s.noticeMessage}>{editing ? 'Bài tuyển dụng đã được cập nhật.' : 'Bài tuyển dụng đã được đăng công khai.'} Đang chuyển về trang quản lý bài đăng…</Text></View></View></Modal>
     {!!formNotice && <View accessibilityRole="alert" style={[s.notice, formNotice.type === 'success' ? s.noticeSuccess : s.noticeError]}><Text style={s.noticeTitle}>{formNotice.title}</Text><Text style={s.noticeMessage}>{formNotice.message}</Text></View>}
     {!!loadError && <Card><Text style={s.error}>{loadError}</Text><ActionButton title="Quay lại" onPress={() => router.back()} variant="outline" /></Card>}
     {loading ? <Card><ActivityIndicator color={c.purple} /><Text style={s.helper}>Đang tải dữ liệu bài tuyển dụng…</Text></Card> : null}
@@ -486,7 +507,7 @@ export default function CompanyCreateJob() {
     <Card style={s.dateTimeCard}>
       <Text style={s.sectionTitle}>Thông tin công việc</Text><Text style={s.sectionSub}>Dấu * là thông tin bắt buộc.</Text>
       <View ref={node => { errorTargets.current.title = node; }}><Field label="Tiêu đề bài đăng *" value={title} onChangeText={setTitle} onBlur={() => validateOnBlur('title')} placeholder="Ví dụ: Thực tập sinh Backend" error={fieldErrors.title} /></View>
-      <View ref={node => { errorTargets.current.startAt = node; }} style={s.startAtLayer}><View style={s.dateRow}><View style={{ flex: 1 }}><DateTimeField label="Bắt đầu nhận hồ sơ · tùy chọn" value={startDate} mode="date" minDate={minimumStartDate} onChange={value => { setStartDate(value); const minTime = value === minimumStartDate ? startBoundary.time : '00:00'; setStartTime(current => current && Number(current.split(':')[1]) % 15 === 0 && current >= minTime ? current : value === minimumStartDate ? firstQuarterAtOrAfter(minTime) : '09:00'); }} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn ngày" /></View>{!!startDate && <View style={{ flex: 0.7 }}><DateTimeField label="Giờ bắt đầu *" value={startTime} mode="time" minTime={minimumStartTime} onChange={setStartTime} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn giờ" /></View>}</View>{!!fieldErrors.startAt && <Text style={s.fieldError}>{fieldErrors.startAt}</Text>}</View>
+      <View ref={node => { errorTargets.current.startAt = node; }} style={s.startAtLayer}><View style={s.dateRow}><View style={{ flex: 1 }}><DateTimeField label="Bắt đầu nhận hồ sơ · tùy chọn" value={startDate} mode="date" minDate={minimumStartDate} disabled={startTimeLocked} onChange={value => { setStartDate(value); const minTime = value === minimumStartDate ? startBoundary.time : '00:00'; setStartTime(current => current && Number(current.split(':')[1]) % 15 === 0 && current >= minTime ? current : value === minimumStartDate ? firstQuarterAtOrAfter(minTime) : '09:00'); }} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn ngày" /></View>{!!startDate && <View style={{ flex: 0.7 }}><DateTimeField label="Giờ bắt đầu *" value={startTime} mode="time" minTime={minimumStartTime} disabled={startTimeLocked} onChange={setStartTime} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn giờ" /></View>}</View>{startTimeLocked && <Text style={s.lockNotice}>Thời điểm bắt đầu còn không quá 5 phút hoặc đã đến, nên không thể chỉnh sửa.</Text>}{!!fieldErrors.startAt && <Text style={s.fieldError}>{fieldErrors.startAt}</Text>}</View>
       <View ref={node => { errorTargets.current.deadline = node; }}><DateTimeField label="Hạn ứng tuyển *" value={deadline} mode="date" minDate={minimumDeadlineDate} onChange={setDeadline} onBlur={() => validateOnBlur('deadline')} placeholder="Chọn ngày (dd/mm/yyyy)" />{!!fieldErrors.deadline && <Text style={s.fieldError}>{fieldErrors.deadline}</Text>}</View>
       <View ref={node => { errorTargets.current.workMode = node; }}><Text style={s.label}>Hình thức làm việc *</Text><PillSelect values={['Tại văn phòng', 'Kết hợp', 'Từ xa']} value={workMode} onChange={setWorkMode} />{!!fieldErrors.workMode && <Text style={s.fieldError}>{fieldErrors.workMode}</Text>}</View>
       <View ref={node => { errorTargets.current.location = node; }}><Field label="Địa điểm *" value={location} onChangeText={setLocation} onBlur={() => validateOnBlur('location')} placeholder="Nhập địa chỉ làm việc" error={fieldErrors.location} /></View>
@@ -527,14 +548,14 @@ export default function CompanyCreateJob() {
       {!!benefitError && <Text accessibilityRole="alert" style={s.fieldError}>{benefitError}</Text>}
       <ActionButton title="Thêm quyền lợi" onPress={addBenefit} variant="soft" icon={{ ios: 'plus', android: 'add', web: 'add' }} />
     </Card>
-    <View style={s.submitRow}><ActionButton title={saving ? 'Đang lưu…' : 'Lưu bản nháp'} onPress={() => { if (!saving && !loading) void saveJob(0); }} variant="outline" icon={{ ios: 'tray.and.arrow.down', android: 'save', web: 'save' }} /><ActionButton title={saving ? 'Đang lưu…' : editing && jobStatus === 1 ? 'Lưu thay đổi' : 'Đăng bài tuyển dụng'} onPress={() => { if (!saving && !loading) void saveJob(1); }} icon={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} /></View>
+    <View style={s.submitRow}>{!(editing && jobStatus === 1) && <ActionButton title={saving ? 'Đang lưu…' : 'Lưu bản nháp'} onPress={() => { if (!saving && !loading) void saveJob(0); }} variant="outline" icon={{ ios: 'tray.and.arrow.down', android: 'save', web: 'save' }} />}<ActionButton title={saving ? 'Đang lưu…' : editing && jobStatus === 1 ? 'Lưu thay đổi' : 'Đăng bài tuyển dụng'} onPress={() => { if (!saving && !loading) void saveJob(1); }} icon={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} /></View>
   </PageScroll></CompanyPage>;
 }
 
 const s = StyleSheet.create({
   nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 },
   jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontWeight: '900', fontSize: 10 }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
-  sectionTitle: { color: c.ink, fontSize: 14, fontWeight: '900', marginBottom: 4 }, sectionSub: { color: c.muted, fontSize: 9, marginBottom: 5 }, field: { marginTop: 8, gap: 5 }, label: { color: c.ink, fontSize: 10, fontWeight: '700' }, input: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, color: c.ink, fontSize: 10 }, textarea: { minHeight: 72, paddingTop: 10, lineHeight: 16 }, salaryRow: { flexDirection: 'row', gap: 8 }, dateRow: { flexDirection: 'row', gap: 8 }, dateButton: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, dateText: { color: c.ink, fontSize: 11 }, datePlaceholder: { color: c.muted, fontSize: 11 }, dateTimeCard: { position: 'relative', zIndex: 1000, elevation: 100 }, startAtLayer: { position: 'relative', zIndex: 1000, elevation: 100 },
+  sectionTitle: { color: c.ink, fontSize: 14, fontWeight: '900', marginBottom: 4 }, sectionSub: { color: c.muted, fontSize: 9, marginBottom: 5 }, field: { marginTop: 8, gap: 5 }, label: { color: c.ink, fontSize: 10, fontWeight: '700' }, input: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, color: c.ink, fontSize: 10 }, textarea: { minHeight: 72, paddingTop: 10, lineHeight: 16 }, salaryRow: { flexDirection: 'row', gap: 8 }, dateRow: { flexDirection: 'row', gap: 8 }, dateButton: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, dateButtonDisabled: { backgroundColor: '#F4F6FA', opacity: 0.72 }, dateText: { color: c.ink, fontSize: 11 }, datePlaceholder: { color: c.muted, fontSize: 11 }, dateTimeCard: { position: 'relative', zIndex: 1000, elevation: 100 }, startAtLayer: { position: 'relative', zIndex: 1000, elevation: 100 }, lockNotice: { color: c.muted, fontSize: 9, lineHeight: 13, marginTop: 5 },
   editableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, rowInput: { flex: 1 }, addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, purpleText: { color: c.purple, fontSize: 10, fontWeight: '800' }, suggestions: { borderWidth: 1, borderColor: c.line, borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden' }, suggestion: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, suggestionText: { color: c.ink, fontSize: 11, fontWeight: '600' }, noSkill: { gap: 6, marginTop: 7 }, skillList: { gap: 8, marginTop: 12, alignItems: 'center' }, skillChip: { minHeight: 32, maxWidth: 260, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, borderWidth: 1 }, skillRequired: { borderColor: '#BFDBFE', backgroundColor: '#EAF3FF' }, skillPreferred: { borderColor: '#BBF7D0', backgroundColor: '#E8F7F0' }, skillChipBody: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }, skillChipText: { maxWidth: 220, fontSize: 10, fontWeight: '700' }, skillRequiredText: { color: c.purple }, skillPreferredText: { color: c.green }, skillRemove: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2' }, skillRemoveText: { color: c.rose, fontSize: 15, fontWeight: '700', lineHeight: 17 },
   requirementSwitch: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, padding: 3, borderRadius: 20, backgroundColor: '#F1F5F9' }, requirementOption: { minHeight: 30, paddingHorizontal: 12, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, requirementOptionRequired: { backgroundColor: c.purple }, requirementOptionPreferred: { backgroundColor: c.green }, requirementOptionText: { color: c.muted, fontSize: 9, fontWeight: '800' }, requirementOptionTextActive: { color: '#FFF' },
   benefitEdit: { paddingVertical: 12, borderBottomWidth: 1, borderColor: c.line }, benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, benefitIconTile: { width: 44, height: 44, marginTop: 21, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF3FF' }, benefitFields: { flex: 1, gap: 6 }, benefitInput: { minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 9, color: c.ink, fontSize: 12 }, benefitDescription: { minHeight: 72, textAlignVertical: 'top' }, benefitDelete: { marginTop: 20, padding: 4 }, benefitIconOptions: { flexDirection: 'row', gap: 8, marginTop: 10, marginLeft: 54, paddingVertical: 2 }, benefitIconOption: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, benefitIconOptionActive: { backgroundColor: '#EAF3FF', borderColor: c.blue }, newBenefit: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 12 }, newBenefitIconColumn: { width: 44 }, submitRow: { flexDirection: 'row', gap: 8 }, error: { color: c.rose, fontSize: 11 }, inputError: { borderColor: c.rose }, fieldError: { color: c.rose, fontSize: 9, lineHeight: 13 }, notice: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 3 }, noticeSuccess: { backgroundColor: '#ECFDF5', borderColor: '#86EFAC' }, noticeError: { backgroundColor: '#FFF1F2', borderColor: '#FDA4AF' }, noticeTitle: { color: c.ink, fontSize: 11, fontWeight: '800' }, noticeMessage: { color: c.ink, fontSize: 10, lineHeight: 15 }, leaveOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20 }, leaveDialog: { width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, backgroundColor: '#FFF', gap: 10 }, leaveActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginTop: 6 }, timeField: { position: 'relative', zIndex: 1000 }, timeModalRoot: { flex: 1 }, timeModalBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent' }, timeDropdown: { position: 'absolute', width: 152, height: 216, flexDirection: 'row', backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 4, zIndex: 2000, elevation: 100, shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }, timeWheel: { flex: 1 }, timeWheelItem: { height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, timeWheelItemSelected: { backgroundColor: '#0878F9' }, timeWheelItemDisabled: { backgroundColor: '#EEF1F5' }, timeWheelText: { color: c.ink, fontSize: 13, fontWeight: '500' }, timeWheelTextSelected: { color: '#FFF', fontWeight: '800' }, timeWheelTextDisabled: { color: '#C4CBD4' }, pill: { borderWidth: 1, borderColor: c.line, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#FFF' }, pillActive: { backgroundColor: c.purple, borderColor: c.purple }, pillText: { color: c.muted, fontSize: 9, fontWeight: '700' }, pillTextActive: { color: '#FFF' },
