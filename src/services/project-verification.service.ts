@@ -1,6 +1,6 @@
 import { API_URL } from '@/constants/config';
 import { apiRequest } from '@/services/api';
-import type { EvidenceModeration, VerificationDetail, VerificationPage, VerificationPackage, MeetingSlots, MeetingSlot } from '@/types/project-verification';
+import type { EvidenceModeration, VerificationDetail, VerificationPage, VerificationPackage, MeetingSlots, MeetingSlot, VerificationFinalResult } from '@/types/project-verification';
 
 const base = () => `${API_URL.endsWith('/api') ? '' : '/api'}/projects`;
 const id = (value: string) => {
@@ -14,6 +14,14 @@ const review = (value: EvidenceModeration, projectId: string) => {
   return value;
 };
 export const projectVerificationService = {
+  cancel(verificationId: string, reason: string) {
+    return apiRequest<VerificationDetail>(`${base()}/verifications/${id(verificationId)}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason: reason.trim() }) });
+  },
+  async result(verificationId: string, signal?: AbortSignal) {
+    const value = await apiRequest<VerificationFinalResult>(`${base()}/verifications/${id(verificationId)}/result`, { signal });
+    if (!value || ![0, 1, 2, 3].includes(value.status) || !Array.isArray(value.reports)) throw new Error('Phản hồi kết quả cấp 2 không hợp lệ.');
+    return value;
+  },
   packages(page = 1, signal?: AbortSignal) {
     return apiRequest<{ packages: VerificationPackage[]; totalPages: number }>(`${API_URL.endsWith('/api') ? '' : '/api'}/packages?type=0&role=0&isActive=true&page=${page}&pageSize=20`, { signal });
   },

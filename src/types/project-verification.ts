@@ -14,16 +14,27 @@ export type EvidenceModeration = {
   attempts: { number: number; transient: boolean; errorCode: string | null; results: EvidenceCheck[] }[];
 };
 export type Verification = {
+  projectId?: string; projectTitle?: string; submittedAt?: string; createdAt?: string; updatedAt?: string;
   id: string; status: number; bookingStatus: number; reservedUntil: string | null;
   scheduledStartAt: string | null; scheduledEndAt: string | null;
 };
 export type VerificationPage = { page: number; pageSize: number; totalPages: number; totalItems: number; verifications: Verification[] };
 export type VerificationDetail = {
+  project?: { id: string; title: string; status: number; leaderId: string };
+  finalResult?: VerificationFinalResult | null;
+  cancellationReason?: string | null; cancelledAt?: string | null;
   packageId?: string;
   meetingStartAt?: string | null;
   verification: Verification; meetingEndAt: string | null;
-  assignments: { id: string; status: number }[];
+  assignments: { id: string; status: number; assignedAt?: string; assignedToUserId?: string; report?: VerificationReport | null }[];
   payments: { transactionId?: string; amount?: number; status: number; requiresManualReview: boolean }[];
+};
+export type VerificationReport = {
+  id: string; assignmentId: string; summary: string; findings: string | null;
+  recommendations: string | null; submittedAt: string;
+};
+export type VerificationFinalResult = {
+  status: number; finalizedAt: string | null; finalizedByUserId: string | null; reports: VerificationReport[];
 };
 export type VerificationTransaction = {
   id: string; verificationId: string; packageId: string; amountVnd: number; currency: string;
