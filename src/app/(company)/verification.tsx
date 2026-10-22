@@ -9,6 +9,13 @@ import type { VerificationDocument } from '@/types/student-verification';
 const statusText = (status: PartnerVerificationStatus['status']) => status === 0 ? 'Đang chờ admin duyệt' : status === 1 ? 'Đã xác minh tài khoản' : status === 2 ? 'Bị từ chối' : status === 3 ? 'Yêu cầu cũ đã hết hiệu lực' : 'Chưa gửi hồ sơ';
 const statusTone = (status: PartnerVerificationStatus['status']): 'green' | 'amber' | 'rose' | 'gray' => status === 1 ? 'green' : status === 0 ? 'amber' : status === 2 ? 'rose' : 'gray';
 const documentTypeFor = (partnerType: number): VerificationDocumentType => partnerType === 0 || partnerType === 2 ? 3 : partnerType === 1 || partnerType === 3 ? 4 : 5;
+const isValidHttpsUrl = (value: string) => {
+  if (value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !!url.hostname;
+  } catch { return false; }
+};
 
 type DocumentDraft = { id: string; fileName: string; mode: 'url' | 'file'; url: string; file: VerificationDocument | null };
 
@@ -44,10 +51,15 @@ export default function PartnerVerificationScreen() {
   const submit = async () => {
     if (!profile || saving) return;
     if (status?.status === 0 || status?.status === 1) return;
+    if (taxCode.trim().length > 50 || representativeName.trim().length > 255) {
+      setFormNotice({ type: 'error', title: 'Thông tin xác minh quá dài', message: taxCode.trim().length > 50 ? 'Mã số thuế tối đa 50 ký tự.' : 'Tên người đại diện tối đa 255 ký tự.' });
+      return;
+    }
     const errors: Record<string, string> = {};
     for (const document of documents) {
       if (!document.fileName.trim()) errors[document.id] = 'Nhập tên tài liệu.';
-      else if (document.mode === 'url' && (!document.url.trim() || !/^https:\/\//i.test(document.url.trim()))) errors[document.id] = 'Nhập URL HTTPS hợp lệ.';
+      else if (document.fileName.trim().length > 255) errors[document.id] = 'Tên tài liệu không được dài quá 255 ký tự.';
+      else if (document.mode === 'url' && !isValidHttpsUrl(document.url.trim())) errors[document.id] = 'Nhập URL HTTPS hợp lệ (tối đa 2.048 ký tự).';
       else if (document.mode === 'file' && documentErrors[document.id]) errors[document.id] = documentErrors[document.id];
       else if (document.mode === 'file' && !document.file) errors[document.id] = 'Chọn ảnh hoặc tệp PDF.';
     }
