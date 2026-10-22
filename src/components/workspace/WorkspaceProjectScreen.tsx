@@ -30,6 +30,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 type WorkspaceTab = "tasks" | "reports" | "meetings" | "rooms" | "contribution";
 
+const WORKSPACE_TABS: WorkspaceTab[] = [
+  "tasks",
+  "reports",
+  "meetings",
+  "rooms",
+  "contribution",
+];
+
+function resolveWorkspaceTab(value: string | string[] | undefined): WorkspaceTab {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return WORKSPACE_TABS.includes(candidate as WorkspaceTab)
+    ? (candidate as WorkspaceTab)
+    : "tasks";
+}
+
 type LoadedWorkspace = {
   projectTitle: string;
   isCreator: boolean;
@@ -138,20 +153,6 @@ function TaskCard({
         )}
       </View>
 
-      <View style={styles.laterPhase}>
-        <SymbolView
-          name={{
-            ios: "doc.text",
-            android: "description",
-            web: "description",
-          }}
-          size={18}
-          tintColor={colors.primary}
-        />
-        <Text style={styles.laterPhaseText}>
-          Báo cáo và minh chứng sẽ được bổ sung ở giai đoạn tiếp theo.
-        </Text>
-      </View>
       {onManage ? (
         task.status === VerifiedProjectTaskStatus.Overdue ? (
           <View style={styles.lockedTaskNotice}>
@@ -188,7 +189,7 @@ function TaskCard({
 }
 
 export function WorkspaceProjectScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  const { projectId, tab } = useLocalSearchParams<{ projectId: string; tab?: string | string[] }>();
   const { account, accessToken } = useAuthStore();
   const { width } = useWindowDimensions();
   const [loaded, setLoaded] = useState<LoadedWorkspace | null>(null);
@@ -196,10 +197,15 @@ export function WorkspaceProjectScreen() {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("tasks");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => resolveWorkspaceTab(tab));
   const [editorTask, setEditorTask] = useState<
     ProjectTask | null | undefined
   >(undefined);
+
+  // Cho phép Project Explorer mở thẳng tab Workspace được chọn qua query param ?tab=reports.
+  useEffect(() => {
+    setActiveTab(resolveWorkspaceTab(tab));
+  }, [tab, projectId]);
 
   useEffect(() => {
     const controller = new AbortController();

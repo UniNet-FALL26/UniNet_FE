@@ -1,6 +1,7 @@
 import { EvidenceList } from '@/components/workspace/reports/EvidenceList';
 import { ReportForm } from '@/components/workspace/reports/ReportForm';
 import { taskReportService } from '@/services/task-report.service';
+import { workspaceService } from '@/services/workspace.service';
 import { TASK_REPORT_STATUS_LABEL, type TaskReport, type TaskReportListResponse } from '@/types/task-report';
 import type { ProjectTask } from '@/types/workspace';
 import { parseReportContent } from '@/utils/report-content';
@@ -57,18 +58,37 @@ export default function ReportsTab({ projectId, tasks, userId, accessToken, isPr
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
     setError('');
-    const result = await Promise.all(tasks.map(async (task): Promise<TaskData> => {
-      try {
-        // Request a larger first page so the filter can inspect reports across the task.
-        const data = await taskReportService.list(projectId, task.id, accessToken, 1, 100);
-        return { task, data };
-      } catch (e) {
-        return { task, data: null, error: e instanceof Error ? e.message : 'Không thể tải báo cáo.' };
+    try {
+      // When Reports is opened directly, the parent Workspace may not have
+      // finished loading tasks yet. Fetch them here as a fallback so Reports
+      // does not depend on visiting the Tasks tab first.
+      const taskList = tasks.length > 0
+        ? tasks
+        : (await workspaceService.listTasks(projectId)).tasks ?? [];
+
+      const result = await Promise.all(taskList.map(async (task): Promise<TaskData> => {
+        try {
+          // Each report request needs both the project ID and the task ID.
+          const data = await taskReportService.list(projectId, task.id, accessToken, 1, 100);
+          return { task, data };
+        } catch (e) {
+          return { task, data: null, error: e instanceof Error ? e.message : 'Không thể tải báo cáo.' };
+        }
+      }));
+
+      setItems(result);
+      if (result.length > 0 && result.every(x => x.error)) {
+        setError('Không thể tải báo cáo của các task. Vui lòng thử lại.');
+      } else if (result.length === 0) {
+        setError('');
       }
-    }));
-    setItems(result);
-    if (result.length && result.every(x => x.error)) setError('Không thể tải báo cáo của các task. Vui lòng thử lại.');
-    setLoading(false); setRefreshing(false);
+    } catch (e) {
+      setItems([]);
+      setError(e instanceof Error ? e.message : 'Không thể tải danh sách task của dự án.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [projectId, tasks, accessToken]);
 
   useEffect(() => { void load(); }, [load]);
