@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, PageTitle, Tag } from '@/components/company/company-ui';
+import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
+import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
 import { companyJobApplicationStatusLabel, companyJobStatusLabel, companyJobWorkTypeLabel, formatCompanyDate, companyService, type CompanyApplicant, type CompanyJob, type CompanyJobApplicationStatus } from '@/services/company.service';
+import type { PortfolioResponse } from '@/types/portfolio';
 
 const statuses: CompanyJobApplicationStatus[] = [0, 1, 2, 3, 4];
+const canMoveToStatus = (current: CompanyJobApplicationStatus, next: CompanyJobApplicationStatus) =>
+  current < 3 && next > current;
 
 export default function CompanyApplicants() {
   const { jobId } = useLocalSearchParams<{ jobId?: string }>();
   const [jobs, setJobs] = useState<CompanyJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState(typeof jobId === 'string' ? jobId : '');
   const [applicants, setApplicants] = useState<CompanyApplicant[]>([]);
+  const [submittedCv, setSubmittedCv] = useState<PortfolioResponse | null>(null);
+  const [submittedCvOwner, setSubmittedCvOwner] = useState('');
+  const [cvFrameWidth, setCvFrameWidth] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [applicantsLoading, setApplicantsLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [statusConfirmation, setStatusConfirmation] = useState<{ applicant: CompanyApplicant; status: CompanyJobApplicationStatus } | null>(null);
   const [error, setError] = useState('');
   const [applicantError, setApplicantError] = useState('');
   const [reload, setReload] = useState(0);
   const [applicantsReload, setApplicantsReload] = useState(0);
+  const { width: screenWidth } = useWindowDimensions();
+  const cvTemplate = getProfileTemplate(submittedCv?.portfolio.appearance.profile.template);
+  const cvTheme = getProfileTheme(cvTemplate.id, submittedCv?.portfolio.appearance.profile.theme);
 
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
@@ -91,24 +104,42 @@ export default function CompanyApplicants() {
       {!applicantsLoading && !applicantError && applicants.map(applicant => <Card key={applicant.id} style={s.applicantCard}>
         <View style={s.applicantHead}>
           {applicant.avatarUrl ? <Image source={{ uri: applicant.avatarUrl }} style={s.avatar} /> : <View style={[s.avatar, s.avatarFallback]}><Text style={s.avatarText}>{applicant.fullName.trim().charAt(0).toUpperCase() || 'S'}</Text></View>}
-          <View style={s.applicantInfo}><Text style={s.applicantName}>{applicant.fullName}</Text><Text style={s.jobSub}>{[applicant.major, applicant.universityName].filter(Boolean).join(' · ') || 'Sinh viên UniNet'}</Text><Text style={s.meta}>Ứng tuyển {formatCompanyDate(applicant.appliedAt)}</Text></View>
+          <View style={s.applicantInfo}><Text style={s.applicantName}>{applicant.fullName}</Text><Text style={s.jobSub}>{[applicant.major, applicant.universityName].filter(Boolean).join(' · ') || 'Sinh viên UniNet'}</Text><Text style={s.meta}>Ứng tuyển {formatCompanyDate(applicant.appliedAt)} · Lần {applicant.applicationRound}</Text></View>
           <Tag tone={applicant.status === 3 ? 'green' : applicant.status === 4 ? 'rose' : applicant.status === 2 ? 'purple' : 'gray'}>{companyJobApplicationStatusLabel[applicant.status]}</Tag>
         </View>
         {!!applicant.coverMessage && <View style={s.message}><Text style={s.messageLabel}>LỜI NHẮN</Text><Text style={s.messageText}>{applicant.coverMessage}</Text></View>}
         {applicant.aiMatchScore != null && <Text style={s.match}>Điểm phù hợp: {Math.round(applicant.aiMatchScore)}%</Text>}
+        {applicant.submittedPortfolio ? <Pressable accessibilityRole="button" onPress={() => { setSubmittedCv(applicant.submittedPortfolio); setSubmittedCvOwner(applicant.fullName); }} style={({ pressed }) => [s.viewCvButton, pressed && { opacity: 0.7 }]}><CompanyIcon name={{ ios: 'doc.text', android: 'description', web: 'description' }} size={15} color={c.blue} /><Text style={s.viewCvText}>Xem CV đã nộp</Text></Pressable> : <Text style={s.noSnapshot}>Hồ sơ này được nộp trước khi lưu bản CV đã nộp.</Text>}
         <Text style={s.statusLabel}>CẬP NHẬT TRẠNG THÁI</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.statusOptions}>
-          {statuses.map(status => <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected: status === applicant.status, disabled: updatingId === applicant.id }} disabled={updatingId === applicant.id} onPress={() => void updateStatus(applicant, status)} style={[s.statusOption, status === applicant.status && s.statusOptionActive]}><Text style={[s.statusOptionText, status === applicant.status && s.statusOptionTextActive]}>{companyJobApplicationStatusLabel[status]}</Text></Pressable>)}
+          {statuses.map(status => {
+            const disabled = !!updatingId || !canMoveToStatus(applicant.status, status);
+            return <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected: status === applicant.status, disabled }} disabled={disabled} onPress={() => setStatusConfirmation({ applicant, status })} style={[s.statusOption, status === applicant.status && s.statusOptionActive, disabled && status !== applicant.status && s.statusOptionDisabled]}><Text style={[s.statusOptionText, status === applicant.status && s.statusOptionTextActive, disabled && status !== applicant.status && s.statusOptionTextDisabled]}>{companyJobApplicationStatusLabel[status]}</Text></Pressable>;
+          })}
         </ScrollView>
         {updatingId === applicant.id && <View style={s.updating}><ActivityIndicator size="small" color={c.blue} /><Text style={s.meta}>Đang cập nhật…</Text></View>}
       </Card>)}
     </>}
-  </PageScroll></CompanyPage>;
+  </PageScroll><Modal visible={!!submittedCv} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setSubmittedCv(null)}>
+    <SafeAreaView style={s.cvModal} edges={['top', 'bottom']}>
+      <View style={s.cvModalHeader}><View><Text style={s.cvModalTitle}>CV đã nộp</Text><Text style={s.meta}>{submittedCvOwner}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Đóng CV" onPress={() => setSubmittedCv(null)} style={s.cvModalClose}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} color={c.ink} size={17} /></Pressable></View>
+      <ScrollView contentContainerStyle={s.cvModalContent}>{submittedCv && <View onLayout={event => setCvFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={cvTemplate.id} data={submittedCv} theme={cvTheme} width={Math.min(cvFrameWidth || screenWidth, 1120)} /></View>}</ScrollView>
+    </SafeAreaView>
+  </Modal><Modal visible={!!statusConfirmation} transparent animationType="fade" onRequestClose={() => setStatusConfirmation(null)}>
+    <View style={s.confirmOverlay}><View style={s.confirmCard}><Text style={s.confirmTitle}>Xác nhận chuyển trạng thái</Text><Text style={s.confirmMessage}>{statusConfirmation ? 'Chuyển hồ sơ của ' + statusConfirmation.applicant.fullName + ' sang “' + companyJobApplicationStatusLabel[statusConfirmation.status] + '”?' : ''}{statusConfirmation?.status === 4 ? '\nSinh viên sẽ thấy hồ sơ bị từ chối và có thể nộp lại.' : ''}{statusConfirmation?.status === 3 || statusConfirmation?.status === 4 ? '\nSau khi xác nhận, hồ sơ sẽ không thể chuyển sang trạng thái khác.' : ''}</Text><View style={s.confirmActions}><ActionButton title="Hủy" variant="outline" onPress={() => setStatusConfirmation(null)} /><ActionButton title="Xác nhận" onPress={() => { const pending = statusConfirmation; setStatusConfirmation(null); if (pending) void updateStatus(pending.applicant, pending.status); }} /></View></View></View>
+  </Modal></CompanyPage>;
 }
 
 const s = StyleSheet.create({
+  statusOptionDisabled: { backgroundColor: '#F3F5F8', borderColor: '#E1E6EE' },
+  statusOptionTextDisabled: { color: '#A8B0BE' },
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(20,18,30,0.45)', justifyContent: 'center', padding: 18 },
+  confirmCard: { maxWidth: 420, width: '100%', alignSelf: 'center', borderRadius: 16, padding: 16, backgroundColor: '#FFF', gap: 10 },
+  confirmTitle: { color: c.ink, fontSize: 15, fontWeight: '900' },
+  confirmMessage: { color: c.muted, fontSize: 11, lineHeight: 17 },
+  confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
   topline: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 7 }, brandMark: { width: 27, height: 27, borderRadius: 8, backgroundColor: c.blue, alignItems: 'center', justifyContent: 'center' }, brand: { color: c.ink, fontSize: 13, fontWeight: '900', flex: 1 }, caption: { color: c.blue, fontSize: 7 },
   jobPicker: { backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 }, codeIcon: { width: 36, height: 36, backgroundColor: '#EAF3FF', borderRadius: 11, justifyContent: 'center', alignItems: 'center' }, jobInfo: { flex: 1, gap: 3 }, jobTitle: { color: c.ink, fontSize: 11, fontWeight: '900' }, jobSub: { color: c.muted, fontSize: 9, lineHeight: 14 }, metaRow: { flexDirection: 'row', gap: 7, alignItems: 'center', marginTop: 3 }, meta: { color: c.muted, fontSize: 8 }, jobOptions: { paddingVertical: 4, gap: 0 }, jobOption: { minHeight: 52, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, jobOptionActive: { backgroundColor: '#F4F8FF' }, jobOptionText: { flex: 1, gap: 2 },
   stats: { flexDirection: 'row', gap: 7 }, stat: { flex: 1, minHeight: 58, backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 11, alignItems: 'center', justifyContent: 'center', gap: 3 }, statValue: { color: c.ink, fontSize: 16, fontWeight: '900' }, statLabel: { color: c.muted, fontSize: 8 }, stateCard: { alignItems: 'center', gap: 8, paddingVertical: 20 }, emptyIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#EAF3FF', alignItems: 'center', justifyContent: 'center' }, emptyTitle: { color: c.ink, fontSize: 12, fontWeight: '900', textAlign: 'center' }, stateText: { color: c.muted, fontSize: 10, lineHeight: 15, textAlign: 'center' }, error: { color: c.rose, fontSize: 11, textAlign: 'center' },
-  applicantCard: { padding: 12, gap: 10 }, applicantHead: { flexDirection: 'row', alignItems: 'center', gap: 9 }, avatar: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EAF3FF' }, avatarFallback: { alignItems: 'center', justifyContent: 'center' }, avatarText: { color: c.blue, fontSize: 17, fontWeight: '900' }, applicantInfo: { flex: 1, gap: 2 }, applicantName: { color: c.ink, fontSize: 12, fontWeight: '900' }, message: { padding: 10, borderRadius: 10, backgroundColor: '#F5F8FC', gap: 4 }, messageLabel: { color: c.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 }, messageText: { color: c.ink, fontSize: 10, lineHeight: 15 }, match: { color: c.blue, fontSize: 10, fontWeight: '700' }, statusLabel: { color: c.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 }, statusOptions: { gap: 6 }, statusOption: { minHeight: 29, borderWidth: 1, borderColor: c.line, borderRadius: 15, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, statusOptionActive: { backgroundColor: '#EAF3FF', borderColor: '#9EC5FF' }, statusOptionText: { color: c.muted, fontSize: 9, fontWeight: '700' }, statusOptionTextActive: { color: c.blue }, updating: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  applicantCard: { padding: 12, gap: 10 }, applicantHead: { flexDirection: 'row', alignItems: 'center', gap: 9 }, avatar: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EAF3FF' }, avatarFallback: { alignItems: 'center', justifyContent: 'center' }, avatarText: { color: c.blue, fontSize: 17, fontWeight: '900' }, applicantInfo: { flex: 1, gap: 2 }, applicantName: { color: c.ink, fontSize: 12, fontWeight: '900' }, message: { padding: 10, borderRadius: 10, backgroundColor: '#F5F8FC', gap: 4 }, messageLabel: { color: c.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 }, messageText: { color: c.ink, fontSize: 10, lineHeight: 15 }, match: { color: c.blue, fontSize: 10, fontWeight: '700' }, viewCvButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#BBD5FC', borderRadius: 10, backgroundColor: '#F4F8FF' }, viewCvText: { color: c.blue, fontSize: 10, fontWeight: '800' }, noSnapshot: { color: c.muted, fontSize: 9, lineHeight: 14 }, statusLabel: { color: c.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 }, statusOptions: { gap: 6 }, statusOption: { minHeight: 29, borderWidth: 1, borderColor: c.line, borderRadius: 15, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, statusOptionActive: { backgroundColor: '#EAF3FF', borderColor: '#9EC5FF' }, statusOptionText: { color: c.muted, fontSize: 9, fontWeight: '700' }, statusOptionTextActive: { color: c.blue }, updating: { flexDirection: 'row', gap: 6, alignItems: 'center' }, cvModal: { flex: 1, backgroundColor: '#F6F9FD' }, cvModalHeader: { minHeight: 54, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: c.line }, cvModalTitle: { color: c.ink, fontSize: 14, fontWeight: '900' }, cvModalClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F0F4FA', alignItems: 'center', justifyContent: 'center' }, cvModalContent: { paddingBottom: 24 },
 });

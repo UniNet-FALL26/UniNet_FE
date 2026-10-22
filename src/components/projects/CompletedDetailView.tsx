@@ -57,13 +57,16 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
     if (level1Only) router.push({ pathname: '/group/[id]', params: { id: project.id, tab: 'Minh chứng' } } as never);
     else setTab('Minh chứng');
   };
+  const openLevel2 = () => router.push(level2.data
+    ? { pathname: '/group/verification-dossier/[id]', params: { id: level2.data.verification.id } } as never
+    : { pathname: '/group/verification/[id]', params: { id: project.id } } as never);
   const canRetry = project.isCreator && !level1.loading && !level1.error && !level1.forbidden && review?.status !== 0 && review?.status !== 1;
   const level1Title = level1.error ? 'Chưa tải được kết quả cấp 1' : level1.loading && !review ? 'Đang tải cấp 1…' : review ? level1Labels[review.status] : 'Chưa có kết quả cấp 1';
   const nextMessage = !project.isCreator ? privateMessage : level1.error || (level1.loading && !review ? 'Đang tải kết quả xác minh để xác định bước tiếp theo.' : level1Message(review));
   const cta = level1Only
     ? { title: 'Xem minh chứng cần cập nhật', action: showEvidence }
-    : !level2.loading && !level2.error && (level2.data?.verification.status === 0 || eligible)
-    ? { title: level2.data?.verification.status === 0 ? 'Tiếp tục hồ sơ cấp 2' : 'Chọn gói xác minh cấp 2', action: () => router.push({ pathname: '/group/verification/[id]', params: { id: project.id } } as never) }
+    : !level2.loading && !level2.error && (level2.data || eligible)
+    ? { title: level2.data ? level2.data.verification.status === 0 ? 'Tiếp tục hồ sơ cấp 2' : 'Xem hồ sơ và kết quả cấp 2' : 'Chọn gói xác minh cấp 2', action: openLevel2 }
     : { title: 'Xem kết quả cấp 1', action: openLevel1 };
   const members = project.members.some(member => member.userId === project.creator.id) ? project.members
     : [{ userId: project.creator.id, fullName: project.creator.fullName, role: 'Người tạo dự án' }, ...project.members];
@@ -139,8 +142,8 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
           <Text style={s.label}>Cấp 2 · Xác minh chuyên viên</Text>
           <Text style={s.body}>{level2.error || (level2.loading && !level2.data ? 'Đang tải…' : level2Label(level2.data, !!eligible))}</Text>
           {level2.data?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(level2.data.verification.scheduledStartAt)} — {date(level2.data.verification.scheduledEndAt)} (giờ thiết bị)</Text>}
-          {!level2.loading && !level2.error && (eligible || level2.data?.verification.status === 0) && <Button title={level2.data?.verification.status === 0 ? 'Tiếp tục hồ sơ · Chọn lịch' : 'Chọn gói cấp 2'} onPress={() => router.push({ pathname: '/group/verification/[id]', params: { id: project.id } } as never)} />}
-          <Text style={s.small}>Chọn gói và giữ lịch trước khi thanh toán. Checkout, meeting và kết quả được tiếp nối ở các bước sau.</Text>
+          {!level2.loading && !level2.error && (eligible || level2.data) && <Button title={level2.data ? 'Xem hồ sơ cấp 2' : 'Chọn gói cấp 2'} onPress={openLevel2} />}
+          <Text style={s.small}>Theo dõi lịch hẹn, thanh toán và kết luận chuyên viên trong hồ sơ cấp 2.</Text>
         </>}
       </Card>}
     </ScrollView>

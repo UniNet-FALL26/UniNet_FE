@@ -158,6 +158,7 @@ export function VerificationCheckoutScreen() {
         <View style={s.card}><Text style={s.heading}>Thanh toán qua PayOS</Text><Text style={s.body}>Ứng dụng mở trang thanh toán do hệ thống cung cấp. Sau khi quay lại, kiểm tra trạng thái để nhận kết quả mới nhất.</Text><Text style={s.small}>Thanh toán thành công chưa phải kết quả đạt xác minh cấp 2.</Text></View>
       </>}
       <Button title="Kiểm tra trạng thái" variant="outline" onPress={refresh} disabled={busy || loading} />
+      {detail && <Button title="Xem hồ sơ và kết quả cấp 2" variant="outline" disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />}
       <Button title="Quay lại lịch và hồ sơ" variant="outline" onPress={backToBooking} disabled={busy} />
     </ScrollView>
     {(link || canCreate) && <View style={s.footer}><Button title={link ? 'Mở PayOS để thanh toán' : transaction?.status === 2 ? 'Tạo checkout để thử lại' : 'Tạo checkout thanh toán'} onPress={link ? openPayment : createCheckout} loading={busy} disabled={loading || !!error || amount == null} /></View>}

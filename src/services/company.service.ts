@@ -1,5 +1,9 @@
 import { apiRequest } from '@/services/api';
 import { skillService } from '@/services/skill.service';
+import { Platform } from 'react-native';
+import { File as NativeFile } from 'expo-file-system';
+import type { VerificationDocument } from '@/types/student-verification';
+import type { PortfolioResponse } from '@/types/portfolio';
 export type { SkillCatalogItem } from '@/services/skill.service';
 
 export type CompanyJobStatus = 0 | 1 | 2 | 3;
@@ -22,6 +26,8 @@ export type CompanyApplicant = {
   id: string; jobId: string; studentUserId: string; fullName: string; nickname: string;
   universityName: string | null; major: string | null; avatarUrl: string | null; coverMessage: string | null;
   aiMatchScore: number | null; status: CompanyJobApplicationStatus; appliedAt: string; updatedAt: string;
+  submittedPortfolio: PortfolioResponse | null;
+  applicationRound: number;
 };
 export type CompanyJobInput = {
   title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
@@ -47,7 +53,8 @@ export type CompanyJobsPage = {
 };
 export type PartnerVerificationStatus = { id: string | null; status: VerificationStatus | null; rejectReason: string | null; submittedAt: string | null };
 export type PartnerVerificationDocument = { type: VerificationDocumentType; fileName: string; url: string };
-export type PartnerVerificationInput = { taxCode?: string | null; representativeName?: string | null; documents: PartnerVerificationDocument[] };
+export type PartnerVerificationUploadDocument = { type: VerificationDocumentType; fileName: string; url?: string | null; document?: VerificationDocument | null };
+export type PartnerVerificationInput = { taxCode?: string | null; representativeName?: string | null; documents: PartnerVerificationUploadDocument[] };
 
 type PartnerProfileResponse = {
   id: string; fullName: string; organizationName: string | null; avatarUrl: string | null; coverUrl: string | null;
@@ -105,7 +112,27 @@ export const companyService = {
   updateApplicantStatus: (jobId: string, applicationId: string, status: CompanyJobApplicationStatus, signal?: AbortSignal) => apiRequest<CompanyApplicant>(`/partner/jobs/${encodeURIComponent(jobId)}/applications/${encodeURIComponent(applicationId)}`, { method: 'PATCH', body: JSON.stringify({ status }), signal }),
   getSkills: skillService.getSkills,
   getVerificationStatus: (signal?: AbortSignal) => apiRequest<PartnerVerificationStatus>('/partner/verification/me', { signal }),
-  submitVerification: (input: PartnerVerificationInput, signal?: AbortSignal) => apiRequest<PartnerVerificationStatus>('/partner/verification', { method: 'POST', body: JSON.stringify(input), signal }),
+  submitVerification: async (input: PartnerVerificationInput, signal?: AbortSignal) => {
+    const body = new FormData();
+    body.append('taxCode', input.taxCode || '');
+    body.append('representativeName', input.representativeName || '');
+    const files: VerificationDocument[] = [];
+    const documents = input.documents.map(document => {
+      const fileIndex = document.document ? files.push(document.document) - 1 : null;
+      return { type: document.type, fileName: document.fileName, url: document.url || null, fileIndex };
+    });
+    body.append('documentsJson', JSON.stringify(documents));
+    for (const document of files) {
+      if (Platform.OS === 'web') {
+        if (!document.file) throw new Error('Vui lòng chọn lại tài liệu.');
+        body.append('files', document.file, document.name);
+      } else {
+        const file = new NativeFile(document.uri);
+        body.append('files', file);
+      }
+    }
+    return apiRequest<PartnerVerificationStatus>('/partner/verification/submit-multiple', { method: 'POST', body, signal });
+  },
 };
 
 export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đã đăng', 2: 'Đã đóng', 3: 'Hết hạn' };
@@ -116,8 +143,10 @@ export function formatCompanyDate(value: string | null): string {
   return Number.isNaN(date.getTime()) ? 'Chưa đặt' : new Intl.DateTimeFormat('vi-VN', { timeZone: 'UTC' }).format(date);
 }
 export function formatCompanySalary(min: number | null, max: number | null): string {
-  const format = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
+  const format = (value: number) => value >= 1_000_000
+    ? `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value / 1_000_000)} triệu`
+    : new Intl.NumberFormat('vi-VN').format(value);
   if (min == null && max == null) return 'Thỏa thuận';
-  if (min != null && max != null) return `${format(min)}–${format(max)} đ/tháng`;
-  return `${format(min ?? max!)} đ/tháng`;
+  if (min != null && max != null) return `${format(min)}–${format(max)} VND/tháng`;
+  return `${format(min ?? max!)} VND/tháng`;
 }
