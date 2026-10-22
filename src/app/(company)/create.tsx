@@ -233,8 +233,11 @@ export default function CompanyCreateJob() {
   const validateFields = () => {
     const errors: Record<string, string> = {};
     if (!title.trim()) errors.title = 'Vui lòng nhập tiêu đề bài đăng.';
+    else if (title.trim().length > 255) errors.title = 'Tiêu đề không được dài quá 255 ký tự.';
     if (!location.trim()) errors.location = 'Vui lòng nhập địa điểm làm việc.';
+    else if (location.trim().length > 255) errors.location = 'Địa điểm không được dài quá 255 ký tự.';
     if (!description.trim()) errors.description = 'Vui lòng nhập nội dung mô tả.';
+    else if (description.length > 20000) errors.description = 'Mô tả không được dài quá 20.000 ký tự.';
     if (!workMode) errors.workMode = 'Vui lòng chọn hình thức làm việc.';
     const parsedDeadline = dateValue(deadline, '', true);
     if (!parsedDeadline) errors.deadline = 'Vui lòng chọn hạn ứng tuyển hợp lệ.';
@@ -250,9 +253,28 @@ export default function CompanyCreateJob() {
     };
     const minimum = parseSalary(salary);
     const maximum = parseSalary(salaryMax);
+    const maxSalary = 99_999_999_999_999;
     if (Number.isNaN(minimum) || (minimum != null && minimum < 1_000_000)) errors.salary = 'Lương tối thiểu phải từ 1.000.000 VND/tháng.';
     if (Number.isNaN(maximum) || (maximum != null && maximum < 1_000_000)) errors.salaryMax = 'Lương tối đa phải từ 1.000.000 VND/tháng.';
+    if (minimum != null && minimum > maxSalary) errors.salary = 'Lương tối thiểu vượt giới hạn hỗ trợ.';
+    if (maximum != null && maximum > maxSalary) errors.salaryMax = 'Lương tối đa vượt giới hạn hỗ trợ.';
     if (minimum != null && maximum != null && minimum > maximum) errors.salary = 'Lương tối thiểu phải nhỏ hơn hoặc bằng lương tối đa.';
+    const requirementGroups = [
+      { label: 'Yêu cầu bắt buộc', values: qualifications },
+      { label: 'Yêu cầu ưu tiên', values: preferredQualifications },
+    ];
+    for (const group of requirementGroups) {
+      if (group.values.length > 50 || group.values.some(value => value.length > 2000)) {
+        errors.requirements = `${group.label}: tối đa 50 mục, mỗi mục không quá 2.000 ký tự.`;
+        break;
+      }
+    }
+    if (projectAreas.length > 50 || projectAreas.some(value => value.length > 255)) errors.projectAreas = 'Nhóm lĩnh vực dự án tối đa 50 mục, mỗi mục không quá 255 ký tự.';
+    if (skills.length > 100) errors.skills = 'Mỗi bài tuyển dụng có tối đa 100 kỹ năng.';
+    if (benefits.length > 30) errors.benefits = 'Mỗi bài tuyển dụng có tối đa 30 quyền lợi.';
+    else if (benefits.some(item => !item.title.trim() || item.title.trim().length > 255 || !item.description.trim() || item.description.length > 2000)) {
+      errors.benefits = 'Mỗi quyền lợi cần có tiêu đề (tối đa 255 ký tự) và mô tả (tối đa 2.000 ký tự).';
+    }
     return errors;
   };
 
@@ -280,6 +302,10 @@ export default function CompanyCreateJob() {
   const minimumDeadlineDate = startDate && addDays(startDate, 1) > addDays(today, 1) ? addDays(startDate, 1) : addDays(today, 1);
 
   const addCatalogSkill = (item: SkillCatalogItem, type: 0 | 1) => {
+    if (!skills.some(skill => skill.skillId === item.id) && skills.length >= 100) {
+      setFormNotice({ type: 'error', title: 'Đã đủ số kỹ năng', message: 'Mỗi bài tuyển dụng có tối đa 100 kỹ năng.' });
+      return;
+    }
     const key = item.id;
     setSkills(current => current.some(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase())
       ? current.map(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase() ? { ...skill, key, skillId: item.id, name: item.name, requirementType: type } : skill)
@@ -291,6 +317,10 @@ export default function CompanyCreateJob() {
     const name = skillQuery.trim().replace(/\s+/g, ' ');
     if (!name || name.length > 100) {
       setFormNotice({ type: 'error', title: 'Tên kỹ năng chưa hợp lệ', message: 'Tên kỹ năng cần có tối đa 100 ký tự.' });
+      return;
+    }
+    if (!skills.some(skill => skill.name.toLocaleLowerCase() === name.toLocaleLowerCase()) && skills.length >= 100) {
+      setFormNotice({ type: 'error', title: 'Đã đủ số kỹ năng', message: 'Mỗi bài tuyển dụng có tối đa 100 kỹ năng.' });
       return;
     }
     const key = `pending:${name.toLocaleLowerCase()}`;
@@ -321,8 +351,20 @@ export default function CompanyCreateJob() {
 
   const addRequirement = () => {
     const value = requirementDraft.trim();
-    if (!value) return;
+    if (!value) {
+      setFormNotice({ type: 'error', title: 'Chưa có nội dung yêu cầu', message: 'Nhập nội dung rồi chọn “Thêm”.' });
+      return;
+    }
+    if (value.length > 2000) {
+      setFormNotice({ type: 'error', title: 'Yêu cầu quá dài', message: 'Mỗi mục yêu cầu không được dài quá 2.000 ký tự.' });
+      return;
+    }
     const setter = requirementType === 0 ? setQualifications : setPreferredQualifications;
+    const current = requirementType === 0 ? qualifications : preferredQualifications;
+    if (current.length >= 50) {
+      setFormNotice({ type: 'error', title: 'Đã đủ số yêu cầu', message: 'Mỗi nhóm yêu cầu có tối đa 50 mục.' });
+      return;
+    }
     setter(current => [...current, value]);
     skillCatalog.filter(item => value.toLocaleLowerCase().includes(item.name.toLocaleLowerCase()))
       .forEach(item => addCatalogSkill(item, requirementType));
@@ -332,6 +374,14 @@ export default function CompanyCreateJob() {
   const addBenefit = () => {
     if (!benefitTitle.trim() || !benefitDescription.trim()) {
       setBenefitError('Vui lòng nhập tiêu đề và mô tả quyền lợi.');
+      return;
+    }
+    if (benefitTitle.trim().length > 255 || benefitDescription.length > 2000) {
+      setBenefitError('Tiêu đề tối đa 255 ký tự; mô tả tối đa 2.000 ký tự.');
+      return;
+    }
+    if (benefits.length >= 30) {
+      setBenefitError('Mỗi bài tuyển dụng có tối đa 30 quyền lợi.');
       return;
     }
     setBenefitError('');
@@ -408,7 +458,7 @@ export default function CompanyCreateJob() {
     const maximum = salaryMax.trim() ? Number(salaryMax.replace(/\D/g, '')) : null;
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
-      setFormNotice({ type: 'error', title: 'Chưa thể lưu bài tuyển dụng', message: `Có ${Object.keys(errors).length} mục cần kiểm tra. Các lỗi được ghi ngay bên dưới trường tương ứng.` });
+      setFormNotice({ type: 'error', title: 'Chưa thể lưu bài tuyển dụng', message: Object.values(errors).join('\n') });
       scrollToFirstError(errors);
       return;
     }
@@ -521,6 +571,7 @@ export default function CompanyCreateJob() {
       <RequirementSwitch value={requirementType} onChange={setRequirementType} />
       {(requirementType === 0 ? qualifications : preferredQualifications).map((item, index) => <View style={s.editableRow} key={`${requirementType}-${index}`}><TextInput style={[s.input, s.rowInput]} value={item} onChangeText={value => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.map((entry, i) => i === index ? value : entry))} /><Pressable accessibilityLabel="Xóa yêu cầu" onPress={() => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.filter((_, i) => i !== index))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View>)}
       <View style={s.addRow}><TextInput style={[s.input, s.rowInput, s.textarea]} value={requirementDraft} onChangeText={setRequirementDraft} multiline placeholder="Ví dụ: Có kinh nghiệm JavaScript và Node.js" placeholderTextColor={c.muted} /><Pressable onPress={addRequirement}><Text style={s.purpleText}>+ Thêm</Text></Pressable></View>
+      {!!fieldErrors.requirements && <Text accessibilityRole="alert" style={s.fieldError}>{fieldErrors.requirements}</Text>}
     </Card>
     <Card><Text style={s.sectionTitle}>Kỹ năng cần có</Text><Text style={s.helper}>Chọn nhóm trước khi thêm. Kỹ năng mới sẽ được gửi để admin phân loại sau khi bài được đăng công khai.</Text>
       <RequirementSwitch value={skillType} onChange={setSkillType} />
@@ -535,6 +586,7 @@ export default function CompanyCreateJob() {
           {canRemove && <Pressable accessibilityRole="button" accessibilityLabel={`Xóa ${skill.name}`} onPress={() => { setSkills(current => current.filter(item => item.key !== skill.key)); setHoveredSkillDelete(null); setMobileSkillDelete(null); }} style={s.skillRemove}><Text style={s.skillRemoveText}>×</Text></Pressable>}
         </View>;
       })}</ScrollView>}
+      {!!fieldErrors.skills && <Text accessibilityRole="alert" style={s.fieldError}>{fieldErrors.skills}</Text>}
     </Card>
     <Card><Text style={s.sectionTitle}>Quyền lợi</Text><Text style={s.helper}>Chọn một icon có sẵn làm biểu tượng cho từng quyền lợi.</Text>{benefits.map((item, index) => {
       const icon = getBenefitIcon(item.icon);
@@ -545,6 +597,7 @@ export default function CompanyCreateJob() {
     })}
       <View style={s.newBenefit}><View style={s.newBenefitIconColumn}><Pressable accessibilityRole="button" accessibilityLabel={`Chọn icon: ${getBenefitIcon(benefitIcon).label}`} onPress={() => setActiveBenefitIconPicker(current => current === 'new' ? null : 'new')} style={s.benefitIconTile}><CompanyIcon name={{ ios: getBenefitIcon(benefitIcon).ios, android: getBenefitIcon(benefitIcon).android, web: getBenefitIcon(benefitIcon).web }} size={23} color={c.blue} /></Pressable></View><View style={s.benefitFields}><Text style={s.label}>Tiêu đề</Text><TextInput style={s.benefitInput} value={benefitTitle} onChangeText={setBenefitTitle} placeholder={`Ví dụ: ${getBenefitIcon(benefitIcon).example}`} placeholderTextColor={c.muted} /><Text style={s.label}>Mô tả</Text><TextInput style={[s.benefitInput, s.benefitDescription]} value={benefitDescription} onChangeText={setBenefitDescription} multiline placeholder="Mô tả quyền lợi" placeholderTextColor={c.muted} /></View></View>
       {activeBenefitIconPicker === 'new' && <View style={s.benefitIconOptions}>{benefitIcons.map(option => <Pressable key={option.key} accessibilityRole="button" accessibilityLabel={option.label} onPress={() => { setBenefitIcon(option.key); setActiveBenefitIconPicker(null); }} style={[s.benefitIconOption, benefitIcon === option.key && s.benefitIconOptionActive]}><CompanyIcon name={{ ios: option.ios, android: option.android, web: option.web }} size={19} color={benefitIcon === option.key ? c.blue : c.muted} /></Pressable>)}</View>}
+      {!!fieldErrors.benefits && <Text accessibilityRole="alert" style={s.fieldError}>{fieldErrors.benefits}</Text>}
       {!!benefitError && <Text accessibilityRole="alert" style={s.fieldError}>{benefitError}</Text>}
       <ActionButton title="Thêm quyền lợi" onPress={addBenefit} variant="soft" icon={{ ios: 'plus', android: 'add', web: 'add' }} />
     </Card>

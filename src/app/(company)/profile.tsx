@@ -26,6 +26,7 @@ export default function CompanyProfile() {
   const [draft, setDraft] = useState<CompanyProfileInput | null>(null);
   const [saving, setSaving] = useState(false);
   const [companyNameError, setCompanyNameError] = useState('');
+  const [profileFieldErrors, setProfileFieldErrors] = useState<Record<string, string>>({});
   const [editNotice, setEditNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
   const [profileNotice, setProfileNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
   const [reload, setReload] = useState(0);
@@ -49,6 +50,7 @@ export default function CompanyProfile() {
   const edit = (section: 'profile' | 'about') => {
     if (!profile) return;
     setCompanyNameError('');
+    setProfileFieldErrors({});
     setEditNotice(null);
     setEditSection(section);
     setDraft({
@@ -68,13 +70,35 @@ export default function CompanyProfile() {
 
   const saveProfile = async () => {
     if (!draft || !profile || saving) return;
-    if (editSection === 'profile' && (!draft.companyName.trim() || draft.companyName.trim().length > 255)) {
-      const message = draft.companyName.trim() ? 'Tên tổ chức không được dài quá 255 ký tự.' : 'Vui lòng nhập tên tổ chức.';
-      setCompanyNameError(message);
-      setEditNotice({ type: 'error', title: 'Chưa thể lưu thông tin', message });
+    const errors: Record<string, string> = {};
+    if (!draft.companyName.trim()) errors.companyName = 'Vui lòng nhập tên tổ chức.';
+    else if (draft.companyName.trim().length > 255) errors.companyName = 'Tên tổ chức không được dài quá 255 ký tự.';
+    if (editSection === 'profile') {
+      if ((draft.industry?.length ?? 0) > 150) errors.industry = 'Lĩnh vực không được dài quá 150 ký tự.';
+      if ((draft.contactEmail?.length ?? 0) > 255) errors.contactEmail = 'Email liên hệ không được dài quá 255 ký tự.';
+      else if (draft.contactEmail?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail.trim())) errors.contactEmail = 'Email liên hệ không đúng định dạng.';
+      if ((draft.phone?.length ?? 0) > 30) errors.phone = 'Số điện thoại không được dài quá 30 ký tự.';
+      else if (draft.phone?.trim()) {
+        const phone = draft.phone.trim();
+        const digits = phone.replace(/\D/g, '').length;
+        if (!/^\+?[0-9().\-\s]+$/.test(phone) || digits < 7 || digits > 15) errors.phone = 'Số điện thoại chỉ gồm chữ số và ký hiệu + ( ) . -, dài từ 7 đến 15 chữ số.';
+      }
+      if ((draft.address?.length ?? 0) > 2000) errors.address = 'Địa chỉ không được dài quá 2.000 ký tự.';
+    } else {
+      if ((draft.website?.length ?? 0) > 2048) errors.website = 'Website không được dài quá 2.048 ký tự.';
+      else if (draft.website?.trim()) {
+        try {
+          const website = new URL(draft.website.trim());
+          if (!['http:', 'https:'].includes(website.protocol) || !website.hostname) errors.website = 'Website phải là URL http hoặc https hợp lệ.';
+        } catch { errors.website = 'Website phải là URL http hoặc https hợp lệ.'; }
+      }
+    }
+    setCompanyNameError(errors.companyName ?? '');
+    setProfileFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setEditNotice({ type: 'error', title: 'Chưa thể lưu thông tin', message: Object.values(errors).join('\n') });
       return;
     }
-    setCompanyNameError('');
     setEditNotice(null);
     setSaving(true);
     try {
@@ -91,7 +115,9 @@ export default function CompanyProfile() {
 
   const setField = (key: Exclude<keyof CompanyProfileInput, 'partnerType'>, value: string) => {
     setDraft(current => current ? { ...current, [key]: value } : current);
-    if (key === 'companyName') { setCompanyNameError(''); setEditNotice(null); }
+    if (key === 'companyName') setCompanyNameError('');
+    setProfileFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
+    setEditNotice(null);
   };
   const choosePhoto = async (target: 'avatarUrl' | 'coverUrl') => {
     if (choosingPhoto) return;
@@ -173,14 +199,14 @@ export default function CompanyProfile() {
       <View style={s.modalBackdrop}><View style={s.modalCard}><Text style={s.modalTitle}>{editSection === 'profile' ? 'Chỉnh sửa thông tin tổ chức' : 'Chỉnh sửa phần giới thiệu'}</Text>{!!editNotice && <View accessibilityRole="alert" style={[s.saveNotice, editNotice.type === 'success' ? s.saveNoticeSuccess : s.saveNoticeError]}><Text style={s.saveNoticeTitle}>{editNotice.title}</Text><Text style={s.saveNoticeText}>{editNotice.message}</Text></View>}<ScrollView keyboardShouldPersistTaps="handled" style={s.modalScroll}>
         {draft && editSection === 'profile' && <>
           <ProfileEditField label="Tên tổ chức *" value={draft.companyName} onChangeText={value => setField('companyName', value)} error={companyNameError} />
-          <ProfileEditField label="Lĩnh vực" value={draft.industry ?? ''} onChangeText={value => setField('industry', value)} />
-          <ProfileEditField label="Email liên hệ" value={draft.contactEmail ?? ''} onChangeText={value => setField('contactEmail', value)} />
-          <ProfileEditField label="Số điện thoại" value={draft.phone ?? ''} onChangeText={value => setField('phone', value)} />
-          <ProfileEditField label="Địa chỉ" value={draft.address ?? ''} onChangeText={value => setField('address', value)} multiline />
+          <ProfileEditField label="Lĩnh vực" value={draft.industry ?? ''} onChangeText={value => setField('industry', value)} error={profileFieldErrors.industry} />
+          <ProfileEditField label="Email liên hệ" value={draft.contactEmail ?? ''} onChangeText={value => setField('contactEmail', value)} error={profileFieldErrors.contactEmail} />
+          <ProfileEditField label="Số điện thoại" value={draft.phone ?? ''} onChangeText={value => setField('phone', value)} error={profileFieldErrors.phone} />
+          <ProfileEditField label="Địa chỉ" value={draft.address ?? ''} onChangeText={value => setField('address', value)} multiline error={profileFieldErrors.address} />
         </>}
         {draft && editSection === 'about' && <>
           <ProfileEditField label="Giới thiệu" value={draft.description ?? ''} onChangeText={value => setField('description', value)} multiline />
-          <ProfileEditField label="Website (URL)" value={draft.website ?? ''} onChangeText={value => setField('website', value)} />
+          <ProfileEditField label="Website (URL)" value={draft.website ?? ''} onChangeText={value => setField('website', value)} error={profileFieldErrors.website} />
         </>}
       </ScrollView><View style={s.modalActions}><ActionButton title="Hủy" onPress={() => setEditOpen(false)} variant="outline" /><ActionButton title={saving ? 'Đang lưu…' : 'Lưu thay đổi'} onPress={() => void saveProfile()} /></View></View></View>
     </Modal>
