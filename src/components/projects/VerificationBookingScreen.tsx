@@ -129,6 +129,7 @@ export function VerificationBookingScreen() {
           {expired && <Text accessibilityRole="alert" style={s.error}>Đã hết thời gian giữ lịch. Chọn lại khung giờ khi hệ thống cho phép.</Text>}
           {!choosing && <Text style={s.small}>Hồ sơ hiện không cho phép chọn hoặc đổi lịch. Nếu giao dịch đang chờ, cần kiểm tra thanh toán trước khi đặt lại.</Text>}
           <Button title="Làm mới hồ sơ" variant="outline" onPress={reload} disabled={busy} />
+          <Button title="Xem hồ sơ cấp 2" variant="outline" disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />
         </View>
         {choosing && <>
           <Text style={s.heading}>{held ? 'Đổi khung giờ' : 'Chọn ngày và khung giờ'}</Text><Text style={s.small}>Múi giờ: {slots?.timeZoneId || 'Đang tải từ hệ thống'}. Chỉ hiển thị lịch còn chỗ do hệ thống cung cấp.</Text>

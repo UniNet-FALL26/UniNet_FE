@@ -18,8 +18,8 @@ export const verificationPaymentService = {
   async get(verificationId: string, transactionId: string, signal?: AbortSignal) {
     return validate(await apiRequest<VerificationTransaction>(`${base(verificationId)}/${encodeURIComponent(transactionId)}`, { signal }), verificationId);
   },
-  async history(verificationId: string, signal?: AbortSignal) {
-    const result = await apiRequest<VerificationTransactions>(`${base(verificationId)}?page=1&pageSize=10`, { signal });
+  async history(verificationId: string, signal?: AbortSignal, page = 1) {
+    const result = await apiRequest<VerificationTransactions>(`${base(verificationId)}?page=${page}&pageSize=10`, { signal });
     if (!result || !Array.isArray(result.transactions) || !Number.isInteger(result.totalPages)) throw new Error('Chưa tải được giao dịch thanh toán.');
     result.transactions.forEach(t => validate(t, verificationId));
     return result;
