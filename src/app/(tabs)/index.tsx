@@ -13,6 +13,7 @@ import { SymbolView } from "expo-symbols";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Linking,
@@ -57,11 +58,17 @@ export default function CommunityScreen() {
     null,
   );
 
+  // State xác nhận xóa bài viết
+  const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(
+    null,
+  );
+  const [deletingPost, setDeletingPost] = useState(false);
+
   const trackedImpressions = useRef<Set<string>>(new Set());
   const abortController = useRef<AbortController | null>(null);
   const cachedAds = useRef<AdCampaignFeedItem[]>([]);
 
-  // Trộn bài đăng và quảng cáo với key độc nhất cho cả Post và Ad
+  // Trộn bài đăng và quảng cáo
   const mergePostsAndAds = (
     posts: PostResponse[],
     ads: AdCampaignFeedItem[],
@@ -175,17 +182,30 @@ export default function CommunityScreen() {
     ]);
   };
 
-  // Xóa bài viết
-  const handleDeletePost = async (postId: string) => {
-    setOptionsPost(null);
-    setFeedItems((prev) =>
-      prev.filter((item) => !(item.type === "post" && item.data.id === postId)),
-    );
+  // Xử lý khi người dùng bấm xác nhận Xóa trên Popup
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmPostId) return;
 
+    setDeletingPost(true);
     try {
-      await communityService.deletePost(postId);
-    } catch {
-      fetchFeed(1);
+      // 1. Gọi API xóa bài viết từ Backend
+      await communityService.deletePost(deleteConfirmPostId);
+
+      // 2. Xóa bài viết khỏi giao diện UI sau khi API thành công
+      setFeedItems((prev) =>
+        prev.filter(
+          (item) =>
+            !(item.type === "post" && item.data.id === deleteConfirmPostId),
+        ),
+      );
+
+      // 3. Đóng Popup xác nhận
+      setDeleteConfirmPostId(null);
+    } catch (cause) {
+      console.error("Lỗi xóa bài viết:", cause);
+      Alert.alert("Lỗi", "Không thể xóa bài viết. Vui lòng thử lại.");
+    } finally {
+      setDeletingPost(false);
     }
   };
 
@@ -319,6 +339,10 @@ export default function CommunityScreen() {
 
   const renderPostCard = (post: PostResponse) => {
     const isMenuOpen = optionsPost?.id === post.id;
+    // Kiểm tra an toàn xem user hiện tại có phải chủ bài đăng không
+    const isPostOwner =
+      account?.id === post.authorUserId ||
+      (account as any)?.profile?.id === post.authorUserId;
 
     return (
       <View style={[styles.card, isMenuOpen && styles.activeCard]}>
@@ -361,12 +385,15 @@ export default function CommunityScreen() {
               />
             </Pressable>
 
-            {/* Dropdown Menu thả xuống tại chỗ */}
             {isMenuOpen && (
               <View style={styles.dropdownMenu}>
-                {account?.id === post.authorUserId && (
+                {/* 1. Nếu là chủ bài viết: Hiện nút Xóa mở Popup xác nhận */}
+                {isPostOwner && (
                   <Pressable
-                    onPress={() => handleDeletePost(post.id)}
+                    onPress={() => {
+                      setDeleteConfirmPostId(post.id); // Lưu ID để mở Modal xác nhận
+                      setOptionsPost(null); // Đóng Dropdown 3 chấm
+                    }}
                     style={({ pressed }) => [
                       styles.dropdownItem,
                       pressed && styles.pressed,
@@ -381,29 +408,32 @@ export default function CommunityScreen() {
                   </Pressable>
                 )}
 
-                <Pressable
-                  onPress={() => {
-                    setReportPostId(post.id);
-                    setReportReason("");
-                    setReportError("");
-                    setOptionsPost(null);
-                  }}
-                  style={({ pressed }) => [
-                    styles.dropdownItem,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <SymbolView
-                    name={{
-                      ios: "exclamationmark.triangle",
-                      android: "report",
-                      web: "report",
+                {/* 2. Nếu không phải chủ bài viết: Hiện nút Báo cáo */}
+                {!isPostOwner && (
+                  <Pressable
+                    onPress={() => {
+                      setReportPostId(post.id);
+                      setReportReason("");
+                      setReportError("");
+                      setOptionsPost(null);
                     }}
-                    size={16}
-                    tintColor={colors.textPrimary}
-                  />
-                  <Text style={styles.optionText}>Báo cáo bài viết</Text>
-                </Pressable>
+                    style={({ pressed }) => [
+                      styles.dropdownItem,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <SymbolView
+                      name={{
+                        ios: "exclamationmark.triangle",
+                        android: "report",
+                        web: "report",
+                      }}
+                      size={16}
+                      tintColor={colors.textPrimary}
+                    />
+                    <Text style={styles.optionText}>Báo cáo bài viết</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>
@@ -529,14 +559,6 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Overlay trong suốt đóng dropdown khi nhấp ra ngoài */}
-      {!!optionsPost && (
-        <Pressable
-          style={styles.backdropOverlay}
-          onPress={() => setOptionsPost(null)}
-        />
-      )}
-
       {loading ? (
         <View style={styles.stateContainer}>
           <ActivityIndicator
@@ -663,6 +685,43 @@ export default function CommunityScreen() {
         </View>
       </Modal>
 
+      {/* Modal Popup xác nhận xóa bài viết */}
+      <Modal
+        visible={!!deleteConfirmPostId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmPostId(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Xác nhận xóa</Text>
+            <Text style={styles.modalSubtitle}>
+              Bạn có chắc chắn muốn xóa bài viết này không? Hành động này không
+              thể hoàn tác.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setDeleteConfirmPostId(null)}
+                style={({ pressed }) => [
+                  styles.cancelBtn,
+                  pressed && styles.pressed,
+                ]}
+                disabled={deletingPost}
+              >
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+
+              <Button
+                title={deletingPost ? "Đang xóa..." : "Xóa"}
+                onPress={handleConfirmDelete}
+                disabled={deletingPost}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal Bình luận */}
       <PostCommentsModal
         visible={!!activeCommentPostId}
@@ -696,11 +755,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  backdropOverlay: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 50,
-    backgroundColor: "transparent",
   },
   pressed: {
     opacity: 0.65,
