@@ -11,6 +11,13 @@ import { level1Labels, level1Message, level2Label } from '@/utils/project-verifi
 
 const limitation = 'Chỉ kiểm tra văn bản báo cáo và độ an toàn URL. Chưa đọc nội dung file hoặc xác nhận công việc đã hoàn thành.';
 const date = (value?: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('vi-VN') : 'Chưa có';
+const projectDate = (value?: string | null) => value && Number.isFinite(Date.parse(value))
+  ? new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(value))
+  : 'Chưa cập nhật.';
 const checkLabels = ['Đạt', 'Không đạt', 'Lỗi dịch vụ', 'Chưa kiểm tra'];
 const kindLabel = (kind: string) => /url/i.test(kind) ? 'Độ an toàn URL' : /text|content/i.test(kind) ? 'Văn bản báo cáo' : 'Kiểm tra minh chứng';
 
@@ -126,7 +133,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
 
       {!level1Only && <View accessibilityRole="tablist" style={s.tabs}>{['Tổng quan', 'Minh chứng', 'Xác minh'].map(name => <Pressable key={name} accessibilityRole="tab" accessibilityState={{ selected: tab === name }} onPress={() => setTab(name)} style={[s.tab, tab === name && s.selectedTab]}><Text style={[s.tabText, tab === name && s.selectedText]}>{name}</Text></Pressable>)}</View>}
       {!level1Only && tab === 'Tổng quan' && <>
-        <Card title="Về dự án"><Text style={s.body} numberOfLines={expanded ? undefined : 5}>{project.description || 'Chưa có mô tả.'}</Text><Button title={expanded ? 'Thu gọn mô tả' : 'Đọc đầy đủ mô tả'} variant="outline" onPress={() => setExpanded(v => !v)} /><Text style={s.label}>Kết quả dự kiến</Text><Text style={s.body}>{project.expectedOutput || 'Chưa cập nhật.'}</Text><Text style={s.small}>Ngày tạo: {date(project.createdAt)}{ '\n' }Cập nhật: {date(project.updatedAt)}</Text></Card>
+        <Card title="Về dự án"><Text style={s.body} numberOfLines={expanded ? undefined : 5}>{project.description || 'Chưa có mô tả.'}</Text><Button title={expanded ? 'Thu gọn mô tả' : 'Đọc đầy đủ mô tả'} variant="outline" onPress={() => setExpanded(v => !v)} /><Text style={s.label}>Kết quả dự kiến</Text><Text style={s.body}>{projectDate(project.expectedOutput)}</Text><Text style={s.small}>Ngày tạo: {projectDate(project.createdAt)}{ '\n' }Cập nhật: {projectDate(project.updatedAt)}</Text></Card>
         <Card title={`Đội ngũ · ${members.length}`} >{members.map(member => <View key={member.userId} style={s.member}><View style={s.avatar}><Text style={s.avatarText}>{member.fullName.trim().split(/\s+/).slice(-2).map(word => word[0]).join('')}</Text></View><View style={s.stepBody}><Text style={s.label}>{member.fullName}</Text><Text style={s.small}>{member.role}</Text></View></View>)}</Card>
         <Card title="Kỹ năng"><View style={s.skillList}>{project.skills.length ? project.skills.map(skill => <Text key={skill.skillId} style={s.skillChip}>{skill.skillName}</Text>) : <Text style={s.body}>Chưa có kỹ năng.</Text>}</View></Card>
       </>}
