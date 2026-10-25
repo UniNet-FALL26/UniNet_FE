@@ -120,30 +120,34 @@ export function PostDetailModal({
     const fetchDetailData = async () => {
       setLoading(true);
       setError("");
+
+      // 1. Hiển thị bài viết ngay lập tức nếu đã có dữ liệu truyền vào (từ Feed)
+      if (initialPost && initialPost.id === postId) {
+        setPost(initialPost);
+      }
+
       try {
-        if (initialPost && initialPost.id === postId) {
-          setPost(initialPost);
-        } else {
-          const postData = await communityService.getPosts(
-            { page: 1, pageSize: 100 },
+        if (!postId.startsWith("temp-")) {
+          const commentsData = await communityService.getComments(
+            postId,
             controller.signal,
           );
-          const posts = (postData as any)?.data ?? postData;
-          setPost(
-            Array.isArray(posts)
-              ? (posts.find((item) => item.id === postId) ?? null)
-              : posts,
-          );
+          setComments(Array.isArray(commentsData) ? commentsData : []);
+        } else {
+          setComments([]);
         }
+      } catch (cause: any) {
+        // KIỂM TRA NGẶT NGHÈO LỖI ABORT
+        const isAbortError =
+          cause?.name === "AbortError" ||
+          cause?.message?.includes("aborted") ||
+          controller.signal.aborted;
 
-        const commentsData = await communityService.getComments(
-          postId,
-          controller.signal,
-        );
-        setComments(Array.isArray(commentsData) ? commentsData : []);
-      } catch (cause) {
-        if (!controller.signal.aborted) {
-          setError("Không thể tải dữ liệu bài viết.");
+        if (!isAbortError) {
+          // CHỈ gọi hàm hiển thị thông báo (toast/console) nếu KHÔNG PHẢI lỗi hủy API
+          console.error("Lỗi lấy bình luận:", cause);
+          // showToastError("Lỗi lấy bình luận..."); // Giữ nguyên hàm show thông báo của bạn ở đây
+          setComments([]);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -282,15 +286,22 @@ export function PostDetailModal({
 
   const handleConfirmDeletePost = async () => {
     if (!post) return;
+
+    // 1. ĐÓNG POPUP XÁC NHẬN NGAY LẬP TỨC
+    // (Hãy thay setIsDeleteConfirmVisible bằng đúng tên state quản lý popup của bạn)
+    setDeleteConfirmPost(false);
+
     try {
-      await communityService.deletePost(post.id);
+      if (!post.id.startsWith("temp-")) {
+        await communityService.deletePost(post.id);
+      }
+
       onPostDeleted?.(post.id);
-      handleDismiss();
+      handleDismiss(); // Đóng PostDetailModal
     } catch {
       Alert.alert("Lỗi", "Không thể xóa bài viết.");
     }
   };
-
   const handleEditComment = (comment: CommentResponse) => {
     setEditingComment({ id: comment.id, content: comment.content });
     setInputText(comment.content);

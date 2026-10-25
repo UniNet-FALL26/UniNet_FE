@@ -1,8 +1,5 @@
 import { colors } from "@/constants/colors";
-import {
-  communityService,
-  type PostResponse,
-} from "@/services/community.service";
+import { communityService } from "@/services/community.service";
 import { portfolioService } from "@/services/portfolio.service";
 import { useAuthStore } from "@/store/auth.store";
 import { pickProfileImage } from "@/utils/profile-image-picker";
@@ -23,11 +20,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-export function CommunityComposer({
-  onCreated,
-}: {
-  onCreated: (post: PostResponse) => void;
-}) {
+export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
   const { account } = useAuthStore();
   const { width } = useWindowDimensions();
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -58,8 +51,11 @@ export function CommunityComposer({
       portfolioService
         .getMine(request.signal)
         .then((data) => {
-          if (!request.signal.aborted && data.isOwner)
-            setAvatar(data.profile.avatarUrl || null);
+          if (!request.signal.aborted && data.isOwner) {
+            const url = data.profile.avatarUrl;
+            // Bỏ qua nếu URL bị backend trả về chữ "string" mặc định của Swagger
+            setAvatar(url && url !== "string" ? url : null);
+          }
         })
         .catch(() => {});
     return () => {
@@ -129,12 +125,13 @@ export function CommunityComposer({
         }
       });
 
-      const post = await communityService.createPost(
-        formData,
-        controller.current.signal,
-      );
+      // 1. Chỉ cần đợi API gọi thành công
+      await communityService.createPost(formData, controller.current.signal);
 
-      onCreated(post);
+      // 2. Kích hoạt hàm báo hiệu ra bên ngoài để tải lại Feed
+      onCreated();
+
+      // 3. Reset form và đóng modal
       setDescription("");
       setSelectedFiles([]);
       setOpen(false);
@@ -148,7 +145,6 @@ export function CommunityComposer({
       setBusy(false);
     }
   }
-
   const actions = [
     {
       label: "Ảnh/Video",
