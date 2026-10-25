@@ -2,7 +2,6 @@ import { API_URL } from "@/constants/config";
 import { localizeProjectError } from "@/services/project-errors";
 import type { LoginResponse } from "@/types/auth";
 import { tokenStorage, type AuthSession } from "@/utils/storage";
-
 export class ApiError extends Error {
   constructor(
     message: string,
