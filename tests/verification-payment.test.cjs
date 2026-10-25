@@ -35,6 +35,15 @@ test('success comes only from backend payment state and confirmed booking', () =
   assert.equal(rules.paymentPresentation(d, transaction({ status: 1 }), now).title, 'Thanh toán thành công');
   assert.match(rules.paymentPresentation(d, transaction({ status: 1, requiresReview: true }), now).title, /đối soát/);
 });
+
+test('QR uses the backend payload only while checkout remains payable', () => {
+  const tx = transaction({ qrCode: '000201-bank-payment-payload' });
+  assert.equal(rules.paymentQrPayload(tx, detail(), now), tx.qrCode);
+  for (const overrides of [{ qrCode: null }, { qrCode: '' }, { qrCode: '  ' }, { qrCode: 'x'.repeat(4097) }, { status: 1 }, { status: 2 }, { requiresReview: true }, { reconciliationRequired: true }]) {
+    assert.equal(rules.paymentQrPayload({ ...tx, ...overrides }, detail(), now), null);
+  }
+  assert.equal(rules.paymentQrPayload(tx, detail(), Date.parse(until)), null);
+});
 test('failed and expired pending payments cannot lead to reusing an old checkout', () => {
   assert.match(rules.paymentPresentation(detail(), transaction({ status: 2 }), now).title, /chưa thành công/);
   assert.match(rules.paymentPresentation(detail(), transaction(), Date.parse(until)).title, /Đang chờ/);
@@ -86,6 +95,7 @@ function renderCheckout(snapshot) {
     'expo-router': { router: {}, useFocusEffect() {}, useLocalSearchParams: () => ({ id: 'v', projectId: 'project', status: 'PAID', cancel: 'false' }) },
     'expo-web-browser': { openBrowserAsync() {} },
     '@/components/ui/Button': { Button: props => React.createElement('button', { disabled: props.disabled }, props.title) },
+    '@/components/projects/PaymentQrCode': { PaymentQrCode: props => React.createElement('div', { 'data-qr': props.value }, 'QR thanh toán') },
     '@/constants/colors': { colors: {} },
     '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'account' } }) },
     '@/services/api': { ApiError: class extends Error {} },
@@ -100,11 +110,15 @@ function renderCheckout(snapshot) {
 test('checkout screen renders ready, pending, successful and expired states without trusting redirect PAID', () => {
   const d = detail(); d.verification.reservedUntil = '2099-10-21T02:00:00Z'; d.verification.scheduledStartAt = '2099-10-22T02:00:00Z';
   let html = renderCheckout({ detail: d, transaction: null, packageData: { name: 'Gói sinh viên', price: 120000 } });
-  assert.match(html, /Tạo checkout thanh toán/); assert.doesNotMatch(html, />Thanh toán thành công</);
+  assert.match(html, /Tạo mã QR thanh toán/); assert.doesNotMatch(html, />Thanh toán thành công</);
   html = renderCheckout({ detail: d, transaction: transaction({ expiredAt: d.verification.reservedUntil }), packageData: null });
   assert.match(html, /Mở PayOS để thanh toán/); assert.match(html, /Đang chờ xác nhận/); assert.doesNotMatch(html, />Thanh toán thành công</);
+  assert.match(html, /chưa có dữ liệu QR/);
+  html = renderCheckout({ detail: d, transaction: transaction({ expiredAt: d.verification.reservedUntil, qrCode: 'bank-qr-payload' }), packageData: null });
+  assert.match(html, /data-qr="bank-qr-payload"/);
   d.verification.bookingStatus = 2;
-  html = renderCheckout({ detail: d, transaction: transaction({ status: 1 }), packageData: null });
+  html = renderCheckout({ detail: d, transaction: transaction({ status: 1, qrCode: 'bank-qr-payload' }), packageData: null });
+  assert.doesNotMatch(html, /data-qr/);
   assert.match(html, /Thanh toán thành công/); assert.ok(!html.includes('Mở PayOS để thanh toán'));
   d.verification.bookingStatus = 3;
   html = renderCheckout({ detail: d, transaction: transaction({ status: 2 }), packageData: null });
@@ -123,7 +137,7 @@ test('checkout polling only reads, pauses in background, stops after three failu
     'react-native': { Platform: { OS: 'android' }, AppState: appState, Linking: { addEventListener: () => ({ remove() { removed++; } }) }, StyleSheet: { create: v => v } },
     'react-native-safe-area-context': {},
     'expo-router': { router: {}, useFocusEffect: cb => { focus = cb; }, useLocalSearchParams: () => ({ id: 'v' }) },
-    'expo-web-browser': {}, '@/components/ui/Button': {}, '@/constants/colors': { colors: {} },
+    'expo-web-browser': {}, '@/components/ui/Button': {}, '@/components/projects/PaymentQrCode': {}, '@/constants/colors': { colors: {} },
     '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'a' } }) }, '@/services/api': { ApiError: class extends Error {} },
     '@/services/verification-checkout': { loadVerificationCheckout: async (_, s) => { reads++; signal = s; if (failed) throw Error('Offline'); return { detail: detail(), transaction: transaction(), packageData: null }; } },
     '@/services/verification-payment.service': { verificationPaymentService: { create: () => { posts++; } } },

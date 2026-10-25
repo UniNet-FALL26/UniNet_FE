@@ -37,6 +37,7 @@ export type VerificationFinalResult = {
   status: number; finalizedAt: string | null; finalizedByUserId: string | null; reports: VerificationReport[];
 };
 export type VerificationTransaction = {
+  qrCode?: string | null;
   id: string; verificationId: string; packageId: string; amountVnd: number; currency: string;
   status: number; checkoutUrl: string | null; paidAt: string | null; expiredAt: string | null;
   createdAt: string; updatedAt: string; reconciliationRequired: boolean; requiresReview: boolean;

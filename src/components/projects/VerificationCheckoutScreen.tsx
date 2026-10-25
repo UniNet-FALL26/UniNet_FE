@@ -4,12 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Button } from '@/components/ui/Button';
+import { PaymentQrCode } from '@/components/projects/PaymentQrCode';
 import { colors } from '@/constants/colors';
 import { useAuthStore } from '@/store/auth.store';
 import { ApiError } from '@/services/api';
 import { loadVerificationCheckout } from '@/services/verification-checkout';
 import { verificationPaymentService as payments } from '@/services/verification-payment.service';
-import { canCreateCheckout, checkoutLink, paymentPresentation } from '@/utils/verification-payment';
+import { canCreateCheckout, checkoutLink, paymentPresentation, paymentQrPayload } from '@/utils/verification-payment';
 import { holdSeconds } from '@/utils/verification-booking';
 
 type Snapshot = Awaited<ReturnType<typeof loadVerificationCheckout>>;
@@ -108,7 +109,7 @@ export function VerificationCheckoutScreen() {
       setSnapshot(latest);
       if (canCreateCheckout(latest.detail, latest.transaction, Date.now())) {
         const transaction = await payments.create(id);
-        if (isCurrent()) { setSnapshot({ ...latest, transaction }); setNotice('Checkout đã sẵn sàng. Kiểm tra số tiền và chọn Mở PayOS để thanh toán.'); }
+        if (isCurrent()) { setSnapshot({ ...latest, transaction }); setNotice('Giao dịch đã sẵn sàng. Quét mã QR bên dưới hoặc mở PayOS để thanh toán.'); }
       }
     } catch (cause) {
       if (isCurrent()) setNotice(`${errorText(cause)} Đang kiểm tra lại hồ sơ; không gửi lại thanh toán tự động.`);
@@ -134,6 +135,7 @@ export function VerificationCheckoutScreen() {
   const remaining = detail ? holdSeconds(detail, now) : 0;
   const presentation = detail ? paymentPresentation(detail, transaction, now) : null;
   const link = detail ? checkoutLink(transaction, detail, now) : null;
+  const qrPayload = detail && !error ? paymentQrPayload(transaction, detail, now) : null;
   const canCreate = !!snapshot && canCreateCheckout(snapshot.detail, transaction, now);
   const amount = transaction?.amountVnd ?? snapshot?.packageData?.price;
   const backToBooking = () => projectId ? router.dismissTo({ pathname: '/group/verification/[id]', params: { id: projectId } } as never) : router.back();
@@ -155,13 +157,16 @@ export function VerificationCheckoutScreen() {
           {transaction?.expiredAt && <Text style={s.small}>Hạn checkout: {date(transaction.expiredAt)} (giờ thiết bị)</Text>}
           {transaction && <Text selectable style={s.small}>Mã giao dịch: {transaction.id}</Text>}
         </View>
-        <View style={s.card}><Text style={s.heading}>Thanh toán qua PayOS</Text><Text style={s.body}>Ứng dụng mở trang thanh toán do hệ thống cung cấp. Sau khi quay lại, kiểm tra trạng thái để nhận kết quả mới nhất.</Text><Text style={s.small}>Thanh toán thành công chưa phải kết quả đạt xác minh cấp 2.</Text></View>
+        <View style={s.card}><Text style={s.heading}>Thanh toán qua PayOS</Text>
+          {qrPayload ? <><Text style={s.body}>Mở ứng dụng ngân hàng và quét mã QR để thanh toán đúng số tiền của giao dịch này.</Text><PaymentQrCode value={qrPayload} /><Text style={s.small}>Trạng thái thanh toán sẽ tự cập nhật sau khi hệ thống ghi nhận giao dịch. Bạn cũng có thể mở PayOS bằng nút bên dưới.</Text></>
+            : <Text style={s.body}>{!transaction && canCreate ? 'Chọn “Tạo mã QR thanh toán” bên dưới để tạo giao dịch và hiển thị mã QR.' : link ? 'Giao dịch này chưa có dữ liệu QR. Chọn “Mở PayOS để thanh toán” bên dưới để xem mã QR trên PayOS.' : 'Mã QR chỉ hiển thị khi giao dịch đang chờ thanh toán và lịch giữ còn hiệu lực. Kiểm tra trạng thái để nhận kết quả mới nhất.'}</Text>}
+          <Text style={s.small}>Thanh toán thành công chưa phải kết quả đạt xác minh cấp 2.</Text></View>
       </>}
       <Button title="Kiểm tra trạng thái" variant="outline" onPress={refresh} disabled={busy || loading} />
       {detail && <Button title="Xem hồ sơ và kết quả cấp 2" variant="outline" disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />}
       <Button title="Quay lại lịch và hồ sơ" variant="outline" onPress={backToBooking} disabled={busy} />
     </ScrollView>
-    {(link || canCreate) && <View style={s.footer}><Button title={link ? 'Mở PayOS để thanh toán' : transaction?.status === 2 ? 'Tạo checkout để thử lại' : 'Tạo checkout thanh toán'} onPress={link ? openPayment : createCheckout} loading={busy} disabled={loading || !!error || amount == null} /></View>}
+    {(link || canCreate) && <View style={s.footer}><Button title={link ? 'Mở PayOS để thanh toán' : transaction?.status === 2 ? 'Tạo mã QR để thử lại' : 'Tạo mã QR thanh toán'} onPress={link ? openPayment : createCheckout} loading={busy} disabled={loading || !!error || amount == null} /></View>}
   </SafeAreaView>;
 }
 
