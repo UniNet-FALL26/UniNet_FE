@@ -1,25 +1,26 @@
+// src/app/company/ads/index.tsx
 import { Button } from "@/components/ui/Button";
 import { colors } from "@/constants/colors";
 import {
-    AdCampaign,
-    AdPackage,
-    advertisementService,
+  AdCampaign,
+  AdPackage,
+  advertisementService,
 } from "@/services/advertisement.service";
 import * as Linking from "expo-linking";
 import { useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -33,7 +34,7 @@ export default function CompanyAdvertisementScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // State Modal Đăng ký gói
+  // State Modal Đăng ký gói quảng cáo
   const [selectedPackage, setSelectedPackage] = useState<AdPackage | null>(
     null,
   );
@@ -53,11 +54,17 @@ export default function CompanyAdvertisementScreen() {
 
       try {
         if (activeTab === "packages") {
-          const res = await advertisementService.getPackages();
-          setPackages(Array.isArray(res) ? res : ((res as any)?.data ?? []));
+          const res = await advertisementService.getPackages({
+            page: 1,
+            pageSize: 20,
+          });
+          setPackages(res?.packages || (Array.isArray(res) ? res : []));
         } else {
           const res = await advertisementService.getMyCampaigns();
-          setCampaigns(Array.isArray(res) ? res : ((res as any)?.data ?? []));
+          // Bóc tách mảng campaigns từ object phân trang trả về
+          const campaignList =
+            (res as any)?.campaigns || (Array.isArray(res) ? res : []);
+          setCampaigns(campaignList);
         }
       } catch (cause) {
         console.error("Lỗi tải dữ liệu quảng cáo:", cause);
@@ -84,7 +91,6 @@ export default function CompanyAdvertisementScreen() {
 
     setSubmitting(true);
     try {
-      // Thiết lập URL callback cho PayOS tự động redirect sau khi thanh toán xong/hủy
       const returnUrl = Linking.createURL("company/ads/payment-success");
       const cancelUrl = Linking.createURL("company/ads/payment-cancel");
 
@@ -104,7 +110,6 @@ export default function CompanyAdvertisementScreen() {
       if (checkoutUrl) {
         setSelectedPackage(null);
         setForm({ title: "", content: "", mediaUrl: "", destinationUrl: "" });
-        // Mở cổng thanh toán PayOS
         await Linking.openURL(checkoutUrl);
       } else {
         Alert.alert("Lỗi", "Không nhận được đường dẫn thanh toán từ hệ thống.");
@@ -119,74 +124,89 @@ export default function CompanyAdvertisementScreen() {
 
   const renderPackageCard = ({ item }: { item: AdPackage }) => (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{item.name}</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.cardTitle}>{item.name}</Text>
+        <View style={styles.badgeCode}>
+          <Text style={styles.badgeCodeText}>{item.code}</Text>
+        </View>
+      </View>
       <Text style={styles.price}>
-        {item.price.toLocaleString("vi-VN")} VNĐ{" "}
-        <Text style={styles.duration}>/ {item.durationDays} ngày</Text>
+        {item.price?.toLocaleString("vi-VN")} VNĐ{" "}
+        <Text style={styles.duration}>/ {item.durationInDays} ngày</Text>
       </Text>
-      <Text style={styles.description}>{item.description}</Text>
+      <Text style={styles.description}>
+        {item.description ||
+          "Gói quảng cáo chính thức giúp doanh nghiệp tiếp cận hàng ngàn sinh viên trên hệ thống UniNet."}
+      </Text>
       <Button title="Đăng ký gói" onPress={() => setSelectedPackage(item)} />
     </View>
   );
 
-  const renderCampaignCard = ({ item }: { item: AdCampaign }) => (
-    <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <View
-          style={[
-            styles.statusBadge,
-            item.status === "Active" ? styles.bgSuccess : styles.bgPending,
-          ]}
-        >
-          <Text
+  const renderCampaignCard = ({ item }: { item: AdCampaign }) => {
+    // Quy ước trạng thái: 3 là Active (hoặc kiểm tra linh hoạt)
+    const isActive = item.status === 3 || item.status === ("Active" as any);
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.headerRow}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <View
             style={[
-              styles.statusText,
-              item.status === "Active"
-                ? styles.textSuccess
-                : styles.textPending,
+              styles.statusBadge,
+              isActive ? styles.bgSuccess : styles.bgPending,
             ]}
           >
-            {item.status}
-          </Text>
+            <Text
+              style={[
+                styles.statusText,
+                isActive ? styles.textSuccess : styles.textPending,
+              ]}
+            >
+              {isActive ? "Active" : `Status: ${item.status}`}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.date}>
+          Hiệu lực:{" "}
+          {item.startedAt
+            ? new Date(item.startedAt).toLocaleDateString("vi-VN")
+            : "---"}{" "}
+          -{" "}
+          {item.expiredAt
+            ? new Date(item.expiredAt).toLocaleDateString("vi-VN")
+            : "---"}
+        </Text>
+
+        {/* Khung Tracking Thông số khớp với impressionCount và clickCount */}
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <SymbolView
+              name={{ ios: "eye", android: "visibility", web: "visibility" }}
+              size={18}
+              tintColor={colors.primary}
+            />
+            <Text style={styles.statValue}>{item.impressionCount ?? 0}</Text>
+            <Text style={styles.statLabel}>Lượt hiển thị</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <SymbolView
+              name={{ ios: "hand.tap", android: "touch_app", web: "touch_app" }}
+              size={18}
+              tintColor={colors.primary}
+            />
+            <Text style={styles.statValue}>{item.clickCount ?? 0}</Text>
+            <Text style={styles.statLabel}>Lượt click</Text>
+          </View>
         </View>
       </View>
-
-      <Text style={styles.date}>
-        Hiệu lực: {new Date(item.startDate).toLocaleDateString("vi-VN")} -{" "}
-        {new Date(item.endDate).toLocaleDateString("vi-VN")}
-      </Text>
-
-      {/* Khung Tracking Thông số */}
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <SymbolView
-            name={{ ios: "eye", android: "visibility", web: "visibility" }}
-            size={18}
-            tintColor={colors.primary}
-          />
-          <Text style={styles.statValue}>{item.impressions ?? 0}</Text>
-          <Text style={styles.statLabel}>Lượt hiển thị</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statBox}>
-          <SymbolView
-            name={{ ios: "hand.tap", android: "touch_app", web: "touch_app" }}
-            size={18}
-            tintColor={colors.primary}
-          />
-          <Text style={styles.statValue}>{item.clicks ?? 0}</Text>
-          <Text style={styles.statLabel}>Lượt click</Text>
-        </View>
-      </View>
-    </View>
-  );
-
+    );
+  };
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Bộ chuyển đổi Tab */}
       <View style={styles.tabsContainer}>
         <Pressable
           style={[styles.tab, activeTab === "packages" && styles.activeTab]}
@@ -227,7 +247,7 @@ export default function CompanyAdvertisementScreen() {
               ? (packages as any[])
               : (campaigns as any[])
           }
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item.id || index.toString()}
           renderItem={({ item }) =>
             activeTab === "packages"
               ? renderPackageCard({ item: item as AdPackage })
@@ -249,7 +269,7 @@ export default function CompanyAdvertisementScreen() {
         />
       )}
 
-      {/* Modal Nhập thông tin chiến dịch để thanh toán */}
+      {/* Modal Đăng ký gói */}
       <Modal
         visible={!!selectedPackage}
         transparent
@@ -260,8 +280,8 @@ export default function CompanyAdvertisementScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Thiết lập nội dung quảng cáo</Text>
             <Text style={styles.modalSubtitle}>
-              Gói: {selectedPackage?.name} (
-              {selectedPackage?.price.toLocaleString("vi-VN")} VNĐ)
+              Gói: {selectedPackage?.name} ({selectedPackage?.durationInDays}{" "}
+              ngày) - {selectedPackage?.price?.toLocaleString("vi-VN")} VNĐ
             </Text>
 
             <TextInput
@@ -358,6 +378,13 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     flex: 1,
   },
+  badgeCode: {
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  badgeCodeText: { color: colors.primary, fontSize: 11, fontWeight: "700" },
   price: { fontSize: 16, color: colors.primary, fontWeight: "700" },
   duration: { fontSize: 13, color: colors.textSecondary, fontWeight: "400" },
   description: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
@@ -388,7 +415,6 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: colors.textSecondary },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
 
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

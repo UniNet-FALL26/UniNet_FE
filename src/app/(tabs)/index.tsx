@@ -1,13 +1,19 @@
 import { AdPostCard, type AdResponse } from "@/components/community/AdPostCard";
 import { CommunityComposer } from "@/components/community/CommunityComposer";
 import { PostDetailModal } from "@/components/community/CommunityPostDetailModal";
+import { UpdatePostModal } from "@/components/community/UpdatePostModal";
 import { colors } from "@/constants/colors";
 import {
   communityService,
   type PostResponse,
 } from "@/services/community.service";
 import { useAuthStore } from "@/store/auth.store";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+  usePathname,
+} from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -16,6 +22,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -27,7 +34,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function CommunityScreen() {
   const { isAuthenticated, account } = useAuthStore();
   const params = useLocalSearchParams<{ postId?: string }>();
-
+  const pathname = usePathname();
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(
+    params.postId || null,
+  );
   const [posts, setPosts] = useState<PostResponse[]>([]);
   const [adPost, setAdPost] = useState<AdResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +49,7 @@ export default function CommunityScreen() {
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(
     null,
   );
+  const [editingPost, setEditingPost] = useState<PostResponse | null>(null);
 
   const fetchAdPost = async () => {
     try {
@@ -103,17 +114,37 @@ export default function CommunityScreen() {
   );
 
   const openPostDetail = (post: PostResponse) => {
-    router.setParams({ postId: post.id });
+    // 1. Mở modal bằng state
+    setSelectedPostId(post.id);
+
+    // 2. Gắn ?postId vào URL trong im lặng (để nếu user copy link share vẫn có)
+    if (Platform.OS === "web") {
+      window.history.replaceState(null, "", `${pathname}?postId=${post.id}`);
+    } else {
+      router.setParams({ postId: post.id });
+    }
   };
 
   const closePostDetail = () => {
-    router.setParams({ postId: "" });
-  };
+    // 1. Đóng modal bằng state
+    setSelectedPostId(null);
 
+    // 2. Xóa sạch query param khỏi URL trong im lặng (KHÔNG GÂY RE-RENDER)
+    if (Platform.OS === "web") {
+      window.history.replaceState(null, "", pathname);
+    } else {
+      router.setParams({ postId: undefined });
+    }
+  };
   const handleConfirmDeletePost = async () => {
     if (!deleteConfirmPostId) return;
     try {
-      await communityService.deletePost(deleteConfirmPostId);
+      // 1. Chỉ gọi API xóa trên Server nếu KHÔNG PHẢI là ID tạm
+      if (!deleteConfirmPostId.startsWith("temp-")) {
+        await communityService.deletePost(deleteConfirmPostId);
+      }
+
+      // 2. Xóa bài viết khỏi màn hình (UI) ngay lập tức
       setPosts((prev) => prev.filter((p) => p.id !== deleteConfirmPostId));
       if (adPost?.id === deleteConfirmPostId) setAdPost(null);
       setDeleteConfirmPostId(null);
@@ -280,10 +311,17 @@ export default function CommunityScreen() {
             style={styles.authorInfo}
             onPress={() => openPostDetail(item)}
           >
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {item.authorName?.charAt(0)}
-              </Text>
+            <View style={[styles.avatarPlaceholder, { overflow: "hidden" }]}>
+              {item.authorAvatar ? (
+                <Image
+                  source={{ uri: item.authorAvatar }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {item.authorName?.charAt(0)?.toUpperCase()}
+                </Text>
+              )}
             </View>
             <View>
               <Text style={styles.authorName}>{item.authorName}</Text>
@@ -337,19 +375,38 @@ export default function CommunityScreen() {
                     </Pressable>
 
                     {isPostOwner && (
-                      <Pressable
-                        onPress={() => {
-                          setOptionsPostId(null);
-                          setDeleteConfirmPostId(item.id);
-                        }}
-                        style={styles.dropdownItem}
-                      >
-                        <Text
-                          style={[styles.optionText, { color: colors.error }]}
+                      <>
+                        <Pressable
+                          onPress={() => {
+                            setOptionsPostId(null);
+                            setEditingPost(item); // Mở modal chỉnh sửa
+                          }}
+                          style={styles.dropdownItem}
                         >
-                          Xóa bài viết
-                        </Text>
-                      </Pressable>
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: colors.textPrimary },
+                            ]}
+                          >
+                            Sửa bài viết
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => {
+                            setOptionsPostId(null);
+                            setDeleteConfirmPostId(item.id);
+                          }}
+                          style={styles.dropdownItem}
+                        >
+                          <Text
+                            style={[styles.optionText, { color: colors.error }]}
+                          >
+                            Xóa bài viết
+                          </Text>
+                        </Pressable>
+                      </>
                     )}
                   </View>
                 </View>
@@ -438,7 +495,9 @@ export default function CommunityScreen() {
           }}
           ListHeaderComponent={
             isAuthenticated ? (
-              <CommunityComposer onCreated={(p) => setPosts([p, ...posts])} />
+              <CommunityComposer
+                onCreated={() => fetchFeed(1, true)} // <--- Load lại trang 1 và bật loading refresh
+              />
             ) : null
           }
           contentContainerStyle={styles.listContent}
@@ -455,8 +514,8 @@ export default function CommunityScreen() {
       )}
 
       <PostDetailModal
-        postId={params.postId || null}
-        initialPost={posts.find((p) => p.id === params.postId) || null}
+        postId={selectedPostId} // <--- Đổi thành state cục bộ
+        initialPost={posts.find((p) => p.id === selectedPostId) || null} // <--- Đổi thành state cục bộ
         onClose={closePostDetail}
         onPostDeleted={(id) => {
           setPosts((prev) => prev.filter((p) => p.id !== id));
@@ -499,6 +558,16 @@ export default function CommunityScreen() {
           </View>
         </View>
       </Modal>
+      <UpdatePostModal
+        post={editingPost}
+        visible={!!editingPost}
+        onClose={() => setEditingPost(null)}
+        onUpdated={(updated) => {
+          setPosts((prev) =>
+            prev.map((p) => (p.id === updated.id ? updated : p)),
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -513,7 +582,11 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: "100%",
   },
-
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
   card: {
     backgroundColor: "#FFF",
     borderRadius: 16,

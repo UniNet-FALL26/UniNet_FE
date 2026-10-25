@@ -12,6 +12,7 @@ export interface PostResponse {
   id: string;
   authorUserId: string;
   authorName: string;
+  authorAvatar?: string | null;
   authorActorType: CommunityActorType;
   description: string;
   mediaUrls: string[];
