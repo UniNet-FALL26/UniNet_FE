@@ -94,7 +94,7 @@ export function ProjectExplorerScreen() {
   }, [searchQuery]);
   const statusTab = activeTab === "Dự án hoàn thành" ? ApiProjectStatus.Completed
     : activeTab === "Dự án chờ duyệt" ? ApiProjectStatus.Pending
-    : activeTab === "Dự án bị từ chối" ? ApiProjectStatus.Rejected : undefined;
+      : activeTab === "Dự án bị từ chối" ? ApiProjectStatus.Rejected : undefined;
   const personalTab = activeTab !== "Đang tuyển";
   useEffect(() => {
     const controller = new AbortController();
@@ -102,10 +102,11 @@ export function ProjectExplorerScreen() {
     const request = statusTab !== undefined
       ? projectService.listProjectsByStatus(statusTab, page, 10, controller.signal)
       : personalTab
-      ? projectService.listMyProjects({ page, pageSize: 10 }, controller.signal)
-      : projectService.listProjects({ page, pageSize: 10, keyword, field: selectedFields[0], skillnames: selectedSkills,
-      recruitmentStatus: activeTab === "Đang tuyển" ? ApiRecruitmentStatus.Open : undefined,
-    }, controller.signal);
+        ? projectService.listMyProjects({ page, pageSize: 10 }, controller.signal)
+        : projectService.listProjects({
+          page, pageSize: 10, keyword, field: selectedFields[0], skillnames: selectedSkills,
+          recruitmentStatus: activeTab === "Đang tuyển" ? ApiRecruitmentStatus.Open : undefined,
+        }, controller.signal);
     request.then((data) => {
       if (controller.signal.aborted) return;
       setProjects(data.projects); setTotalPages(data.totalPages); setTotalItems(data.totalItems);
@@ -463,9 +464,9 @@ export function ProjectExplorerScreen() {
               const progress =
                 project.memberTarget > 0
                   ? Math.min(
-                      memberCount / project.memberTarget,
-                      1,
-                    )
+                    memberCount / project.memberTarget,
+                    1,
+                  )
                   : 0;
 
               return (
@@ -487,9 +488,9 @@ export function ProjectExplorerScreen() {
                         {project.creator.avatarUrl ? (
                           <Image source={{ uri: project.creator.avatarUrl }} style={{ width: "100%", height: "100%", borderRadius: 24 }} />
                         ) : (
-                        <Text style={styles.creatorAvatarText}>
-                          {getInitials((project.creator.fullName || project.creator.nickname || "Người tạo"))}
-                        </Text>
+                          <Text style={styles.creatorAvatarText}>
+                            {getInitials((project.creator.fullName || project.creator.nickname || "Người tạo"))}
+                          </Text>
                         )}
                       </View>
 
@@ -575,10 +576,8 @@ export function ProjectExplorerScreen() {
                       </View>
                     )}
 
-                    {/* FOOTER */}
-
+                    {/* FOOTER: chỉ giữ nút xem chi tiết ở hàng này */}
                     <View style={styles.footerRow}>
-                      {/* Nút Xem chi tiết */}
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`Xem chi tiết dự án ${project.title}`}
@@ -598,243 +597,256 @@ export function ProjectExplorerScreen() {
                           <Text style={styles.arrow}>›</Text>
                         </View>
                       </Pressable>
-
-                      {/* Nút Workspace */}
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Mở Workspace của dự án ${project.title}`}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/workspace/[projectId]" as never,
-                            params: { projectId: project.id },
-                          } as never)
-                        }
-                        style={({ pressed }) => [
-                          styles.workspaceButton,
-                          pressed && styles.workspaceButtonPressed,
-                        ]}
-                      >
-                        <SymbolView
-                          name={{
-                            ios: "briefcase.fill",
-                            android: "work",
-                            web: "work",
-                          }}
-                          size={17}
-                          tintColor={colors.surface}
-                        />
-                        <Text style={styles.workspaceButtonText}>
-                          Workspace
-                        </Text>
-                      </Pressable>
                     </View>
+
+                    {/* WORKSPACE: mục riêng bên dưới, chỉ có trong tab Dự án của tôi */}
+                    {activeTab === "Dự án của tôi" && (
+                      <View style={styles.workspaceSection}>
+                        <View style={styles.workspaceSectionHeader}>
+                          <View style={styles.workspaceHeadingIcon}>
+                            <SymbolView
+                              name={{ ios: "square.grid.2x2.fill", android: "dashboard", web: "dashboard" }}
+                              size={18}
+                              tintColor={colors.primary}
+                            />
+                          </View>
+                          <View style={styles.workspaceHeadingContent}>
+                            <Text style={styles.workspaceSectionTitle}>Workspace</Text>
+                            <Text style={styles.workspaceSectionHint}>Truy cập nhanh các khu vực dự án</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.workspaceTabsRow}>
+                          {([
+                            { key: "tasks", label: "Tasks", icon: { ios: "checkmark.square", android: "check_box", web: "check_box" } },
+                            { key: "reports", label: "Reports", icon: { ios: "doc.text", android: "description", web: "description" } },
+                            { key: "meetings", label: "Meetings", icon: { ios: "calendar", android: "event", web: "event" } },
+                            { key: "rooms", label: "Rooms", icon: { ios: "bubble.left.and.bubble.right", android: "forum", web: "forum" } },
+                          ] as const).map((tab) => (
+                            <Pressable
+                              key={tab.key}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Mở ${tab.label} của dự án ${project.title}`}
+                              onPress={() => router.push({
+                                pathname: "/workspace/[projectId]" as never,
+                                params: { projectId: project.id, tab: tab.key },
+                              } as never)}
+                              style={({ pressed }) => [styles.workspaceTabButton, pressed && styles.workspaceTabPressed]}
+                            >
+                              <SymbolView name={tab.icon} size={19} tintColor={colors.textSecondary} />
+                              <Text style={styles.workspaceTabLabel}>{tab.label}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
               );
             })
           )}
         </View>
-      {/* =========================
+        {/* =========================
           FILTER MODAL
       ========================= */}
 
-      <Modal
-        visible={filterVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setFilterVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setFilterVisible(false)}
-          />
+        <Modal
+          visible={filterVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setFilterVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={() => setFilterVisible(false)}
+            />
 
-          <View style={styles.filterModal}>
-            {/* MODAL HEADER */}
+            <View style={styles.filterModal}>
+              {/* MODAL HEADER */}
 
-            <View style={styles.filterHeader}>
-              <View>
-                <Text style={styles.filterTitle}>Bộ lọc dự án</Text>
+              <View style={styles.filterHeader}>
+                <View>
+                  <Text style={styles.filterTitle}>Bộ lọc dự án</Text>
 
-                <Text style={styles.filterSubtitle}>
-                  Chọn kỹ năng và lĩnh vực bạn quan tâm
-                </Text>
-              </View>
+                  <Text style={styles.filterSubtitle}>
+                    Chọn kỹ năng và lĩnh vực bạn quan tâm
+                  </Text>
+                </View>
 
-              <Pressable
-                onPress={() => setFilterVisible(false)}
-                style={styles.modalCloseButton}
-              >
-                <Text style={styles.modalCloseText}>×</Text>
-              </Pressable>
-            </View>
-
-            {/* FILTER SEARCH */}
-
-            <View style={styles.filterSearchContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
-
-              <TextInput
-                value={filterSearch}
-                onChangeText={setFilterSearch}
-                placeholder="Tìm kỹ năng hoặc lĩnh vực..."
-                placeholderTextColor={colors.textSecondary}
-                style={styles.filterSearchInput}
-              />
-
-              {filterSearch.length > 0 && (
-                <Pressable onPress={() => setFilterSearch("")}>
-                  <Text style={styles.clearSearchText}>×</Text>
+                <Pressable
+                  onPress={() => setFilterVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Text style={styles.modalCloseText}>×</Text>
                 </Pressable>
-              )}
-            </View>
+              </View>
 
-            {/* FILTER CONTENT */}
+              {/* FILTER SEARCH */}
 
-            <ScrollView
-              style={styles.filterScroll}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* SKILLS */}
+              <View style={styles.filterSearchContainer}>
+                <Text style={styles.searchIcon}>🔍</Text>
 
-              <View style={styles.filterGroup}>
-                <View style={styles.filterGroupHeader}>
-                  <Text style={styles.filterGroupTitle}>
-                    Kỹ năng / Công nghệ
-                  </Text>
+                <TextInput
+                  value={filterSearch}
+                  onChangeText={setFilterSearch}
+                  placeholder="Tìm kỹ năng hoặc lĩnh vực..."
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.filterSearchInput}
+                />
 
-                  {draftSkills.length > 0 && (
-                    <Text style={styles.filterGroupCount}>
-                      {draftSkills.length} đã chọn
-                    </Text>
-                  )}
-                </View>
-
-                {catalogLoading ? <Text style={styles.noOptionText}>Đang tải kỹ năng…</Text> : catalogError ? (
-                  <View>
-                    <Text accessibilityRole="alert" style={styles.noOptionText}>{catalogError}</Text>
-                    <Button title="Thử tải lại kỹ năng" variant="outline" onPress={() => setCatalogRetry((value) => value + 1)} />
-                  </View>
-                ) : filteredAvailableSkills.length === 0 ? (
-                  <Text style={styles.noOptionText}>
-                    Không tìm thấy kỹ năng phù hợp.
-                  </Text>
-                ) : (
-                  <View style={styles.optionGrid}>
-                    {filteredAvailableSkills.map((skill) => {
-                      const selected = draftSkills.includes(skill);
-
-                      return (
-                        <Pressable
-                          key={skill}
-                          onPress={() => toggleSkill(skill)}
-                          style={[
-                            styles.optionChip,
-                            selected && styles.optionChipSelected,
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.checkbox,
-                              selected && styles.checkboxSelected,
-                            ]}
-                          >
-                            {selected && (
-                              <Text style={styles.checkboxCheck}>✓</Text>
-                            )}
-                          </View>
-
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.optionChipText,
-                              selected && styles.optionChipTextSelected,
-                            ]}
-                          >
-                            {skill}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                {filterSearch.length > 0 && (
+                  <Pressable onPress={() => setFilterSearch("")}>
+                    <Text style={styles.clearSearchText}>×</Text>
+                  </Pressable>
                 )}
               </View>
 
-              {/* ROLES */}
+              {/* FILTER CONTENT */}
 
-              <View style={styles.filterGroup}>
-                <View style={styles.filterGroupHeader}>
-                  <Text style={styles.filterGroupTitle}>Lĩnh vực</Text>
+              <ScrollView
+                style={styles.filterScroll}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* SKILLS */}
 
-                  {draftFields.length > 0 && (
-                    <Text style={styles.filterGroupCount}>
-                      {draftFields.length} đã chọn
+                <View style={styles.filterGroup}>
+                  <View style={styles.filterGroupHeader}>
+                    <Text style={styles.filterGroupTitle}>
+                      Kỹ năng / Công nghệ
                     </Text>
+
+                    {draftSkills.length > 0 && (
+                      <Text style={styles.filterGroupCount}>
+                        {draftSkills.length} đã chọn
+                      </Text>
+                    )}
+                  </View>
+
+                  {catalogLoading ? <Text style={styles.noOptionText}>Đang tải kỹ năng…</Text> : catalogError ? (
+                    <View>
+                      <Text accessibilityRole="alert" style={styles.noOptionText}>{catalogError}</Text>
+                      <Button title="Thử tải lại kỹ năng" variant="outline" onPress={() => setCatalogRetry((value) => value + 1)} />
+                    </View>
+                  ) : filteredAvailableSkills.length === 0 ? (
+                    <Text style={styles.noOptionText}>
+                      Không tìm thấy kỹ năng phù hợp.
+                    </Text>
+                  ) : (
+                    <View style={styles.optionGrid}>
+                      {filteredAvailableSkills.map((skill) => {
+                        const selected = draftSkills.includes(skill);
+
+                        return (
+                          <Pressable
+                            key={skill}
+                            onPress={() => toggleSkill(skill)}
+                            style={[
+                              styles.optionChip,
+                              selected && styles.optionChipSelected,
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.checkbox,
+                                selected && styles.checkboxSelected,
+                              ]}
+                            >
+                              {selected && (
+                                <Text style={styles.checkboxCheck}>✓</Text>
+                              )}
+                            </View>
+
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.optionChipText,
+                                selected && styles.optionChipTextSelected,
+                              ]}
+                            >
+                              {skill}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   )}
                 </View>
 
-                {filteredAvailableFields.length === 0 ? (
-                  <Text style={styles.noOptionText}>
-                    Không tìm thấy lĩnh vực phù hợp.
-                  </Text>
-                ) : (
-                  <View style={styles.optionGrid}>
-                    {filteredAvailableFields.map((role) => {
-                      const selected = draftFields.includes(role);
+                {/* ROLES */}
 
-                      return (
-                        <Pressable
-                          key={role}
-                          onPress={() => toggleField(role)}
-                          style={[
-                            styles.optionChip,
-                            selected && styles.optionChipSelected,
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.checkbox,
-                              selected && styles.checkboxSelected,
-                            ]}
-                          >
-                            {selected && (
-                              <Text style={styles.checkboxCheck}>✓</Text>
-                            )}
-                          </View>
+                <View style={styles.filterGroup}>
+                  <View style={styles.filterGroupHeader}>
+                    <Text style={styles.filterGroupTitle}>Lĩnh vực</Text>
 
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.optionChipText,
-                              selected && styles.optionChipTextSelected,
-                            ]}
-                          >
-                            {role}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                    {draftFields.length > 0 && (
+                      <Text style={styles.filterGroupCount}>
+                        {draftFields.length} đã chọn
+                      </Text>
+                    )}
                   </View>
-                )}
+
+                  {filteredAvailableFields.length === 0 ? (
+                    <Text style={styles.noOptionText}>
+                      Không tìm thấy lĩnh vực phù hợp.
+                    </Text>
+                  ) : (
+                    <View style={styles.optionGrid}>
+                      {filteredAvailableFields.map((role) => {
+                        const selected = draftFields.includes(role);
+
+                        return (
+                          <Pressable
+                            key={role}
+                            onPress={() => toggleField(role)}
+                            style={[
+                              styles.optionChip,
+                              selected && styles.optionChipSelected,
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.checkbox,
+                                selected && styles.checkboxSelected,
+                              ]}
+                            >
+                              {selected && (
+                                <Text style={styles.checkboxCheck}>✓</Text>
+                              )}
+                            </View>
+
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.optionChipText,
+                                selected && styles.optionChipTextSelected,
+                              ]}
+                            >
+                              {role}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+
+              {/* MODAL FOOTER */}
+
+              <View style={styles.filterFooter}>
+                <Pressable onPress={clearFilter} style={styles.clearFilterButton}>
+                  <Text style={styles.clearFilterButtonText}>Xóa bộ lọc</Text>
+                </Pressable>
+
+                <Pressable onPress={applyFilter} style={styles.applyFilterButton}>
+                  <Text style={styles.applyFilterButtonText}>Áp dụng</Text>
+                </Pressable>
               </View>
-            </ScrollView>
-
-            {/* MODAL FOOTER */}
-
-            <View style={styles.filterFooter}>
-              <Pressable onPress={clearFilter} style={styles.clearFilterButton}>
-                <Text style={styles.clearFilterButtonText}>Xóa bộ lọc</Text>
-              </Pressable>
-
-              <Pressable onPress={applyFilter} style={styles.applyFilterButton}>
-                <Text style={styles.applyFilterButtonText}>Áp dụng</Text>
-              </Pressable>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
       </ScrollView>
     </View>
   );
@@ -1430,12 +1442,12 @@ const styles = StyleSheet.create({
   footerRow: {
     marginTop: 16,
     minHeight: 44,
+    width: "100%",
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "stretch",
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: 6,
+    paddingTop: 10,
   },
 
   detailHint: {
@@ -1462,32 +1474,78 @@ const styles = StyleSheet.create({
   },
 
   detailAction: {
-    minHeight: 40,
+    flex: 1,
+    width: "100%",
+    minHeight: 44,
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D7E6FF",
+    backgroundColor: colors.primaryLight,
     gap: 7,
   },
 
-  workspaceButton: {
-    minHeight: 40,
+  workspaceSection: {
+    marginTop: 12,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 12,
+  },
+  workspaceSectionHeader: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  workspaceHeadingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryLight,
+  },
+  workspaceHeadingContent: {
+    flex: 1,
+    gap: 2,
+  },
+  workspaceSectionTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  workspaceSectionHint: {
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  workspaceTabsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  workspaceTabButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 72,
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    borderRadius: 10,
-    paddingHorizontal: 13,
-    backgroundColor: colors.primary,
+    paddingHorizontal: 3,
+    paddingVertical: 10,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceSecondary,
   },
-
-  workspaceButtonPressed: {
-    opacity: 0.8,
+  workspaceTabPressed: {
+    opacity: 0.7,
   },
-
-  workspaceButtonText: {
-    color: colors.surface,
-    fontSize: 13,
-    fontWeight: "700",
+  workspaceTabLabel: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "center",
   },
 
   // =========================
