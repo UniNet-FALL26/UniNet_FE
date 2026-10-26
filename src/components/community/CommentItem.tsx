@@ -36,7 +36,6 @@ export function CommentItem({
   const safeReplies = Array.isArray(comment.replies) ? comment.replies : [];
   const replyToName = (comment as any)?.replyToUserName;
 
-  // Thêm 2 dòng này để xác định trạng thái mở dropdown
   const isThisCommentOpen = optionsCommentId === comment.id;
   const isTreeOpen =
     isThisCommentOpen || safeReplies.some((r) => r.id === optionsCommentId);
@@ -45,7 +44,6 @@ export function CommentItem({
     <View
       style={[
         styles.commentRow,
-        // 1. Nâng toàn bộ cụm bình luận (bao gồm cả con) lên nếu có bất kỳ menu nào đang mở
         isTreeOpen && { zIndex: 9999, elevation: 10 },
         optionsCommentId === comment.id && { zIndex: 9999, elevation: 10 },
       ]}
@@ -53,7 +51,6 @@ export function CommentItem({
       <View
         style={[
           styles.commentMain,
-          // 2. Nâng riêng phần nội dung chính lên trên cụm repliesContainer nếu menu của nó đang mở
           isThisCommentOpen && { zIndex: 9999, elevation: 10 },
         ]}
       >
@@ -66,7 +63,6 @@ export function CommentItem({
           <View
             style={[
               styles.bubbleRow,
-              // 3. Nâng tiếp commentBody lên
               isThisCommentOpen && { zIndex: 9999, elevation: 10 },
               optionsCommentId === comment.id && {
                 zIndex: 9999,

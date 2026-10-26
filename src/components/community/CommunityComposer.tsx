@@ -53,7 +53,6 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
         .then((data) => {
           if (!request.signal.aborted && data.isOwner) {
             const url = data.profile.avatarUrl;
-            // Bỏ qua nếu URL bị backend trả về chữ "string" mặc định của Swagger
             setAvatar(url && url !== "string" ? url : null);
           }
         })
@@ -83,6 +82,7 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
       const asset = await pickProfileImage();
       if (!asset) return;
       setSelectedFiles((prev) => [...prev, asset]);
+      setOpen(true); // <--- Tự động mở modal sau khi chọn ảnh/video xong
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -125,13 +125,9 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
         }
       });
 
-      // 1. Chỉ cần đợi API gọi thành công
       await communityService.createPost(formData, controller.current.signal);
-
-      // 2. Kích hoạt hàm báo hiệu ra bên ngoài để tải lại Feed
       onCreated();
 
-      // 3. Reset form và đóng modal
       setDescription("");
       setSelectedFiles([]);
       setOpen(false);
@@ -145,6 +141,7 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
       setBusy(false);
     }
   }
+
   const actions = [
     {
       label: "Ảnh/Video",
@@ -153,17 +150,17 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
       bgColor: "#ECFDF5",
       onPress: attach,
     },
-    {
-      label: "Tài liệu",
-      icon: {
-        ios: "doc.text.fill",
-        android: "description",
-        web: "description",
-      },
-      tint: "#3B82F6",
-      bgColor: "#EFF6FF",
-      onPress: () => router.push("/(tabs)/documents"),
-    },
+    // {
+    //   label: "Tài liệu",
+    //   icon: {
+    //     ios: "doc.text.fill",
+    //     android: "description",
+    //     web: "description",
+    //   },
+    //   tint: "#3B82F6",
+    //   bgColor: "#EFF6FF",
+    //   onPress: () => router.push("/(tabs)/documents"),
+    // },
     {
       label: "Khảo sát",
       icon: { ios: "chart.bar.fill", android: "bar_chart", web: "bar_chart" },
@@ -171,13 +168,13 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
       bgColor: "#FEF3C7",
       onPress: () => setNotice("Tính năng tạo khảo sát sẽ sớm có mặt."),
     },
-    {
-      label: "Sự kiện",
-      icon: { ios: "calendar", android: "event", web: "event" },
-      tint: "#8B5CF6",
-      bgColor: "#F5F3FF",
-      onPress: () => router.push("/(tabs)/events"),
-    },
+    // {
+    //   label: "Sự kiện",
+    //   icon: { ios: "calendar", android: "event", web: "event" },
+    //   tint: "#8B5CF6",
+    //   bgColor: "#F5F3FF",
+    //   onPress: () => router.push("/(tabs)/events"),
+    // },
   ] as const;
 
   return (
@@ -186,7 +183,6 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
       style={[s.card, Platform.OS === "web" && width >= 1024 && s.desktopCard]}
     >
       <View style={s.row}>
-        {/* Avatar bên ngoài Feed */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Mở hồ sơ cá nhân"
@@ -288,7 +284,6 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
               contentContainerStyle={s.dialogContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* Thông tin tác giả bên trong Modal */}
               <View style={s.modalAuthorRow}>
                 <View style={s.avatarPlaceholder}>
                   {avatar ? (
@@ -312,7 +307,6 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
                 placeholderTextColor="#9CA3AF"
               />
 
-              {/* Khu vực preview ảnh/video dạng lưới tự xuống dòng */}
               {selectedFiles.length > 0 && (
                 <View style={s.previewContainer}>
                   <View style={s.previewGrid}>
@@ -412,7 +406,6 @@ const s = StyleSheet.create({
   },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
 
-  // Style Avatar đồng bộ PostDetailModal
   avatarPlaceholder: {
     width: 40,
     height: 40,
@@ -483,7 +476,6 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
 
-  // Modal Styling
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -541,7 +533,6 @@ const s = StyleSheet.create({
     color: "#1F2937",
     textAlignVertical: "top",
     paddingTop: 4,
-    // Thêm 2 dòng này để triệt tiêu hoàn toàn viền focus mặc định trên Web/Mobile
     ...Platform.select({
       web: {
         outlineStyle: "none",

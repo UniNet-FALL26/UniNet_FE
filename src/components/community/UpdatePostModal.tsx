@@ -1,22 +1,22 @@
 import { colors } from "@/constants/colors";
 import {
-    communityService,
-    type PostResponse,
+  communityService,
+  type PostResponse,
 } from "@/services/community.service";
 import { pickProfileImage } from "@/utils/profile-image-picker";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useState } from "react";
 import {
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 interface UpdatePostModalProps {
@@ -90,17 +90,17 @@ export function UpdatePostModal({
       const formData = new FormData();
       formData.append("description", description.trim());
 
-      // Gửi các URL ảnh cũ muốn giữ lại
-      existingMedia.forEach((url) => {
-        formData.append("existingMediaUrls", url);
+      // KHỚP VỚI API MỚI: Dùng keepMediaUrls
+      existingMedia.forEach((url, index) => {
+        formData.append(`keepMediaUrls[${index}]`, url);
       });
 
-      // Gửi các file ảnh mới thêm vào
+      // KHỚP VỚI API MỚI: Dùng newFiles
       newFiles.forEach((file) => {
         if (Platform.OS === "web" && file.file) {
-          formData.append("files", file.file);
+          formData.append("newFiles", file.file);
         } else {
-          formData.append("files", {
+          formData.append("newFiles", {
             uri: file.uri,
             name:
               file.fileName ||
@@ -111,15 +111,18 @@ export function UpdatePostModal({
         }
       });
 
-      // Gọi API cập nhật (Giả định service của bạn có hàm updatePost hoặc put)
       const res = await communityService.updatePost(post.id, formData as any);
       const updatedPost = (res as any)?.data ?? res;
 
+      // Cập nhật lại UI sau khi Backend trả về thành công
       onUpdated({
         ...post,
-        ...updatedPost,
-        description: description.trim(),
-        mediaUrls: [...existingMedia, ...newFiles.map((f) => f.uri)],
+        ...(typeof updatedPost === "object" ? updatedPost : {}),
+        description: updatedPost?.description || description.trim(),
+        mediaUrls:
+          updatedPost?.mediaUrls && updatedPost.mediaUrls.length > 0
+            ? updatedPost.mediaUrls
+            : [...existingMedia, ...newFiles.map((f) => f.uri)],
       });
 
       onClose();
@@ -133,7 +136,6 @@ export function UpdatePostModal({
       setBusy(false);
     }
   }
-
   return (
     <Modal
       visible={visible}
