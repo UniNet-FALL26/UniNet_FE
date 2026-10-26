@@ -102,7 +102,8 @@ export default function ProfileScreen() {
   const reminder = verificationReminder(account?.createdAt, data?.profile.isVerified ?? account?.profile?.isVerified ?? false, reminderNow);
   const showReminder = isAuthenticated && !!reminder && dismissedReminderAccount !== account?.id;
   const compactHeader = profileWidth < 600 || !student;
-  const header = <View style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }]}>
+  const showStarter = student && !!data && !shouldShowPortfolio(data);
+  const header = <View style={[styles.header, desktop && student && styles.desktopHeader, showStarter && styles.starterHeader, showStarter && profileWidth < 700 && styles.compactStarterHeader, !student && { maxWidth: 600 }]}>
     <View style={styles.reminderSlot}>{showReminder && <VerificationBanner compact={compactHeader} onVerify={() => student && account ? setVerificationAccountId(account.id) : router.push('/settings')} onDismiss={() => setDismissedReminderAccount(account?.id ?? null)} />}</View>
     <View style={[styles.headerActions, compactHeader && styles.compactHeaderActions]}>
       {student && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
@@ -134,6 +135,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   body: { flex: 1, minHeight: 0 }, desktopBody: { width: '100%', maxWidth: 1800, alignSelf: 'center', flexDirection: 'row', gap: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }, mainColumn: { flex: 1, minWidth: 0, minHeight: 0 }, settingsColumn: { width: 400, overflow: 'hidden', borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' },
   desktopSaved: { alignSelf: 'flex-start', maxWidth: '100%' }, desktopHeader: { maxWidth: '100%', paddingHorizontal: 0 }, desktopMainColumn: { marginTop: -13 },
+  starterHeader: { maxWidth: 1000, paddingHorizontal: 24 }, compactStarterHeader: { paddingHorizontal: 16 },
   safe: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.background }, scrollContent: { paddingBottom: 24 },
   photoStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 8 }, photoMessage: { color: colors.textPrimary, textAlign: 'center', padding: 8 },
   header: { flexShrink: 0, zIndex: 1, backgroundColor: colors.background, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 8 },

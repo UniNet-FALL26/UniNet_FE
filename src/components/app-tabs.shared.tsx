@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
 import { useAuthStore } from '@/store/auth.store';
 import { portfolioService } from '@/services/portfolio.service';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type TabItem = { label: string; href: Href; paths: string[]; icon: SymbolName; activeIcon: SymbolName; unread?: number };
@@ -43,6 +45,7 @@ function FooterTab({ item, active, onPress }: { item: TabItem; active: boolean; 
 
 export default function AppTabs() {
   const { account } = useAuthStore();
+  const { unreadCount } = useNotificationUpdates();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -102,7 +105,8 @@ export default function AppTabs() {
           })}
         </View>
         <View accessibilityRole="tablist" accessibilityLabel="Tài khoản và thông báo" style={styles.headerActions}>
-          {[tabs[2], tabs[3]].map(item => {
+          <NotificationBell />
+          {[tabs[3]].map(item => {
             const active = item.paths.some(path => pathname === path || pathname.startsWith(`${path}/`));
             const profile = item === tabs[3];
             return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => router.navigate(item.href)} style={({ hovered, pressed }) => [styles.actionButton, profile && styles.profileAction, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
@@ -133,7 +137,7 @@ export default function AppTabs() {
       <Pressable onPress={() => setMenuOpen(open => !open)} hitSlop={{ top: 20, left: 6, right: 6 }} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Đóng menu' : 'Mở menu'} accessibilityState={{ expanded: menuOpen }} style={styles.menuSlot}>
         <View style={styles.menuButton}><SymbolView name={menuOpen ? { ios: 'xmark', android: 'close', web: 'close' } : { ios: 'line.3.horizontal', android: 'menu', web: 'menu' }} size={25} tintColor="#FFFFFF" /></View>
       </Pressable>
-      <FooterTab item={tabs[2]} active={tabs[2].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[2].href); }} />
+      <FooterTab item={{ ...tabs[2], unread: unreadCount }} active={tabs[2].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[2].href); }} />
       <FooterTab item={tabs[3]} active={tabs[3].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[3].href); }} />
     </View>}
   </View>;

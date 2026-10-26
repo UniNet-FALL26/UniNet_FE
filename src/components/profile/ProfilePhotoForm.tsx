@@ -186,6 +186,7 @@ export function ProfilePhotoForm({ initialAsset, onConfirm, onClose, portrait = 
         <View style={s.column}><Text style={s.hint}>Ảnh gốc</Text><Image source={{ uri: asset.uri }} contentFit="contain" style={s.preview} accessibilityLabel="Ảnh đã chọn từ máy" /></View>
       </View> : <Text>Ảnh sẽ được bỏ khỏi hồ sơ.</Text>}
       {!!asset && <Text style={s.hint}>Chọn ảnh JPG, PNG hoặc WebP, tối đa 5 MB.</Text>}
+      {!!asset && portrait && <Text style={s.hint}>Chọn ảnh rõ người, ít vật thể che phía trước. Ảnh bị che khuất nhiều có thể không cắt và xóa nền đầy đủ; vui lòng chọn ảnh khác khi nhận cảnh báo.</Text>}
       {processing && !portrait && <Text accessibilityLiveRegion="polite" style={s.hint}>Đang tải ảnh lên…</Text>}
       {portrait && preview && !uploading && <Text style={s.hint}>{confirmationHint}</Text>}
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}

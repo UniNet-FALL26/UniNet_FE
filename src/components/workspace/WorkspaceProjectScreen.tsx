@@ -188,7 +188,7 @@ function TaskCard({
 }
 
 export function WorkspaceProjectScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  const { projectId, taskId } = useLocalSearchParams<{ projectId: string; taskId?: string }>();
   const { account, accessToken } = useAuthStore();
   const { width } = useWindowDimensions();
   const [loaded, setLoaded] = useState<LoadedWorkspace | null>(null);
@@ -262,12 +262,14 @@ export function WorkspaceProjectScreen() {
 
   const tasks = loaded?.tasks ?? [];
   const filteredTasks = useMemo(() => {
+    if (taskId) return tasks.filter(task => task.id === taskId);
     const query = searchQuery.trim().toLocaleLowerCase("vi");
     if (!query) return tasks;
     return tasks.filter((task) =>
       (task.title ?? "").toLocaleLowerCase("vi").includes(query),
     );
-  }, [searchQuery, tasks]);
+  }, [searchQuery, tasks, taskId]);
+  useEffect(() => { if (taskId) setActiveTab('tasks'); }, [taskId]);
 
   const assignedToMe = useMemo(
     () =>
@@ -479,6 +481,7 @@ export function WorkspaceProjectScreen() {
               {filteredTasks.length}/{tasks.length}
             </Text>
           </View>
+          {!!taskId && <View style={styles.listHeader}><Text style={styles.resultCount}>{filteredTasks.length ? 'Công việc từ thông báo' : 'Công việc không còn khả dụng.'}</Text><Button title="Xem tất cả công việc" onPress={() => router.setParams({ taskId: undefined })} /></View>}
 
           {tasks.length === 0 ? (
             <View style={styles.emptyCard}>

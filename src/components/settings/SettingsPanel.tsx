@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
+import type { NavigationProp } from 'expo-router/react-navigation';
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,12 +22,18 @@ export function SettingsPanel({ embedded = false, onPortfolioChanged }: { embedd
   const { logout, loading: loggingOut, error: logoutError, clearError } = useAuth();
   const [dialog, setDialog] = useState<'account' | 'terms' | 'privacy' | null>(null);
   const params = useLocalSearchParams<{ account?: string }>();
+  const navigation = useNavigation<NavigationProp<{ settings: { account?: string } }>>();
   const wide = useWindowDimensions().width >= 900 && !embedded;
   const student = account?.role === ACCOUNT_ROLE.STUDENT;
   const verification = useStudentVerification(student && isAuthenticated ? account?.id : undefined);
   const verificationStatus = verification.value ? verificationPresentation(verification.value) : null;
   useEffect(() => { setDialog(null); }, [account?.id]);
-  useEffect(() => { if (params.account === '1' && student && isAuthenticated) setDialog('account'); }, [params.account, student, isAuthenticated, account?.id]);
+  useEffect(() => {
+    if (params.account === '1' && student && isAuthenticated) {
+      setDialog('account');
+      navigation.setParams({ account: undefined });
+    }
+  }, [params.account, student, isAuthenticated, account?.id, navigation]);
   const [loaded, setLoaded] = useState<{ accountId: string; data: PortfolioResponse } | null>(null);
   const data = isAuthenticated && loaded && loaded.accountId === account?.id ? loaded.data : null;
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [attempt, setAttempt] = useState(0);

@@ -2,7 +2,7 @@ import { opportunitiesService, type OpportunityJob, type OpportunityView, type O
 import { colors } from '@/constants/colors';
 import { portfolioService } from '@/services/portfolio.service';
 import type { PortfolioResponse } from '@/types/portfolio';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
@@ -32,6 +32,7 @@ function applicationStatusInfo(status: number | null) {
   }
 }
 export default function OpportunitiesScreen() {
+  const { jobId: requestedJobId, tab: requestedTab } = useLocalSearchParams<{ jobId?: string; tab?: string }>();
   const [jobs, setJobs] = useState<OpportunityJob[]>([]);
   const [selectedJob, setSelectedJob] = useState<OpportunityJob | null>(null);
   const [myPortfolio, setMyPortfolio] = useState<PortfolioResponse | null>(null);
@@ -90,6 +91,17 @@ export default function OpportunitiesScreen() {
       }
     }
   }, [keyword, view, workType]);
+
+  useFocusEffect(useCallback(() => {
+    if (requestedTab === 'applications') setView('applied');
+    if (!requestedJobId) return;
+    const controller = new AbortController();
+    setError('');
+    opportunitiesService.get(requestedJobId, controller.signal).then(job => {
+      if (!controller.signal.aborted) { setSelectedJob(job); setCoverMessage(''); }
+    }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Nội dung đã bị xóa hoặc bạn không còn quyền truy cập.'); });
+    return () => controller.abort();
+  }, [requestedJobId, requestedTab]));
 
   useFocusEffect(useCallback(() => {
     if (!scholarshipsSelected) void loadJobs(1);

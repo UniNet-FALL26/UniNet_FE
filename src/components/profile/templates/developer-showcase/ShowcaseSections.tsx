@@ -3,10 +3,10 @@ import { EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/P
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
 import { profileMedia, isSampleLink } from '@/components/profile/profile-media';
-import { skillLogo } from '@/components/profile/skill-logo';
+import { ProfileSkillIcon } from '@/components/profile/ProfileSkillIcon';
 import { Chip, PortfolioIcon, PortfolioLink, ui } from '../developer-modern/PortfolioPrimitives';
 
-export type ShowcaseSectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; width: number; thumbnail?: boolean };
+export type ShowcaseSectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean };
 const cardWidth = (width: number, columns: number) => Math.floor((width - (columns - 1) * 12) / columns);
 export function ShowcaseHeading({ eyebrow, title, theme }: { eyebrow: string; title: string; theme: ProfileTheme }) {
   const sectionTitle = eyebrow === 'KỸ NĂNG' ? 'Kỹ năng' : eyebrow === 'CHỨNG CHỈ' ? 'Chứng chỉ' : eyebrow.startsWith('BLOG') ? 'Bài viết' : title;
@@ -28,7 +28,7 @@ export function ShowcaseProjects({ projects, theme, width, thumbnail }: Omit<Sho
     </View>)}</View>
   </View>;
 }
-export function ShowcaseSkills({ portfolio, theme, width, thumbnail }: ShowcaseSectionProps) {
+export function ShowcaseSkills({ portfolio, theme, width, thumbnail, demo = false }: ShowcaseSectionProps) {
   const editing = useProfileEditing();
   if (!portfolio.skills.length && !editing) return null;
   const groups = [...new Set(portfolio.skills.map(skill => skill.category || 'Kỹ năng'))];
@@ -36,7 +36,7 @@ export function ShowcaseSkills({ portfolio, theme, width, thumbnail }: ShowcaseS
   return <View style={s.section}><ShowcaseHeading eyebrow="KỸ NĂNG" title="Công nghệ mình sử dụng" theme={theme} /><View style={s.grid}>{groups.map(group => <View key={group} style={[s.card, { width: cardWidth(width, columns), backgroundColor: theme.surface, borderColor: theme.border }]}>
     <View style={[s.groupHeading, { backgroundColor: theme.accentSoft }]}><PortfolioIcon name="code" size={18} color={theme.accentStrong} /><Text role="heading" aria-level={3} style={[s.groupName, { color: theme.accentStrong }]}>{group}</Text></View>
     <View style={s.skillGrid}>{portfolio.skills.filter(skill => (skill.category || 'Kỹ năng') === group).map(skill => <View key={skill.name} style={[s.skillItem, { width: columns === 2 && width < 600 ? '46%' : '30%' }]}>
-      {skillLogo(skill.name, skill.iconUrl) !== undefined ? <Image source={skillLogo(skill.name, skill.iconUrl)} contentFit="contain" priority="low" loading={thumbnail ? 'eager' : 'lazy'} style={s.logo} accessible={false} /> : <View style={[s.logo, s.coverFallback, { backgroundColor: theme.accentSoft }]}><Text style={[s.caption, { color: theme.accentStrong }]}>{skill.name.slice(0, 2)}</Text></View>}
+      <ProfileSkillIcon name={skill.name} iconUrl={skill.iconUrl} demo={demo} thumbnail={thumbnail} style={s.logo} />
       <Text style={[s.skillName, { color: theme.muted }]}>{skill.name}</Text>
     </View>)}</View>
   </View>)}</View></View>;
