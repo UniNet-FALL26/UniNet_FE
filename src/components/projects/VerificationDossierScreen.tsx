@@ -87,7 +87,7 @@ export function VerificationDossierScreen() {
       </DossierCard>
       <DossierCard title="Lịch hẹn và chuyên viên">
         <Text style={ds.body}>{v.scheduledStartAt ? `${date(v.scheduledStartAt)} — ${date(v.scheduledEndAt)}` : 'Chưa chọn lịch xác minh.'}</Text>
-        <Text style={ds.small}>Múi giờ thiết bị: {Intl.DateTimeFormat().resolvedOptions().timeZone}</Text>
+        <Text style={ds.small}>Giờ Việt Nam (UTC+7)</Text>
         {v.bookingStatus === 1 && <Text style={ds.notice}>{remaining > 0 ? `Giữ lịch đến ${date(v.reservedUntil)}. Thanh toán trước thời hạn để được xác nhận.` : 'Đã hết thời gian giữ lịch. Kiểm tra giao dịch cũ trước khi chọn lại lịch.'}</Text>}
         <Text style={ds.body}>{detail.meetingEndAt ? `Buổi xác minh kết thúc: ${date(detail.meetingEndAt)}` : detail.meetingStartAt ? `Buổi xác minh bắt đầu: ${date(detail.meetingStartAt)}` : activeAssignment ? 'Đã phân công chuyên viên. Vui lòng theo dõi lịch hẹn.' : 'Chưa có phân công đang hoạt động.'}</Text>
         {activeAssignment && <Text style={ds.small}>Phân công lúc: {date(activeAssignment.assignedAt)}. Hệ thống chưa cung cấp tên chuyên viên trong hồ sơ.</Text>}

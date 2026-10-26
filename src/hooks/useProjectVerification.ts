@@ -11,7 +11,7 @@ const errorText = (error: unknown) => error instanceof ApiError && error.status 
   ? 'Bạn không có quyền xem dữ liệu xác minh này.'
   : error instanceof Error ? error.message : 'Không thể tải dữ liệu. Vui lòng thử lại.';
 
-export function useProjectVerification(projectId: string, isCreator: boolean) {
+export function useProjectVerification(projectId: string, isCreator: boolean, level1Only = false) {
   const [level1, setLevel1] = useState<Block<EvidenceModeration>>(initial);
   const [level2, setLevel2] = useState<Block<VerificationDetail>>(initial);
   const [cycle, setCycle] = useState<Block<{ status: number }>>(initial);
@@ -58,6 +58,7 @@ export function useProjectVerification(projectId: string, isCreator: boolean) {
           }
         })(),
         (async () => {
+          if (level1Only) { setLevel2({ data: null, loading: false, error: null }); return; }
           if (forbidden2) return;
           try {
             // Search Pending explicitly so an older active application is never missed by pagination.
@@ -76,7 +77,7 @@ export function useProjectVerification(projectId: string, isCreator: boolean) {
       ]);
       inFlight = false;
       failures = failed ? failures + 1 : 0;
-      if (!stopped && pending && failures < 3) timer = setTimeout(load, 12000);
+
     }
     void load();
     setCycle(v => ({ ...v, loading: true }));
@@ -85,12 +86,8 @@ export function useProjectVerification(projectId: string, isCreator: boolean) {
     }).catch(error => {
       if (!signal.aborted) setCycle({ data: null, loading: false, error: error instanceof ApiError && error.status === 404 ? null : errorText(error) });
     });
-    const subscription = AppState.addEventListener('change', state => {
-      if (timer) clearTimeout(timer);
-      if (state === 'active') void load();
-    });
-    return () => { active.current = false; stopped = true; controller.abort(); if (timer) clearTimeout(timer); subscription.remove(); };
-  }, [projectId, isCreator, revision]));
+    return () => { active.current = false; stopped = true; controller.abort(); };
+  }, [projectId, isCreator, revision, level1Only]));
 
   async function retry() {
     if (!isCreator || level1.forbidden || retryLock.current) return;
