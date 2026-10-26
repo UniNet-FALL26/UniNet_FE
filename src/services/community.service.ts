@@ -1,4 +1,4 @@
-import { apiRequest } from "@/services/api";
+import { apiMultipartRequest, apiRequest } from "@/services/api";
 
 // ==========================================
 // ENUMS & TYPES
@@ -131,17 +131,15 @@ export const communityService = {
    */
   updatePost: (
     id: string,
-    input: UpdatePostInput,
+    formData: FormData,
     signal?: AbortSignal,
   ): Promise<PostResponse> => {
-    return apiRequest<PostResponse>(
+    // Dùng apiMultipartRequest để call API update
+    return apiMultipartRequest<PostResponse>(
       `/community/posts/${encodeURIComponent(id)}`,
       {
         method: "PUT",
-        body: JSON.stringify({
-          description: input.description,
-          mediaUrls: input.mediaUrls ?? [],
-        }),
+        body: formData,
         signal,
       },
     );
