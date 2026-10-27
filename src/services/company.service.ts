@@ -37,11 +37,11 @@ export type CompanyJobInput = {
 };
 export type CompanyProfile = {
   id: string; companyName: string; partnerType: PartnerType; description: string | null; industry: string | null;
-  website: string | null; phone: string | null; address: string | null; contactEmail: string | null;
+  website: string | null; websites: string[]; phone: string | null; address: string | null; contactEmail: string | null;
   avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; updatedAt: string; openJobs: CompanyJob[];
 };
 export type CompanyProfileInput = Pick<CompanyProfile,
-  'companyName' | 'partnerType' | 'description' | 'industry' | 'website' | 'phone' | 'address' | 'contactEmail' | 'avatarUrl' | 'coverUrl'>;
+  'companyName' | 'partnerType' | 'description' | 'industry' | 'website' | 'websites' | 'phone' | 'address' | 'contactEmail' | 'avatarUrl' | 'coverUrl'>;
 export type CompanyDashboard = {
   companyName: string; totalJobs: number; publishedJobs: number; draftJobs: number; closedJobs: number;
   expiringJobs: number; totalApplications: number; pendingApplications: number; viewedApplications: number;
@@ -59,7 +59,7 @@ export type PartnerVerificationInput = { taxCode?: string | null; representative
 type PartnerProfileResponse = {
   id: string; fullName: string; organizationName: string | null; avatarUrl: string | null; coverUrl: string | null;
   bio: string | null; partnerType: PartnerType | null; industry: string | null; website: string | null;
-  contactEmail: string | null; phone: string | null; address: string | null; isVerified: boolean;
+  contactEmail: string | null; phone: string | null; address: string | null; isVerified: boolean; websites?: string[];
 };
 type AccountProfileResponse = { profile: PartnerProfileResponse | null };
 type PartnerDashboardResponse = Omit<CompanyDashboard, 'companyName'> & { organizationName: string };
@@ -71,9 +71,10 @@ async function getProfile(signal?: AbortSignal): Promise<CompanyProfile> {
   ]);
   const profile = account.profile;
   if (!profile) throw new Error('Không tìm thấy hồ sơ đối tác.');
+  const websites = profile.websites?.length ? profile.websites : profile.website ? [profile.website] : [];
   return {
     id: profile.id, companyName: profile.organizationName || profile.fullName, partnerType: profile.partnerType ?? 4,
-    description: profile.bio, industry: profile.industry, website: profile.website, phone: profile.phone,
+    description: profile.bio, industry: profile.industry, website: websites[0] ?? null, websites, phone: profile.phone,
     address: profile.address, contactEmail: profile.contactEmail, avatarUrl: profile.avatarUrl, coverUrl: profile.coverUrl,
     isVerified: profile.isVerified, updatedAt: '', openJobs: dashboard.openJobs,
   };
@@ -85,7 +86,7 @@ export const companyService = {
     await apiRequest('/profile/partner', {
       method: 'PUT', body: JSON.stringify({
         organizationName: input.companyName, partnerType: input.partnerType, avatarUrl: input.avatarUrl,
-        coverUrl: input.coverUrl, bio: input.description, industry: input.industry, website: input.website,
+        coverUrl: input.coverUrl, bio: input.description, industry: input.industry, website: input.websites[0] ?? input.website, websites: input.websites,
         contactEmail: input.contactEmail, phone: input.phone, address: input.address,
       }), signal,
     });

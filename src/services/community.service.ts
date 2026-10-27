@@ -1,4 +1,4 @@
-import { apiRequest } from "@/services/api";
+import { apiMultipartRequest, apiRequest } from "@/services/api";
 
 // ==========================================
 // ENUMS & TYPES
@@ -12,6 +12,7 @@ export interface PostResponse {
   id: string;
   authorUserId: string;
   authorName: string;
+  authorAvatar?: string | null;
   authorActorType: CommunityActorType;
   description: string;
   mediaUrls: string[];
@@ -111,15 +112,16 @@ export const communityService = {
    * Tạo bài đăng mới
    */
   createPost: (
-    input: CreatePostInput,
+    formData: FormData,
     signal?: AbortSignal,
   ): Promise<PostResponse> => {
+    // Không dùng JSON.stringify nữa mà truyền trực tiếp FormData vào body.
+    // Tùy thuộc vào hàm apiRequest của dự án, thường nếu truyền FormData thì
+    // ta nên để headers là undefined hoặc bỏ trống "Content-Type" để trình duyệt/runtime
+    // tự động sinh boundary chính xác cho multipart.
     return apiRequest<PostResponse>("/community/posts", {
       method: "POST",
-      body: JSON.stringify({
-        description: input.description,
-        mediaUrls: input.mediaUrls ?? [],
-      }),
+      body: formData,
       signal,
     });
   },
@@ -129,17 +131,15 @@ export const communityService = {
    */
   updatePost: (
     id: string,
-    input: UpdatePostInput,
+    formData: FormData,
     signal?: AbortSignal,
   ): Promise<PostResponse> => {
-    return apiRequest<PostResponse>(
+    // Dùng apiMultipartRequest để call API update
+    return apiMultipartRequest<PostResponse>(
       `/community/posts/${encodeURIComponent(id)}`,
       {
         method: "PUT",
-        body: JSON.stringify({
-          description: input.description,
-          mediaUrls: input.mediaUrls ?? [],
-        }),
+        body: formData,
         signal,
       },
     );

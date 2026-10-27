@@ -1,5 +1,5 @@
 import { createElement, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { ActivityIndicator, findNodeHandle, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, findNodeHandle, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, Tag } from '@/components/company/company-ui';
@@ -178,10 +178,10 @@ export default function CompanyCreateJob() {
   const [benefitError, setBenefitError] = useState('');
   const [benefitIcon, setBenefitIcon] = useState<BenefitIconKey>('education');
   const [activeBenefitIconPicker, setActiveBenefitIconPicker] = useState<string | null>(null);
-  const [qualifications, setQualifications] = useState<string[]>([]);
-  const [preferredQualifications, setPreferredQualifications] = useState<string[]>([]);
-  const [requirementDraft, setRequirementDraft] = useState('');
-  const [requirementType, setRequirementType] = useState<0 | 1>(0);
+  const [requirementsText, setRequirementsText] = useState('');
+
+
+
   const [skillQuery, setSkillQuery] = useState('');
   const [skillType, setSkillType] = useState<0 | 1>(0);
   const [hoveredSkillDelete, setHoveredSkillDelete] = useState<string | null>(null);
@@ -189,6 +189,8 @@ export default function CompanyCreateJob() {
   const [projectAreas, setProjectAreas] = useState<string[]>([]);
   const [skillCatalog, setSkillCatalog] = useState<SkillCatalogItem[]>([]);
   const [companyName, setCompanyName] = useState('');
+  const [companyAvatarUrl, setCompanyAvatarUrl] = useState<string | null>(null);
+  const [companyAvatarFailed, setCompanyAvatarFailed] = useState(false);
   const [companyAddress, setCompanyAddress] = useState('');
   const [verification, setVerification] = useState<PartnerVerificationStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -205,6 +207,7 @@ export default function CompanyCreateJob() {
   const scrollRef = useRef<ScrollView>(null);
   const errorTargets = useRef<Record<string, View | null>>({});
   const [jobStatus, setJobStatus] = useState<0 | 1 | 2 | 3 | null>(null);
+  const [originalStartAt, setOriginalStartAt] = useState<string | null>(null);
   const [lockCheckNow, setLockCheckNow] = useState(() => Date.now());
   useEffect(() => () => {
     if (publishSuccessTimer.current) clearTimeout(publishSuccessTimer.current);
@@ -224,7 +227,7 @@ export default function CompanyCreateJob() {
     return skillCatalog.filter(item => item.name.toLocaleLowerCase().includes(query) && !skills.some(skill => skill.skillId === item.id)).slice(0, 3);
   }, [skillCatalog, skillQuery, skills]);
 
-  const formSnapshot = () => JSON.stringify({ title, startDate, startTime, deadline, workMode, location, salary, salaryMax, description, skills, benefits, qualifications, preferredQualifications, projectAreas });
+  const formSnapshot = () => JSON.stringify({ title, startDate, startTime, deadline, workMode, location, salary, salaryMax, description, skills, benefits, requirementsText, projectAreas });
   const formIsDirty = savedSnapshot.current !== null && savedSnapshot.current !== formSnapshot();
   useEffect(() => {
     if (!loading && savedSnapshot.current === null) savedSnapshot.current = formSnapshot();
@@ -244,7 +247,7 @@ export default function CompanyCreateJob() {
     const parsedStartAt = startDate ? dateValue(startDate, startTime) : null;
     if (startDate && !parsedStartAt) errors.startAt = 'Chọn đủ ngày và giờ bắt đầu nhận hồ sơ.';
     if (parsedStartAt && !startTimeLocked && (startDate < minimumStartDate || Number(startTime.split(':')[1]) % 15 !== 0 || (startDate === minimumStartDate && startTime < minimumStartTime))) errors.startAt = 'Vui lòng chọn ngày giờ bắt đầu cách hiện tại ít nhất 5 phút.';
-    if (startDate && deadline && deadline <= startDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
+    if (!startedPublishedJob && startDate && deadline && deadline <= startDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
     if (deadline && deadline < minimumDeadlineDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
     const parseSalary = (value: string) => {
       if (!value.trim()) return null;
@@ -259,16 +262,8 @@ export default function CompanyCreateJob() {
     if (minimum != null && minimum > maxSalary) errors.salary = 'Lương tối thiểu vượt giới hạn hỗ trợ.';
     if (maximum != null && maximum > maxSalary) errors.salaryMax = 'Lương tối đa vượt giới hạn hỗ trợ.';
     if (minimum != null && maximum != null && minimum > maximum) errors.salary = 'Lương tối thiểu phải nhỏ hơn hoặc bằng lương tối đa.';
-    const requirementGroups = [
-      { label: 'Yêu cầu bắt buộc', values: qualifications },
-      { label: 'Yêu cầu ưu tiên', values: preferredQualifications },
-    ];
-    for (const group of requirementGroups) {
-      if (group.values.length > 50 || group.values.some(value => value.length > 2000)) {
-        errors.requirements = `${group.label}: tối đa 50 mục, mỗi mục không quá 2.000 ký tự.`;
-        break;
-      }
-    }
+    const requirementLines = requirementsText.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    if (requirementLines.length > 50 || requirementLines.some(value => value.length > 2000)) errors.requirements = 'Tối đa 50 dòng yêu cầu, mỗi dòng không quá 2.000 ký tự.';
     if (projectAreas.length > 50 || projectAreas.some(value => value.length > 255)) errors.projectAreas = 'Nhóm lĩnh vực dự án tối đa 50 mục, mỗi mục không quá 255 ký tự.';
     if (skills.length > 100) errors.skills = 'Mỗi bài tuyển dụng có tối đa 100 kỹ năng.';
     if (benefits.length > 30) errors.benefits = 'Mỗi bài tuyển dụng có tối đa 30 quyền lợi.';
@@ -299,7 +294,8 @@ export default function CompanyCreateJob() {
   const minimumStartTime = startDate === minimumStartDate ? startBoundary.time : '00:00';
   const currentStartAt = startDate ? dateValue(startDate, startTime) : null;
   const startTimeLocked = editing && jobStatus !== null && jobStatus !== 0 && (!currentStartAt || new Date(currentStartAt).getTime() <= lockCheckNow + 5 * 60 * 1000);
-  const minimumDeadlineDate = startDate && addDays(startDate, 1) > addDays(today, 1) ? addDays(startDate, 1) : addDays(today, 1);
+  const startedPublishedJob = editing && jobStatus === 1 && !!originalStartAt && new Date(originalStartAt).getTime() <= Date.now();
+  const minimumDeadlineDate = startedPublishedJob ? today : startDate && addDays(startDate, 1) > addDays(today, 1) ? addDays(startDate, 1) : addDays(today, 1);
 
   const addCatalogSkill = (item: SkillCatalogItem, type: 0 | 1) => {
     if (!skills.some(skill => skill.skillId === item.id) && skills.length >= 100) {
@@ -332,7 +328,7 @@ export default function CompanyCreateJob() {
   };
 
   const scrollToFirstError = (errors: Record<string, string>) => {
-    const firstError = ['title', 'startAt', 'deadline', 'workMode', 'location', 'salary', 'salaryMax', 'description'].find(key => errors[key]);
+    const firstError = ['title', 'startAt', 'deadline', 'workMode', 'location', 'salary', 'salaryMax', 'description', 'requirements'].find(key => errors[key]);
     const target = firstError ? errorTargets.current[firstError] : null;
     if (!target) return;
     if (Platform.OS === 'web') {
@@ -347,28 +343,6 @@ export default function CompanyCreateJob() {
       (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true }),
       () => scrollRef.current?.scrollTo({ y: 0, animated: true }),
     );
-  };
-
-  const addRequirement = () => {
-    const value = requirementDraft.trim();
-    if (!value) {
-      setFormNotice({ type: 'error', title: 'Chưa có nội dung yêu cầu', message: 'Nhập nội dung rồi chọn “Thêm”.' });
-      return;
-    }
-    if (value.length > 2000) {
-      setFormNotice({ type: 'error', title: 'Yêu cầu quá dài', message: 'Mỗi mục yêu cầu không được dài quá 2.000 ký tự.' });
-      return;
-    }
-    const setter = requirementType === 0 ? setQualifications : setPreferredQualifications;
-    const current = requirementType === 0 ? qualifications : preferredQualifications;
-    if (current.length >= 50) {
-      setFormNotice({ type: 'error', title: 'Đã đủ số yêu cầu', message: 'Mỗi nhóm yêu cầu có tối đa 50 mục.' });
-      return;
-    }
-    setter(current => [...current, value]);
-    skillCatalog.filter(item => value.toLocaleLowerCase().includes(item.name.toLocaleLowerCase()))
-      .forEach(item => addCatalogSkill(item, requirementType));
-    setRequirementDraft('');
   };
 
   const addBenefit = () => {
@@ -404,10 +378,13 @@ export default function CompanyCreateJob() {
         ]);
         setSkillCatalog(catalog);
         setCompanyName(profile.companyName);
+        setCompanyAvatarUrl(profile.avatarUrl);
+        setCompanyAvatarFailed(false);
         setCompanyAddress(profile.address ?? '');
         setVerification(verificationStatus);
         if (job) {
           setJobStatus(job.status);
+          setOriginalStartAt(job.startAt);
           setTitle(job.title);
           setWorkMode(['Tại văn phòng', 'Kết hợp', 'Từ xa'][job.workType] ?? 'Tại văn phòng');
           setLocation(job.location ?? '');
@@ -417,13 +394,13 @@ export default function CompanyCreateJob() {
           setSalary(job.minSalaryVnd == null ? '' : formatVnd(String(job.minSalaryVnd)));
           setSalaryMax(job.maxSalaryVnd == null ? '' : formatVnd(String(job.maxSalaryVnd)));
           setDescription(job.description ?? '');
-          setQualifications(job.requiredQualifications);
-          setPreferredQualifications(job.preferredQualifications);
+          setRequirementsText([...job.requiredQualifications, ...job.preferredQualifications].filter(item => item.trim()).join('\n'));
           setProjectAreas(job.projectAreas);
           setSkills(job.skills.map(skill => ({ key: skill.skillId ?? `pending:${skill.name.toLocaleLowerCase()}`, ...(skill.skillId ? { skillId: skill.skillId } : {}), name: skill.name, requirementType: skill.requirementType })));
           setBenefits(job.benefits.map((benefit, index) => ({ ...benefit, icon: benefit.icon ?? benefitIcons[index % benefitIcons.length]!.key })));
         } else {
           setJobStatus(null);
+          setOriginalStartAt(null);
           setLocation(profile.address ?? '');
         }
       } catch (cause) {
@@ -454,6 +431,8 @@ export default function CompanyCreateJob() {
     const errors = validateFields();
     const parsedDeadline = dateValue(deadline, '', true);
     const parsedStartAt = startDate ? dateValue(startDate, startTime) : null;
+    const startAtUnchanged = startDate === datePart(originalStartAt) && startTime === timePart(originalStartAt);
+    const startAtToSave = startTimeLocked && startAtUnchanged ? originalStartAt : parsedStartAt;
     const minimum = salary.trim() ? Number(salary.replace(/\D/g, '')) : null;
     const maximum = salaryMax.trim() ? Number(salaryMax.replace(/\D/g, '')) : null;
     setFieldErrors(errors);
@@ -471,11 +450,11 @@ export default function CompanyCreateJob() {
       maxSalaryVnd: maximum,
       location: location.trim(),
       description: description.trim(),
-      startAt: parsedStartAt,
+      startAt: startAtToSave,
       deadline: parsedDeadline ?? '',
       status,
-      requiredQualifications: qualifications,
-      preferredQualifications,
+      requiredQualifications: requirementsText.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+      preferredQualifications: [],
       projectAreas,
       skills: skills.map(({ skillId, name, requirementType }) => skillId ? ({ skillId, requirementType }) : ({ name, requirementType })),
       benefits,
@@ -533,14 +512,14 @@ export default function CompanyCreateJob() {
   };
 
   return <CompanyPage><PageScroll scrollRef={scrollRef}>
-    <View style={s.nav}><Pressable onPress={() => formIsDirty ? setShowLeavePrompt(true) : router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={{ flex: 1 }}><Text style={s.navTitle}>{editing ? 'Chỉnh sửa bài tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.navSub}>{companyName || 'Tổ chức của bạn'}</Text></View><View style={s.avatar}><Text style={s.avatarText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View></View>
+    <View style={s.nav}><Pressable onPress={() => formIsDirty ? setShowLeavePrompt(true) : router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={{ flex: 1 }}><Text style={s.navTitle}>{editing ? 'Chỉnh sửa bài tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.navSub}>{companyName || 'Tổ chức của bạn'}</Text></View><View style={s.avatar}>{companyAvatarUrl && !companyAvatarFailed ? <Image accessibilityLabel={`Logo ${companyName}`} source={{ uri: companyAvatarUrl }} resizeMode="cover" onError={() => setCompanyAvatarFailed(true)} style={s.avatarImage} /> : <Text style={s.avatarText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text>}</View></View>
     <Modal transparent visible={showLeavePrompt} animationType="fade" onRequestClose={() => setShowLeavePrompt(false)}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>Bài này chưa được lưu</Text><Text style={s.noticeMessage}>{jobStatus === 1 ? 'Bạn có muốn lưu các thay đổi cho bài đã đăng không?' : 'Bạn có muốn lưu nháp lại không?'}</Text><View style={s.leaveActions}><ActionButton title="Ở lại" variant="outline" onPress={() => setShowLeavePrompt(false)} /><ActionButton title="Bỏ qua" variant="soft" onPress={() => router.back()} /><ActionButton title={jobStatus === 1 ? 'Lưu thay đổi' : 'Lưu nháp'} onPress={() => { setShowLeavePrompt(false); void saveJob(jobStatus === 1 ? 1 : 0, true); }} /></View></View></View></Modal>
     <Modal transparent visible={showPublishSuccess} animationType="fade" onRequestClose={() => router.replace('/(company)/jobs')}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>{editing ? 'Cập nhật bài đăng thành công' : 'Đăng bài thành công'}</Text><Text style={s.noticeMessage}>{editing ? 'Bài tuyển dụng đã được cập nhật.' : 'Bài tuyển dụng đã được đăng công khai.'} Đang chuyển về trang quản lý bài đăng…</Text></View></View></Modal>
     {!!formNotice && <View accessibilityRole="alert" style={[s.notice, formNotice.type === 'success' ? s.noticeSuccess : s.noticeError]}><Text style={s.noticeTitle}>{formNotice.title}</Text><Text style={s.noticeMessage}>{formNotice.message}</Text></View>}
     {!!loadError && <Card><Text style={s.error}>{loadError}</Text><ActionButton title="Quay lại" onPress={() => router.back()} variant="outline" /></Card>}
     {loading ? <Card><ActivityIndicator color={c.purple} /><Text style={s.helper}>Đang tải dữ liệu bài tuyển dụng…</Text></Card> : null}
     <Card style={s.jobPreview}>
-      <View style={s.previewTop}><View style={s.logo}><Text style={s.logoText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View><View style={{ flex: 1 }}><Text style={s.company}>{companyName || 'Tổ chức của bạn'}</Text><Text style={s.helper}>{location || 'Địa điểm làm việc'}</Text></View></View>
+      <View style={s.previewTop}><View style={s.logo}>{companyAvatarUrl && !companyAvatarFailed ? <Image accessibilityLabel={`Logo ${companyName}`} source={{ uri: companyAvatarUrl }} resizeMode="cover" onError={() => setCompanyAvatarFailed(true)} style={s.avatarImage} /> : <Text style={s.logoText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text>}</View><View style={{ flex: 1 }}><Text style={s.company}>{companyName || 'Tổ chức của bạn'}</Text><Text style={s.helper}>{location || 'Địa điểm làm việc'}</Text></View></View>
       <Text style={s.previewTitle}>{title || 'Bản xem trước bài tuyển dụng'}</Text>
       {!!workMode && <Tag tone="purple">{workMode}</Tag>}
       <View style={s.pills}>{(() => {
@@ -567,11 +546,8 @@ export default function CompanyCreateJob() {
     </Card>
     <Card><Text style={s.sectionTitle}>Mô tả công việc</Text><View ref={node => { errorTargets.current.description = node; }}><Field label="Nội dung *" value={description} onChangeText={setDescription} onBlur={() => validateOnBlur('description')} multiline placeholder="Mô tả trách nhiệm, môi trường làm việc và quyền lợi..." error={fieldErrors.description} /></View><Text style={s.helper}>Mô tả rõ vai trò, hướng dẫn và sản phẩm giúp ứng viên hiểu cơ hội.</Text>
     </Card>
-    <Card><Text style={s.sectionTitle}>Yêu cầu</Text><Text style={s.helper}>Thêm mô tả yêu cầu. Nếu nội dung có tên kỹ năng trong danh mục UniNet, kỹ năng sẽ tự được gắn vào đúng nhóm.</Text>
-      <RequirementSwitch value={requirementType} onChange={setRequirementType} />
-      {(requirementType === 0 ? qualifications : preferredQualifications).map((item, index) => <View style={s.editableRow} key={`${requirementType}-${index}`}><TextInput style={[s.input, s.rowInput]} value={item} onChangeText={value => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.map((entry, i) => i === index ? value : entry))} /><Pressable accessibilityLabel="Xóa yêu cầu" onPress={() => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.filter((_, i) => i !== index))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View>)}
-      <View style={s.addRow}><TextInput style={[s.input, s.rowInput, s.textarea]} value={requirementDraft} onChangeText={setRequirementDraft} multiline placeholder="Ví dụ: Có kinh nghiệm JavaScript và Node.js" placeholderTextColor={c.muted} /><Pressable onPress={addRequirement}><Text style={s.purpleText}>+ Thêm</Text></Pressable></View>
-      {!!fieldErrors.requirements && <Text accessibilityRole="alert" style={s.fieldError}>{fieldErrors.requirements}</Text>}
+    <Card><Text style={s.sectionTitle}>Yêu cầu</Text><Text style={s.helper}>Nhập yêu cầu bằng văn bản tự do. Kỹ năng được quản lý riêng ở phần bên dưới.</Text>
+      <View ref={node => { errorTargets.current.requirements = node; }}><Field label="Nội dung" value={requirementsText} onChangeText={setRequirementsText} onBlur={() => validateOnBlur('requirements')} multiline placeholder="Mô tả kinh nghiệm, kiến thức hoặc điều kiện cần thiết..." error={fieldErrors.requirements} /></View>
     </Card>
     <Card><Text style={s.sectionTitle}>Kỹ năng cần có</Text><Text style={s.helper}>Chọn nhóm trước khi thêm. Kỹ năng mới sẽ được gửi để admin phân loại sau khi bài được đăng công khai.</Text>
       <RequirementSwitch value={skillType} onChange={setSkillType} />
@@ -606,8 +582,8 @@ export default function CompanyCreateJob() {
 }
 
 const s = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 },
-  jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontWeight: '900', fontSize: 10 }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft, overflow: 'hidden' }, avatarImage: { width: '100%', height: '100%' }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 },
+  jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, logoText: { color: '#FFF', fontWeight: '900', fontSize: 10 }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
   sectionTitle: { color: c.ink, fontSize: 14, fontWeight: '900', marginBottom: 4 }, sectionSub: { color: c.muted, fontSize: 9, marginBottom: 5 }, field: { marginTop: 8, gap: 5 }, label: { color: c.ink, fontSize: 10, fontWeight: '700' }, input: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, color: c.ink, fontSize: 10 }, textarea: { minHeight: 72, paddingTop: 10, lineHeight: 16 }, salaryRow: { flexDirection: 'row', gap: 8 }, dateRow: { flexDirection: 'row', gap: 8 }, dateButton: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, dateButtonDisabled: { backgroundColor: '#F4F6FA', opacity: 0.72 }, dateText: { color: c.ink, fontSize: 11 }, datePlaceholder: { color: c.muted, fontSize: 11 }, dateTimeCard: { position: 'relative', zIndex: 1000, elevation: 100 }, startAtLayer: { position: 'relative', zIndex: 1000, elevation: 100 }, lockNotice: { color: c.muted, fontSize: 9, lineHeight: 13, marginTop: 5 },
   editableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, rowInput: { flex: 1 }, addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, purpleText: { color: c.purple, fontSize: 10, fontWeight: '800' }, suggestions: { borderWidth: 1, borderColor: c.line, borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden' }, suggestion: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, suggestionText: { color: c.ink, fontSize: 11, fontWeight: '600' }, noSkill: { gap: 6, marginTop: 7 }, skillList: { gap: 8, marginTop: 12, alignItems: 'center' }, skillChip: { minHeight: 32, maxWidth: 260, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, borderWidth: 1 }, skillRequired: { borderColor: '#BFDBFE', backgroundColor: '#EAF3FF' }, skillPreferred: { borderColor: '#BBF7D0', backgroundColor: '#E8F7F0' }, skillChipBody: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }, skillChipText: { maxWidth: 220, fontSize: 10, fontWeight: '700' }, skillRequiredText: { color: c.purple }, skillPreferredText: { color: c.green }, skillRemove: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2' }, skillRemoveText: { color: c.rose, fontSize: 15, fontWeight: '700', lineHeight: 17 },
   requirementSwitch: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, padding: 3, borderRadius: 20, backgroundColor: '#F1F5F9' }, requirementOption: { minHeight: 30, paddingHorizontal: 12, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, requirementOptionRequired: { backgroundColor: c.purple }, requirementOptionPreferred: { backgroundColor: c.green }, requirementOptionText: { color: c.muted, fontSize: 9, fontWeight: '800' }, requirementOptionTextActive: { color: '#FFF' },

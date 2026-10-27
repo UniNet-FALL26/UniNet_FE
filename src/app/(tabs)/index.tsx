@@ -1,21 +1,20 @@
-import { PostCommentsModal } from "@/components/community/CommunityCommentsModal";
+import { CommentModal } from "@/components/community/CommentModal";
 import { CommunityComposer } from "@/components/community/CommunityComposer";
-import { Button } from "@/components/ui/Button";
+import { UpdatePostModal } from "@/components/community/UpdatePostModal";
 import { colors } from "@/constants/colors";
 import {
   communityService,
-  type AdCampaignFeedItem,
   type PostResponse,
 } from "@/services/community.service";
 import { useAuthStore } from "@/store/auth.store";
 import { useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
-  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -25,937 +24,920 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type FeedItem =
-  | { id: string; type: "post"; data: PostResponse }
-  | { id: string; type: "ad"; data: AdCampaignFeedItem };
-
-const REPORT_REASONS = [
-  "Spam hoặc quảng cáo rác",
-  "Nội dung vi phạm tiêu chuẩn cộng đồng",
-  "Quấy rối, đe dọa hoặc ngôn từ thù hận",
-  "Thông tin giả mạo hoặc sai sự thật",
-  "Nội dung bạo lực hoặc nhạy cảm",
-];
+// Cpn xử lý Description xem thêm
+const ExpandableDescription = ({ text }: { text: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  const isLong = text.length > 150;
+  return (
+    <View>
+      <Text style={styles.description} numberOfLines={expanded ? undefined : 3}>
+        {text}
+      </Text>
+      {isLong && !expanded && (
+        <Pressable onPress={() => setExpanded(true)}>
+          <Text style={styles.seeMoreText}>Xem thêm</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
 
 export default function CommunityScreen() {
   const { isAuthenticated, account } = useAuthStore();
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [posts, setPosts] = useState<PostResponse[]>([]);
+  const [adPost, setAdPost] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // State menu tùy chọn 3 chấm & báo cáo bài viết
-  const [optionsPost, setOptionsPost] = useState<PostResponse | null>(null);
-  const [reportPostId, setReportPostId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState("");
-  const [submittingReport, setSubmittingReport] = useState(false);
-  const [reportError, setReportError] = useState("");
-  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(
+  const [optionsPostId, setOptionsPostId] = useState<string | null>(null);
+  const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(
+    null,
+  );
+  const [editingPost, setEditingPost] = useState<PostResponse | null>(null);
+
+  const [lightboxPost, setLightboxPost] = useState<PostResponse | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
     null,
   );
 
-  const trackedImpressions = useRef<Set<string>>(new Set());
-  const abortController = useRef<AbortController | null>(null);
-  const cachedAds = useRef<AdCampaignFeedItem[]>([]);
-
-  // Trộn bài đăng và quảng cáo với key độc nhất cho cả Post và Ad
-  const mergePostsAndAds = (
-    posts: PostResponse[],
-    ads: AdCampaignFeedItem[],
-    currentPage: number,
-  ): FeedItem[] => {
-    const result: FeedItem[] = [];
-    let adIndex = 0;
-
-    const safePosts = Array.isArray(posts) ? posts : [];
-    const safeAds = Array.isArray(ads) ? ads : [];
-
-    safePosts.forEach((post, index) => {
-      result.push({ id: `post-${post.id}`, type: "post", data: post });
-
-      if ((index + 1) % 3 === 0 && safeAds.length > 0) {
-        const ad = safeAds[adIndex % safeAds.length];
-        result.push({
-          id: `ad-${ad.id}-p${currentPage}-${index}`,
-          type: "ad",
-          data: ad,
-        });
-        adIndex++;
-      }
-    });
-
-    return result;
+  const fetchAdPost = async () => {
+    try {
+      const data = await communityService.getAdFeed();
+      const fetchedAd = Array.isArray(data)
+        ? data[0]
+        : ((data as any)?.data ?? data);
+      if (fetchedAd) setAdPost(fetchedAd);
+    } catch (error) {
+      console.error("Lỗi tải Ad Post:", error);
+    }
   };
 
-  // Tải Bảng tin từ Backend API
-  const fetchFeed = useCallback(async (pageNum: number, isRefresh = false) => {
-    abortController.current?.abort();
-    const controller = new AbortController();
-    abortController.current = controller;
+  const feedData = useMemo(() => {
+    const combined: Array<{ type: "POST" | "AD"; id: string; data: any }> = [];
+    posts.forEach((post, index) => {
+      combined.push({ type: "POST", id: `post-${post.id}`, data: post });
+      if (index === 2 && adPost) {
+        combined.push({ type: "AD", id: `ad-${adPost.id}`, data: adPost });
+      }
+    });
+    return combined;
+  }, [posts, adPost]);
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else if (pageNum === 1) {
-      setLoading(true);
-    }
-    setError("");
+  const fetchFeed = useCallback(async (pageNum: number, isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else if (pageNum === 1) setLoading(true);
 
     try {
-      const [postsResponse, adsData] = await Promise.all([
-        communityService.getPosts(
-          { page: pageNum, pageSize: 10 },
-          controller.signal,
-        ),
-        pageNum === 1 || cachedAds.current.length === 0
-          ? communityService.getAdFeed(controller.signal).catch(() => [])
-          : Promise.resolve(cachedAds.current),
-      ]);
+      if (pageNum === 1) fetchAdPost();
 
-      if (!controller.signal.aborted) {
-        const fetchedPosts: PostResponse[] = Array.isArray(postsResponse)
-          ? postsResponse
-          : (postsResponse?.data ?? []);
+      const data = await communityService.getPosts({
+        page: pageNum,
+        pageSize: 10,
+      });
+      const fetchedPosts = Array.isArray(data)
+        ? data
+        : ((data as any)?.data ?? []);
 
-        const fetchedAds: AdCampaignFeedItem[] = Array.isArray(adsData)
-          ? adsData
-          : [];
+      if (isRefresh || pageNum === 1) setPosts(fetchedPosts);
+      else setPosts((prev) => [...prev, ...fetchedPosts]);
 
-        if (pageNum === 1) {
-          cachedAds.current = fetchedAds;
-        }
-
-        const newFeedItems = mergePostsAndAds(
-          fetchedPosts,
-          cachedAds.current,
-          pageNum,
-        );
-
-        if (isRefresh || pageNum === 1) {
-          setFeedItems(newFeedItems);
-        } else {
-          setFeedItems((prev) => [...prev, ...newFeedItems]);
-        }
-
-        setHasMore(fetchedPosts.length >= 10);
-        setPage(pageNum);
-      }
-    } catch (cause) {
-      if (!controller.signal.aborted) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Chưa tải được bảng tin. Vui lòng thử lại.",
-        );
-      }
+      setHasMore(fetchedPosts.length >= 10);
+      setPage(pageNum);
+    } catch (error) {
+      console.error(error);
     } finally {
-      if (controller === abortController.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
+      setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchFeed(1);
-      return () => {
-        abortController.current?.abort();
-      };
     }, [fetchFeed]),
   );
 
-  // Thêm bài viết mới vừa đăng lên đầu bảng tin
-  const handlePostCreated = (newPost: PostResponse) => {
-    setFeedItems((prev) => [
-      { id: `post-${newPost.id}`, type: "post", data: newPost },
-      ...prev,
-    ]);
-  };
-
-  // Xóa bài viết
-  const handleDeletePost = async (postId: string) => {
-    setOptionsPost(null);
-    setFeedItems((prev) =>
-      prev.filter((item) => !(item.type === "post" && item.data.id === postId)),
-    );
-
+  const handleConfirmDeletePost = async () => {
+    if (!deleteConfirmPostId) return;
     try {
-      await communityService.deletePost(postId);
+      if (!deleteConfirmPostId.startsWith("temp-")) {
+        await communityService.deletePost(deleteConfirmPostId);
+      }
+      setPosts((prev) => prev.filter((p) => p.id !== deleteConfirmPostId));
+      if (adPost?.id === deleteConfirmPostId) setAdPost(null);
+      setDeleteConfirmPostId(null);
     } catch {
-      fetchFeed(1);
+      Alert.alert("Lỗi", "Không thể xóa bài viết.");
     }
   };
 
-  // Thả tim API
-  const handleToggleLike = async (postId: string) => {
-    let previousItemState: PostResponse | null = null;
+  const handleToggleBookmark = async (postId: string) => {
+    try {
+      const response: any = await communityService.toggleBookmark(postId);
+      const isNowSaved = response?.message === "Saved";
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isSaved: isNowSaved } : p)),
+      );
+      Alert.alert(
+        "Thành công",
+        isNowSaved ? "Đã lưu bài viết." : "Đã hủy lưu bài viết.",
+      );
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể thực hiện lưu bài viết.");
+    }
+  };
 
-    setFeedItems((prev) =>
-      prev.map((item) => {
-        if (item.type === "post" && item.data.id === postId) {
-          previousItemState = { ...item.data };
-          const isFavorited = !item.data.isFavorited;
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              isFavorited,
-              favoriteCount: isFavorited
-                ? item.data.favoriteCount + 1
-                : Math.max(0, item.data.favoriteCount - 1),
-            },
-          };
-        }
-        return item;
-      }),
-    );
-
+  const handleToggleReaction = async (postId: string) => {
     try {
       await communityService.toggleReact(postId);
-    } catch {
-      if (previousItemState) {
-        setFeedItems((prev) =>
-          prev.map((item) =>
-            item.type === "post" && item.data.id === postId
-              ? { ...item, data: previousItemState! }
-              : item,
-          ),
-        );
-      }
-    }
-  };
-
-  // Lưu bài viết API
-  const handleToggleBookmark = async (postId: string) => {
-    let previousItemState: PostResponse | null = null;
-
-    setFeedItems((prev) =>
-      prev.map((item) => {
-        if (item.type === "post" && item.data.id === postId) {
-          previousItemState = { ...item.data };
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              isSaved: !item.data.isSaved,
-            },
-          };
-        }
-        return item;
-      }),
-    );
-
-    try {
-      await communityService.toggleBookmark(postId);
-    } catch {
-      if (previousItemState) {
-        setFeedItems((prev) =>
-          prev.map((item) =>
-            item.type === "post" && item.data.id === postId
-              ? { ...item, data: previousItemState! }
-              : item,
-          ),
-        );
-      }
-    }
-  };
-
-  // Báo cáo bài viết API
-  const handleSubmitReport = async () => {
-    if (!reportPostId || !reportReason.trim()) {
-      setReportError("Vui lòng chọn lý do báo cáo.");
-      return;
-    }
-
-    setSubmittingReport(true);
-    setReportError("");
-
-    try {
-      await communityService.reportPost(reportPostId, {
-        reason: reportReason.trim(),
-      });
-      setReportPostId(null);
-      setReportReason("");
-    } catch (cause) {
-      setReportError(
-        cause instanceof Error
-          ? cause.message
-          : "Không thể gửi báo cáo. Vui lòng thử lại.",
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId) {
+            const isFavorited = !(p as any).isFavorited;
+            return {
+              ...p,
+              isFavorited,
+              favoriteCount: isFavorited
+                ? p.favoriteCount + 1
+                : Math.max(0, p.favoriteCount - 1),
+            };
+          }
+          return p;
+        }),
       );
-    } finally {
-      setSubmittingReport(false);
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể thực hiện thích bài viết.");
     }
   };
 
-  // Click Quảng cáo
-  const handleAdPress = async (ad: AdCampaignFeedItem) => {
-    try {
-      void communityService.trackAdClick(ad.id);
-      if (ad.destinationUrl) {
-        await Linking.openURL(ad.destinationUrl);
-      }
-    } catch {
-      // Ignored
-    }
+  const openLightbox = (post: PostResponse, index: number) => {
+    setLightboxPost(post);
+    setSelectedImageIndex(index);
   };
 
-  // Tracking Impression Quảng cáo
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: FeedItem }> }) => {
-      viewableItems.forEach(({ item }) => {
-        if (
-          item.type === "ad" &&
-          !trackedImpressions.current.has(item.data.id)
-        ) {
-          trackedImpressions.current.add(item.data.id);
-          void communityService.trackAdImpression(item.data.id);
-        }
-      });
-    },
-  ).current;
+  const renderMedia = (post: PostResponse) => {
+    const urls = post.mediaUrls;
+    if (!urls || urls.length === 0) return null;
 
-  const renderPostCard = (post: PostResponse) => {
-    const isMenuOpen = optionsPost?.id === post.id;
-
+    if (urls.length === 1)
+      return (
+        <Pressable onPress={() => openLightbox(post, 0)}>
+          <Image
+            source={{ uri: urls[0] }}
+            style={styles.singleImage}
+            resizeMode="contain"
+          />
+        </Pressable>
+      );
+    if (urls.length === 2)
+      return (
+        <View style={styles.imageGrid}>
+          <View style={styles.imageRow}>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => openLightbox(post, 0)}
+            >
+              <Image
+                source={{ uri: urls[0] }}
+                style={styles.gridImageHalf}
+                resizeMode="cover"
+              />
+            </Pressable>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => openLightbox(post, 1)}
+            >
+              <Image
+                source={{ uri: urls[1] }}
+                style={styles.gridImageHalf}
+                resizeMode="cover"
+              />
+            </Pressable>
+          </View>
+        </View>
+      );
+    if (urls.length === 3)
+      return (
+        <View style={styles.imageGrid}>
+          <Pressable onPress={() => openLightbox(post, 0)}>
+            <Image
+              source={{ uri: urls[0] }}
+              style={styles.gridImageMain}
+              resizeMode="cover"
+            />
+          </Pressable>
+          <View style={styles.imageRow}>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => openLightbox(post, 1)}
+            >
+              <Image
+                source={{ uri: urls[1] }}
+                style={styles.gridImageHalfBottom}
+                resizeMode="cover"
+              />
+            </Pressable>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => openLightbox(post, 2)}
+            >
+              <Image
+                source={{ uri: urls[2] }}
+                style={styles.gridImageHalfBottom}
+                resizeMode="cover"
+              />
+            </Pressable>
+          </View>
+        </View>
+      );
     return (
-      <View style={[styles.card, isMenuOpen && styles.activeCard]}>
+      <View style={styles.imageGrid}>
+        <Pressable onPress={() => openLightbox(post, 0)}>
+          <Image
+            source={{ uri: urls[0] }}
+            style={styles.gridImageMain}
+            resizeMode="cover"
+          />
+        </Pressable>
+        <View style={styles.imageRow}>
+          <Pressable style={{ flex: 1 }} onPress={() => openLightbox(post, 1)}>
+            <Image
+              source={{ uri: urls[1] }}
+              style={styles.gridImageThird}
+              resizeMode="cover"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => openLightbox(post, 2)}>
+            <Image
+              source={{ uri: urls[2] }}
+              style={styles.gridImageThird}
+              resizeMode="cover"
+            />
+          </Pressable>
+          <Pressable style={{ flex: 1 }} onPress={() => openLightbox(post, 3)}>
+            <View style={styles.gridImageThirdContainer}>
+              <Image
+                source={{ uri: urls[3] }}
+                style={styles.gridImageThird}
+                resizeMode="cover"
+              />
+              {urls.length > 4 && (
+                <View style={styles.moreImagesOverlay}>
+                  <Text style={styles.moreImagesText}>+{urls.length - 4}</Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAdCard = (ad: any) => {
+    return (
+      <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.authorInfo}>
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {post.authorName?.charAt(0).toUpperCase() || "U"}
-              </Text>
+            <View style={[styles.avatarPlaceholder, { overflow: "hidden" }]}>
+              {ad.sponsorLogo ? (
+                <Image
+                  source={{ uri: ad.sponsorLogo }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarText}>AD</Text>
+              )}
             </View>
             <View>
-              <Text style={styles.authorName}>{post.authorName}</Text>
-              <Text style={styles.postDate}>
-                {new Date(post.createdAt).toLocaleDateString("vi-VN")}
-              </Text>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Text style={styles.authorName}>
+                  {ad.sponsorName || "Đối tác tài trợ"}
+                </Text>
+                <SymbolView
+                  name={{
+                    ios: "checkmark.seal.fill",
+                    android: "verified",
+                    web: "verified",
+                  }}
+                  size={14}
+                  tintColor="#3B82F6"
+                />
+              </View>
+              <Text style={styles.postDate}>Được tài trợ</Text>
             </View>
           </View>
+        </View>
 
-          {/* Anchor chứa nút 3 chấm và Dropdown */}
+        {ad.description && <ExpandableDescription text={ad.description} />}
+
+        <View style={styles.mediaContainer}>
+          <View style={styles.adMediaBox}>
+            <Image
+              source={{ uri: ad.mediaUrl || ad.imageUrl }}
+              style={styles.singleImage}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.adCtaRow}>
+            <Text style={styles.adDestinationText} numberOfLines={1}>
+              {ad.destinationUrl || "https://uninet.com"}
+            </Text>
+            <Pressable style={styles.adCtaButton}>
+              <Text style={styles.adCtaButtonText}>Xem ngay</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderPostCard = ({ item }: { item: PostResponse }) => {
+    const isPostOwner =
+      account?.id === item.authorUserId ||
+      (account as any)?.profile?.id === item.authorUserId;
+    const isOpenMenu = optionsPostId === item.id;
+    const isSaved = (item as any).isSaved;
+    const isFavorited = (item as any).isFavorited;
+
+    // Ưu tiên hiển thị Nickname
+    const displayName = (item as any).authorNickname || item.authorName;
+
+    return (
+      <View
+        style={[styles.card, isOpenMenu && { zIndex: 9999, elevation: 10 }]}
+      >
+        <View style={[styles.cardHeader, isOpenMenu && { zIndex: 9999 }]}>
+          <Pressable
+            style={styles.authorInfo}
+            onPress={() => setCommentPostId(item.id)}
+          >
+            <View style={[styles.avatarPlaceholder, { overflow: "hidden" }]}>
+              {item.authorAvatar ? (
+                <Image
+                  source={{ uri: item.authorAvatar }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {displayName?.charAt(0)?.toUpperCase()}
+                </Text>
+              )}
+            </View>
+            <View>
+              <Text style={styles.authorName}>{displayName}</Text>
+              <Text style={styles.postDate}>
+                {new Date(item.createdAt).toLocaleDateString("vi-VN")}
+              </Text>
+            </View>
+          </Pressable>
+
           <View style={styles.menuAnchor}>
             <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Tùy chọn bài đăng"
-              onPress={() =>
-                setOptionsPost((prev) => (prev?.id === post.id ? null : post))
-              }
-              style={({ pressed }) => [
-                styles.iconBtn,
-                pressed && styles.pressed,
-              ]}
+              onPress={() => setOptionsPostId(isOpenMenu ? null : item.id)}
+              style={styles.iconBtnSmall}
             >
               <SymbolView
                 name={{
                   ios: "ellipsis",
-                  android: "more_vert",
-                  web: "more_vert",
+                  android: "more_horiz",
+                  web: "more_horiz",
                 }}
                 size={20}
                 tintColor={colors.textSecondary}
               />
             </Pressable>
 
-            {/* Dropdown Menu thả xuống tại chỗ */}
-            {isMenuOpen && (
-              <View style={styles.dropdownMenu}>
-                {account?.id === post.authorUserId && (
-                  <Pressable
-                    onPress={() => handleDeletePost(post.id)}
-                    style={({ pressed }) => [
-                      styles.dropdownItem,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <SymbolView
-                      name={{ ios: "trash", android: "delete", web: "delete" }}
-                      size={16}
-                      tintColor={colors.error}
-                    />
-                    <Text style={styles.deleteOptionText}>Xóa bài viết</Text>
-                  </Pressable>
-                )}
-
+            {isOpenMenu && (
+              <>
                 <Pressable
-                  onPress={() => {
-                    setReportPostId(post.id);
-                    setReportReason("");
-                    setReportError("");
-                    setOptionsPost(null);
-                  }}
-                  style={({ pressed }) => [
-                    styles.dropdownItem,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <SymbolView
-                    name={{
-                      ios: "exclamationmark.triangle",
-                      android: "report",
-                      web: "report",
-                    }}
-                    size={16}
-                    tintColor={colors.textPrimary}
-                  />
-                  <Text style={styles.optionText}>Báo cáo bài viết</Text>
-                </Pressable>
-              </View>
+                  style={styles.dropdownBackdrop}
+                  onPress={() => setOptionsPostId(null)}
+                />
+                <View style={styles.dropdownContainerRight}>
+                  <View style={styles.tooltipArrow} />
+                  <View style={styles.dropdownMenu}>
+                    <Pressable
+                      onPress={() => {
+                        setOptionsPostId(null);
+                        handleToggleBookmark(item.id);
+                      }}
+                      style={styles.dropdownItem}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          { color: colors.textPrimary },
+                        ]}
+                      >
+                        {isSaved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
+                      </Text>
+                    </Pressable>
+
+                    {isPostOwner && (
+                      <>
+                        <Pressable
+                          onPress={() => {
+                            setOptionsPostId(null);
+                            setEditingPost(item);
+                          }}
+                          style={styles.dropdownItem}
+                        >
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: colors.textPrimary },
+                            ]}
+                          >
+                            Sửa bài viết
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            setOptionsPostId(null);
+                            setDeleteConfirmPostId(item.id);
+                          }}
+                          style={styles.dropdownItem}
+                        >
+                          <Text
+                            style={[styles.optionText, { color: colors.error }]}
+                          >
+                            Xóa bài viết
+                          </Text>
+                        </Pressable>
+                      </>
+                    )}
+
+                    {!isPostOwner && (
+                      <Pressable
+                        onPress={() => {
+                          setOptionsPostId(null);
+                          Alert.alert(
+                            "Báo cáo",
+                            "Báo cáo bài viết này với quản trị viên?",
+                            [
+                              { text: "Hủy", style: "cancel" },
+                              {
+                                text: "Gửi báo cáo",
+                                style: "destructive",
+                                onPress: () =>
+                                  Alert.alert(
+                                    "Cảm ơn",
+                                    "Báo cáo của bạn đã được ghi nhận.",
+                                  ),
+                              },
+                            ],
+                          );
+                        }}
+                        style={styles.dropdownItem}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          Báo cáo bài viết
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              </>
             )}
           </View>
         </View>
 
-        <Text style={styles.description}>{post.description}</Text>
+        <Pressable onPress={() => setCommentPostId(item.id)}>
+          <ExpandableDescription text={item.description || ""} />
+        </Pressable>
 
-        {post.mediaUrls && post.mediaUrls.length > 0 && (
-          <Image
-            source={{ uri: post.mediaUrls[0] }}
-            style={styles.mediaImage}
-            resizeMode="cover"
-          />
-        )}
+        <View style={styles.mediaContainer}>{renderMedia(item)}</View>
 
         <View style={styles.cardFooter}>
           <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Thả tim"
-            onPress={() => handleToggleLike(post.id)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              pressed && styles.pressed,
-            ]}
+            style={styles.actionBtn}
+            onPress={() => handleToggleReaction(item.id)}
           >
             <SymbolView
               name={{
-                ios: post.isFavorited ? "heart.fill" : "heart",
-                android: post.isFavorited ? "favorite" : "favorite_border",
-                web: post.isFavorited ? "favorite" : "favorite_border",
+                ios: isFavorited ? "heart.fill" : "heart",
+                android: isFavorited ? "favorite" : "favorite_border",
+                web: isFavorited ? "favorite" : "favorite_border",
               }}
               size={18}
-              tintColor={post.isFavorited ? colors.error : colors.textSecondary}
+              tintColor={isFavorited ? "#EF4444" : colors.textSecondary}
             />
             <Text
               style={[
                 styles.actionText,
-                post.isFavorited && { color: colors.error },
+                isFavorited && { color: "#EF4444", fontWeight: "600" },
               ]}
             >
-              {post.favoriteCount}
+              {item.favoriteCount}
             </Text>
           </Pressable>
-
           <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Bình luận"
-            onPress={() => setActiveCommentPostId(post.id)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              pressed && styles.pressed,
-            ]}
-          >
-            <SymbolView
-              name={{ ios: "bubble.right", android: "comment", web: "comment" }}
-              size={18}
-              tintColor={colors.textSecondary}
-            />
-            <Text style={styles.actionText}>{post.commentCount}</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Lưu bài viết"
-            onPress={() => handleToggleBookmark(post.id)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              pressed && styles.pressed,
-              { marginLeft: "auto" },
-            ]}
+            style={styles.actionBtn}
+            onPress={() => setCommentPostId(item.id)}
           >
             <SymbolView
               name={{
-                ios: post.isSaved ? "bookmark.fill" : "bookmark",
-                android: post.isSaved ? "bookmark" : "bookmark_border",
-                web: post.isSaved ? "bookmark" : "bookmark_border",
+                ios: "bubble.right.fill",
+                android: "comment",
+                web: "comment",
               }}
               size={18}
-              tintColor={post.isSaved ? colors.primary : colors.textSecondary}
+              tintColor={colors.textSecondary}
             />
+            <Text style={styles.actionText}>{item.commentCount}</Text>
           </Pressable>
         </View>
       </View>
     );
   };
 
-  const renderAdCard = (ad: AdCampaignFeedItem) => (
-    <Pressable
-      onPress={() => handleAdPress(ad)}
-      style={({ pressed }) => [
-        styles.card,
-        styles.adCard,
-        pressed && styles.pressed,
-      ]}
-    >
-      <View style={styles.adBadgeContainer}>
-        <Text style={styles.adBadgeText}>Được tài trợ</Text>
-        <SymbolView
-          name={{
-            ios: "arrow.up.right",
-            android: "open_in_new",
-            web: "open_in_new",
-          }}
-          size={14}
-          tintColor={colors.primary}
-        />
-      </View>
-
-      <Text style={styles.adTitle}>{ad.title}</Text>
-      <Text style={styles.description} numberOfLines={3}>
-        {ad.content}
-      </Text>
-
-      {ad.mediaUrl && (
-        <Image
-          source={{ uri: ad.mediaUrl }}
-          style={styles.mediaImage}
-          resizeMode="cover"
-        />
-      )}
-    </Pressable>
-  );
-
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Overlay trong suốt đóng dropdown khi nhấp ra ngoài */}
-      {!!optionsPost && (
-        <Pressable
-          style={styles.backdropOverlay}
-          onPress={() => setOptionsPost(null)}
-        />
-      )}
-
       {loading ? (
-        <View style={styles.stateContainer}>
-          <ActivityIndicator
-            accessibilityLabel="Đang tải bảng tin"
-            color={colors.primary}
-            size="large"
-          />
-        </View>
-      ) : error ? (
-        <View style={styles.stateContainer}>
-          <Text accessibilityRole="alert" style={styles.errorText}>
-            {error}
-          </Text>
-          <Button title="Thử lại" onPress={() => fetchFeed(1)} />
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : (
         <FlatList
-          data={feedItems}
+          data={feedData}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) =>
-            item.type === "post"
-              ? renderPostCard(item.data)
-              : renderAdCard(item.data)
-          }
+          renderItem={({ item }) => {
+            if (item.type === "AD") return renderAdCard(item.data);
+            return renderPostCard({ item: item.data });
+          }}
+          onScroll={() => {
+            if (optionsPostId) setOptionsPostId(null);
+          }}
           ListHeaderComponent={
             isAuthenticated ? (
-              <CommunityComposer onCreated={handlePostCreated} />
+              <CommunityComposer onCreated={() => fetchFeed(1, true)} />
             ) : null
           }
           contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => fetchFeed(1, true)}
-              colors={[colors.primary]}
             />
           }
           onEndReached={() => {
-            if (hasMore && !loading && !refreshing) {
-              fetchFeed(page + 1);
-            }
+            if (hasMore && !loading) fetchFeed(page + 1);
           }}
-          onEndReachedThreshold={0.5}
         />
       )}
 
-      {/* Modal Báo cáo bài viết */}
-      <Modal
-        visible={!!reportPostId}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setReportPostId(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Báo cáo bài viết</Text>
-            <Text style={styles.modalSubtitle}>
-              Chọn lý do bạn muốn báo cáo bài viết này:
-            </Text>
+      <CommentModal
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
+      />
 
-            <View style={styles.reasonsList}>
-              {REPORT_REASONS.map((reason) => {
-                const isSelected = reportReason === reason;
-                return (
-                  <Pressable
-                    key={reason}
-                    onPress={() => {
-                      setReportReason(reason);
-                      setReportError("");
-                    }}
-                    style={({ pressed }) => [
-                      styles.reasonOption,
-                      isSelected && styles.reasonOptionSelected,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        isSelected && styles.radioCircleSelected,
-                      ]}
-                    >
-                      {isSelected && <View style={styles.radioInnerCircle} />}
-                    </View>
-                    <Text
-                      style={[
-                        styles.reasonOptionText,
-                        isSelected && styles.reasonOptionTextSelected,
-                      ]}
-                    >
-                      {reason}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {!!reportError && (
-              <Text style={styles.errorText}>{reportError}</Text>
-            )}
-
-            <View style={styles.modalActions}>
+      <Modal visible={!!deleteConfirmPostId} transparent animationType="fade">
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Xóa bài viết?</Text>
+            <View style={styles.popupActions}>
               <Pressable
-                onPress={() => setReportPostId(null)}
-                style={({ pressed }) => [
-                  styles.cancelBtn,
-                  pressed && styles.pressed,
-                ]}
-                disabled={submittingReport}
+                style={[styles.popupBtn, { backgroundColor: "#F3F4F6" }]}
+                onPress={() => setDeleteConfirmPostId(null)}
               >
-                <Text style={styles.cancelBtnText}>Hủy</Text>
+                <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                  Hủy
+                </Text>
               </Pressable>
-
-              <Button
-                title={submittingReport ? "Đang gửi..." : "Gửi báo cáo"}
-                onPress={handleSubmitReport}
-                disabled={submittingReport || !reportReason}
-              />
+              <Pressable
+                style={[styles.popupBtn, { backgroundColor: colors.error }]}
+                onPress={handleConfirmDeletePost}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "600" }}>Xóa</Text>
+              </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Modal Bình luận */}
-      <PostCommentsModal
-        visible={!!activeCommentPostId}
-        postId={activeCommentPostId || ""}
-        onClose={() => setActiveCommentPostId(null)}
-        onCommentCountChange={(delta) => {
-          setFeedItems((prev) =>
-            prev.map((item) => {
-              if (
-                item.type === "post" &&
-                item.data.id === activeCommentPostId
-              ) {
-                return {
-                  ...item,
-                  data: {
-                    ...item.data,
-                    commentCount: Math.max(0, item.data.commentCount + delta),
-                  },
-                };
-              }
-              return item;
-            }),
-          );
-        }}
+      <UpdatePostModal
+        post={editingPost}
+        visible={!!editingPost}
+        onClose={() => setEditingPost(null)}
+        onUpdated={(updated) =>
+          setPosts((prev) =>
+            prev.map((p) => (p.id === updated.id ? updated : p)),
+          )
+        }
       />
+
+      {/* OVERLAY XEM ẢNH */}
+      <Modal
+        visible={selectedImageIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedImageIndex(null)}
+      >
+        <View style={styles.lightboxOverlay}>
+          <Pressable
+            style={styles.lightboxCloseBtn}
+            onPress={() => setSelectedImageIndex(null)}
+          >
+            <SymbolView
+              name={{ ios: "xmark", android: "close", web: "close" }}
+              size={28}
+              tintColor="#FFF"
+            />
+          </Pressable>
+
+          {selectedImageIndex !== null && lightboxPost?.mediaUrls && (
+            <View style={styles.lightboxContent}>
+              {lightboxPost.mediaUrls.length > 1 && (
+                <Pressable
+                  style={[styles.lightboxNavBtn, { left: 20 }]}
+                  onPress={() =>
+                    setSelectedImageIndex((prev) =>
+                      prev !== null && prev > 0
+                        ? prev - 1
+                        : (lightboxPost.mediaUrls?.length ?? 1) - 1,
+                    )
+                  }
+                >
+                  <SymbolView
+                    name={{
+                      ios: "chevron.left",
+                      android: "chevron_left",
+                      web: "chevron_left",
+                    }}
+                    size={36}
+                    tintColor="#FFF"
+                  />
+                </Pressable>
+              )}
+
+              <Image
+                source={{ uri: lightboxPost.mediaUrls[selectedImageIndex] }}
+                style={styles.lightboxImage}
+                resizeMode="contain"
+              />
+
+              {lightboxPost.mediaUrls.length > 1 && (
+                <Pressable
+                  style={[styles.lightboxNavBtn, { right: 20 }]}
+                  onPress={() =>
+                    setSelectedImageIndex((prev) =>
+                      prev !== null &&
+                      prev < (lightboxPost.mediaUrls?.length ?? 1) - 1
+                        ? prev + 1
+                        : 0,
+                    )
+                  }
+                >
+                  <SymbolView
+                    name={{
+                      ios: "chevron.right",
+                      android: "chevron_right",
+                      web: "chevron_right",
+                    }}
+                    size={36}
+                    tintColor="#FFF"
+                  />
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  backdropOverlay: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 50,
-    backgroundColor: "transparent",
-  },
-  pressed: {
-    opacity: 0.65,
-  },
-  stateContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    padding: 24,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: "center",
-  },
+  safe: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   listContent: {
-    padding: 16,
-    gap: 16,
-    maxWidth: 800,
-    width: "100%",
+    padding: 12, // Giảm từ 16
+    gap: 12, // Giảm từ 16
+    maxWidth: 650, // Thu nhỏ maxWidth lại
     alignSelf: "center",
+    width: "100%",
   },
+  avatarImage: { width: "100%", height: "100%", resizeMode: "cover" },
   card: {
-    backgroundColor: colors.surface || "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    zIndex: 1,
-  },
-  activeCard: {
-    zIndex: 100,
-    elevation: 10,
-  },
-  adCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 14,
+    padding: 14,
+    gap: 10, // Thu nhỏ gap gốc của bài viết
+    elevation: 1,
     borderWidth: 1,
-    borderColor: colors.primaryLight || "#E0E7FF",
-    backgroundColor: "#F8FAFC",
-  },
-  adBadgeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    alignSelf: "flex-start",
-    backgroundColor: colors.primaryLight || "#EEF2FF",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  adBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  adTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textPrimary,
+    borderColor: "#F3F4F6",
   },
   cardHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    position: "relative",
   },
-  authorInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
+  authorInfo: { flexDirection: "row", gap: 10, alignItems: "center", flex: 1 },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight || "#EEF2FF",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: {
+  avatarText: { color: colors.primary, fontWeight: "700" },
+  authorName: { fontSize: 14, fontWeight: "700", color: "#111827" },
+  postDate: { fontSize: 12, color: colors.textSecondary },
+
+  description: { fontSize: 14, lineHeight: 20, color: "#1F2937" },
+  seeMoreText: {
+    fontSize: 14,
     color: colors.primary,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  authorName: {
-    fontSize: 15,
     fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  postDate: {
-    fontSize: 12,
-    color: colors.textSecondary,
     marginTop: 2,
   },
-  menuAnchor: {
-    position: "relative",
-    zIndex: 101,
+
+  mediaContainer: {
+    overflow: "hidden",
+    borderRadius: 12,
+    backgroundColor: "#111827", // Lớp phủ trống cho phần dư của ảnh contain
   },
-  iconBtn: {
-    width: 36,
-    height: 36,
+  singleImage: { width: "100%", height: 280, resizeMode: "contain" }, // Fix 280px + contain
+
+  imageGrid: {
+    width: "100%",
+    overflow: "hidden",
+    gap: 2,
+    backgroundColor: "#FFF",
+  }, // Nền trắng chia ô
+  imageRow: { flexDirection: "row", gap: 2 },
+  gridImageHalf: {
+    flex: 1,
+    aspectRatio: 1,
+    maxHeight: 180,
+    resizeMode: "cover",
+  },
+  gridImageMain: { width: "100%", height: 200, resizeMode: "cover" },
+  gridImageHalfBottom: {
+    flex: 1,
+    aspectRatio: 4 / 3,
+    maxHeight: 130,
+    resizeMode: "cover",
+  },
+  gridImageThirdContainer: { flex: 1, aspectRatio: 1, maxHeight: 130 },
+  gridImageThird: {
+    flex: 1,
+    aspectRatio: 1,
+    maxHeight: 130,
+    resizeMode: "cover",
+  },
+
+  moreImagesOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.5)",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 18,
   },
-  dropdownMenu: {
-    position: "absolute",
-    top: 38,
-    right: 0,
-    minWidth: 160,
-    backgroundColor: colors.surface || "#FFFFFF",
-    borderRadius: 12,
-    paddingVertical: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: colors.border || "#E5E7EB",
-    zIndex: 1000,
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  optionText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: colors.textPrimary,
-  },
-  deleteOptionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.error,
-  },
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textPrimary,
-  },
-  mediaImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 12,
-  },
+  moreImagesText: { color: "#FFF", fontSize: 20, fontWeight: "700" },
+
   cardFooter: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 20,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border || "#F3F4F6",
+    borderColor: "#F3F4F6",
   },
-  actionBtn: {
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
+  actionText: { fontSize: 13, color: colors.textSecondary },
+
+  menuAnchor: { position: "relative" },
+  iconBtnSmall: { padding: 4 },
+  dropdownBackdrop: {
+    position: "absolute",
+    top: -1000,
+    bottom: -1000,
+    left: -1000,
+    right: -1000,
+    backgroundColor: "transparent",
+    zIndex: 999,
+  },
+  dropdownContainerRight: {
+    position: "absolute",
+    top: 32,
+    right: 0,
+    zIndex: 1000,
+  },
+  tooltipArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 10,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#FFF",
+    alignSelf: "flex-end",
+    marginRight: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  dropdownMenu: {
+    minWidth: 160,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8 },
+  optionText: { fontSize: 14, fontWeight: "500" },
+
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  popupContent: { backgroundColor: "#FFF", borderRadius: 16, padding: 20 },
+  popupTitle: { fontSize: 18, fontWeight: "700", marginBottom: 15 },
+  popupActions: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 10,
   },
-  actionText: {
+  popupBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
+
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  lightboxCloseBtn: {
+    position: "absolute",
+    top: 40,
+    right: 30,
+    zIndex: 10,
+    padding: 10,
+  },
+  lightboxContent: {
+    width: "100%",
+    height: "80%",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  lightboxImage: { width: "85%", height: "100%" },
+  lightboxNavBtn: {
+    position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -20 }],
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
+  },
+
+  // Ad Specific Styles
+  adMediaBox: { width: "100%" },
+  adCtaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#F3F4F6",
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  adDestinationText: {
+    flex: 1,
     fontSize: 13,
     color: colors.textSecondary,
     fontWeight: "500",
+    marginRight: 10,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modalContent: {
-    width: "100%",
-    maxWidth: 480,
-    backgroundColor: colors.background || "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  reasonsList: {
-    gap: 8,
-    marginVertical: 4,
-  },
-  reasonOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border || "#E5E7EB",
-    backgroundColor: "#F9FAFB",
-  },
-  reasonOptionSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight || "#EEF2FF",
-  },
-  radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: colors.textSecondary || "#9CA3AF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioCircleSelected: {
-    borderColor: colors.primary,
-  },
-  radioInnerCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  adCtaButton: {
     backgroundColor: colors.primary,
-  },
-  reasonOptionText: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  reasonOptionTextSelected: {
-    fontWeight: "600",
-    color: colors.primary,
-  },
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 8,
-  },
-  cancelBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  cancelBtnText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
+  adCtaButtonText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
 });

@@ -2,7 +2,6 @@ import { API_URL } from "@/constants/config";
 import { localizeProjectError } from "@/services/project-errors";
 import type { LoginResponse } from "@/types/auth";
 import { tokenStorage, type AuthSession } from "@/utils/storage";
-
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -183,6 +182,77 @@ export async function apiRequest<T>(
       throw expired();
     }
   }
+  assertCurrentSession();
+  if (!response.ok) throw await responseError(response, path, options.method);
+  if (response.status === 204) return undefined as T;
+  const result = (await response.json()) as T;
+  assertCurrentSession();
+  return result;
+}
+// Thêm hàm apiMultipartRequest để dùng riêng cho các request upload file (FormData)
+export async function apiMultipartRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const original = tokenStorage.getSession();
+
+  // Dùng plain object thay vì `new Headers()` để tránh bug của React Native
+  // làm mất chuỗi 'boundary' khi upload FormData.
+  const headers: Record<string, string> = {};
+  if (options.headers) {
+    new Headers(options.headers).forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
+
+  // Tuyệt đối không set Content-Type để trình duyệt/fetch tự động sinh ra Content-Type: multipart/form-data kèm boundary
+  if (headers["content-type"]) {
+    delete headers["content-type"];
+  }
+
+  if (original?.accessToken && !headers["authorization"]) {
+    headers["authorization"] = `Bearer ${original.accessToken}`;
+  }
+
+  let response = await fetchResponse(path, { ...options, headers });
+
+  const assertCurrentSession = () => {
+    if (
+      original &&
+      tokenStorage.getSession()?.generation !== original.generation
+    )
+      throw changed();
+  };
+  assertCurrentSession();
+
+  // Xử lý refresh token tương tự như apiRequest
+  const authPath = /^\/auth\/(?:login|register|google|refresh)(?:\/|$)/.test(
+    path.split("?")[0],
+  );
+
+  if (
+    response.status === 401 &&
+    !authPath &&
+    original &&
+    headers["authorization"] === `Bearer ${original.accessToken}`
+  ) {
+    let current = tokenStorage.getSession();
+    if (!current || current.generation !== original.generation) throw changed();
+    if (current.accessToken === original.accessToken) {
+      await refreshSession(current);
+      current = tokenStorage.getSession();
+    }
+    if (!current || current.generation !== original.generation) throw changed();
+
+    headers["authorization"] = `Bearer ${current.accessToken}`;
+    response = await fetchResponse(path, { ...options, headers });
+
+    if (response.status === 401) {
+      await tokenStorage.clear(current);
+      throw expired();
+    }
+  }
+
   assertCurrentSession();
   if (!response.ok) throw await responseError(response, path, options.method);
   if (response.status === 204) return undefined as T;

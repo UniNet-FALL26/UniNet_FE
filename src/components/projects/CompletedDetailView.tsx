@@ -1,3 +1,4 @@
+import { verificationDate as date } from '@/utils/verification-date';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +11,7 @@ import type { EvidenceModeration } from '@/types/project-verification';
 import { level1Labels, level1Message, level2Label } from '@/utils/project-verification';
 
 const limitation = 'Chỉ kiểm tra văn bản báo cáo và độ an toàn URL. Chưa đọc nội dung file hoặc xác nhận công việc đã hoàn thành.';
-const date = (value?: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('vi-VN') : 'Chưa có';
+const projectDate = date;
 const checkLabels = ['Đạt', 'Không đạt', 'Lỗi dịch vụ', 'Chưa kiểm tra'];
 const kindLabel = (kind: string) => /url/i.test(kind) ? 'Độ an toàn URL' : /text|content/i.test(kind) ? 'Văn bản báo cáo' : 'Kiểm tra minh chứng';
 
@@ -48,7 +49,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
   const [tab, setTab] = useState(initialTab);
   const [expanded, setExpanded] = useState(false);
   const wide = useWindowDimensions().width >= 900;
-  const { level1, level2, cycle, notice, retrying, refresh, retry } = useProjectVerification(project.id, project.isCreator);
+  const { level1, level2, cycle, notice, retrying, refresh, retry } = useProjectVerification(project.id, project.isCreator, level1Only);
   const review = level1.data;
   const eligible = review?.status === 2 && review.isCurrent;
   const privateMessage = 'Kết quả xác minh riêng tư chỉ dành cho người tạo dự án. Trạng thái hoàn thành không đồng nghĩa đã xác minh.';
@@ -62,7 +63,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
     : { pathname: '/group/verification/[id]', params: { id: project.id } } as never);
   const canRetry = project.isCreator && !level1.loading && !level1.error && !level1.forbidden && review?.status !== 0 && review?.status !== 1;
   const level1Title = level1.error ? 'Chưa tải được kết quả cấp 1' : level1.loading && !review ? 'Đang tải cấp 1…' : review ? level1Labels[review.status] : 'Chưa có kết quả cấp 1';
-  const nextMessage = !project.isCreator ? privateMessage : level1.error || (level1.loading && !review ? 'Đang tải kết quả xác minh để xác định bước tiếp theo.' : level1Message(review));
+  const nextMessage = !project.isCreator ? privateMessage : level2.data ? level2Label(level2.data, !!eligible) : level1.error || (level1.loading && !review ? 'Đang tải kết quả xác minh để xác định bước tiếp theo.' : level1Message(review));
   const cta = level1Only
     ? { title: 'Xem minh chứng cần cập nhật', action: showEvidence }
     : !level2.loading && !level2.error && (level2.data || eligible)
@@ -77,13 +78,12 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
     </View>
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}>
-        <View pointerEvents="none" style={s.heroRing} /><View pointerEvents="none" style={s.heroRingInner} />
+
         <View style={s.heroTop}><Text style={s.heroKicker}>HỒ SƠ DỰ ÁN</Text><Text style={s.heroMark}>✓</Text></View>
         <Text style={s.eyebrow}>{project.projectField}</Text>
         <Text accessibilityRole="header" style={s.title}>{project.title}</Text>
         <View style={s.badges}><Text style={s.badge}>✓ Đã hoàn thành</Text><Text style={s.role}>{project.isCreator ? 'Người tạo dự án' : project.isMember ? 'Thành viên' : 'Khách xem'}</Text></View>
         <Text style={s.heroNote}>Hoàn thành dự án và xác minh là hai trạng thái độc lập.</Text>
-        <View style={s.heroStats}><View style={s.heroStat}><Text style={s.statValue}>{members.length}</Text><Text style={s.statLabel}>Thành viên</Text></View><View style={s.statDivider} /><View style={s.heroStat}><Text style={s.statValue}>{project.skills.length}</Text><Text style={s.statLabel}>Kỹ năng</Text></View><View style={s.statDivider} /><View style={s.heroStat}><Text style={s.statValue}>02</Text><Text style={s.statLabel}>Cấp xác minh</Text></View></View>
       </View>
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}
       {project.isCreator ? <View style={[s.summary, wide && !level1Only && s.summaryWide]}>
@@ -103,7 +103,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
           <Button title="Làm mới trạng thái" variant="outline" onPress={refresh} disabled={level1.loading || level2.loading} />
         </Card></View>}
         <View style={[s.nextColumn, wide && !level1Only && s.nextColumnWide]}><Card title={level1Only ? level1Title : 'Bước tiếp theo'}>
-          {!level1Only && <Text style={s.actionEyebrow}>TIẾP TỤC HOÀN THIỆN HỒ SƠ</Text>}
+          {!level1Only && <Text style={s.small}>Chọn hành động bên dưới để tiếp tục.</Text>}
           <Text style={s.body}>{!level1Only && level1.error ? 'Kết quả kiểm tra hiện chưa tải được. Bạn có thể mở chi tiết cấp 1 để xem trạng thái và thử lại.' : nextMessage}</Text>
           {level1.loading && <ActivityIndicator color={colors.primary} />}
           {!level1Only && <Button title={cta.title} onPress={cta.action} loading={retrying} />}
@@ -126,22 +126,22 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
 
       {!level1Only && <View accessibilityRole="tablist" style={s.tabs}>{['Tổng quan', 'Minh chứng', 'Xác minh'].map(name => <Pressable key={name} accessibilityRole="tab" accessibilityState={{ selected: tab === name }} onPress={() => setTab(name)} style={[s.tab, tab === name && s.selectedTab]}><Text style={[s.tabText, tab === name && s.selectedText]}>{name}</Text></Pressable>)}</View>}
       {!level1Only && tab === 'Tổng quan' && <>
-        <Card title="Về dự án"><Text style={s.body} numberOfLines={expanded ? undefined : 5}>{project.description || 'Chưa có mô tả.'}</Text><Button title={expanded ? 'Thu gọn mô tả' : 'Đọc đầy đủ mô tả'} variant="outline" onPress={() => setExpanded(v => !v)} /><Text style={s.label}>Kết quả dự kiến</Text><Text style={s.body}>{project.expectedOutput || 'Chưa cập nhật.'}</Text><Text style={s.small}>Ngày tạo: {date(project.createdAt)}{ '\n' }Cập nhật: {date(project.updatedAt)}</Text></Card>
+        <Card title="Về dự án"><Text style={s.body} numberOfLines={expanded ? undefined : 5}>{project.description || 'Chưa có mô tả.'}</Text><Button title={expanded ? 'Thu gọn mô tả' : 'Đọc đầy đủ mô tả'} variant="outline" onPress={() => setExpanded(v => !v)} /><Text style={s.label}>Kết quả dự kiến</Text><Text style={s.body}>{projectDate(project.expectedOutput)}</Text><Text style={s.small}>Giờ Việt Nam (UTC+7)</Text><Text style={s.small}>Ngày tạo: {projectDate(project.createdAt)}{ '\n' }Cập nhật: {projectDate(project.updatedAt)}</Text></Card>
         <Card title={`Đội ngũ · ${members.length}`} >{members.map(member => <View key={member.userId} style={s.member}><View style={s.avatar}><Text style={s.avatarText}>{member.fullName.trim().split(/\s+/).slice(-2).map(word => word[0]).join('')}</Text></View><View style={s.stepBody}><Text style={s.label}>{member.fullName}</Text><Text style={s.small}>{member.role}</Text></View></View>)}</Card>
         <Card title="Kỹ năng"><View style={s.skillList}>{project.skills.length ? project.skills.map(skill => <Text key={skill.skillId} style={s.skillChip}>{skill.skillName}</Text>) : <Text style={s.body}>Chưa có kỹ năng.</Text>}</View></Card>
       </>}
       {(level1Only || tab === 'Minh chứng') && project.isCreator && <Card title="Báo cáo và minh chứng">
-        {cycle.loading ? <Text style={s.small}>Đang kiểm tra quyền cập nhật minh chứng…</Text> : <Text style={s.notice}>{cycle.error ? 'Chưa xác định được quyền cập nhật. Tạm thời chỉ xem minh chứng.' : cycle.data?.status === 0 ? 'Đầu vào đóng góp đang mở. Chỉnh sửa/nộp minh chứng sẽ được triển khai ở màn hình Tasks và report (S03); quyền cuối cùng do backend kiểm tra.' : 'Minh chứng đang ở chế độ chỉ đọc: không có chu kỳ đóng góp đang thu thập đánh giá hoặc đầu vào đã khóa.'}</Text>}
+        {cycle.loading ? <Text style={s.small}>Đang kiểm tra quyền cập nhật minh chứng…</Text> : <Text style={s.notice}>{cycle.error ? 'Chưa xác định được quyền cập nhật. Tạm thời chỉ xem minh chứng.' : cycle.data?.status === 0 ? 'Đầu vào đóng góp đang mở. Bên dưới là minh chứng đã được ghi nhận trong phiên kiểm tra gần nhất.' : 'Minh chứng đang ở chế độ chỉ đọc: không có chu kỳ đóng góp đang thu thập đánh giá hoặc đầu vào đã khóa.'}</Text>}
         <Text style={s.small}>Đây là bản chụp tại thời điểm kiểm tra, có thể khác dữ liệu hiện tại. Cập nhật minh chứng có thể làm kết quả cũ hết hiệu lực.</Text>
         {level1.error ? <Text style={s.warning}>{level1.error}</Text> : review ? <ReviewEvidence review={review} checks={level1Only} /> : <Text style={s.body}>{level1.loading ? 'Đang tải…' : 'Chưa có bản chụp minh chứng cấp 1.'}</Text>}
       </Card>}
-      {!level1Only && tab === 'Minh chứng' && !project.isCreator && <Card title="Minh chứng"><Text style={s.body}>{project.isMember ? 'Báo cáo theo phân công sẽ được hỗ trợ ở màn hình Tasks và report (S03).' : 'Bạn không có quyền xem báo cáo và minh chứng riêng tư.'}</Text></Card>}
+      {!level1Only && tab === 'Minh chứng' && !project.isCreator && <Card title="Minh chứng"><Text style={s.body}>{project.isMember ? 'Minh chứng trong phiên kiểm tra chỉ dành cho người tạo dự án.' : 'Bạn không có quyền xem báo cáo và minh chứng riêng tư.'}</Text></Card>}
       {!level1Only && tab === 'Xác minh' && <Card title="Chi tiết xác minh">
         <Text style={s.body}>{project.isCreator ? nextMessage : privateMessage}</Text>
         {project.isCreator && <>
           <Text style={s.label}>Cấp 2 · Xác minh chuyên viên</Text>
           <Text style={s.body}>{level2.error || (level2.loading && !level2.data ? 'Đang tải…' : level2Label(level2.data, !!eligible))}</Text>
-          {level2.data?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(level2.data.verification.scheduledStartAt)} — {date(level2.data.verification.scheduledEndAt)} (giờ thiết bị)</Text>}
+          {level2.data?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(level2.data.verification.scheduledStartAt)} — {date(level2.data.verification.scheduledEndAt)} (giờ Việt Nam, UTC+7)</Text>}
           {!level2.loading && !level2.error && (eligible || level2.data) && <Button title={level2.data ? 'Xem hồ sơ cấp 2' : 'Chọn gói cấp 2'} onPress={openLevel2} />}
           <Text style={s.small}>Theo dõi lịch hẹn, thanh toán và kết luận chuyên viên trong hồ sơ cấp 2.</Text>
         </>}
@@ -154,17 +154,17 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   back: { minWidth: 48, minHeight: 52, alignItems: 'center', justifyContent: 'center' }, backText: { fontSize: 34, color: colors.primary }, headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: colors.navy },
-  content: { padding: 20, gap: 22, width: '100%', maxWidth: 1120, alignSelf: 'center', paddingBottom: 40 },
-  hero: { padding: 26, backgroundColor: '#102E54', borderRadius: 26, gap: 14, overflow: 'hidden' },
+  content: { padding: 16, gap: 16, width: '100%', maxWidth: 1120, alignSelf: 'center', paddingBottom: 40 },
+  hero: { padding: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 16, gap: 14, overflow: 'hidden' },
   heroRing: { position: 'absolute', width: 380, height: 380, borderRadius: 190, borderWidth: 52, borderColor: '#1A416B', right: -130, top: -100 },
   heroRingInner: { position: 'absolute', width: 240, height: 240, borderRadius: 120, borderWidth: 1, borderColor: '#32608B', right: -60, top: -30 },
-  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, heroKicker: { fontSize: 11, letterSpacing: 2, fontWeight: '700', color: '#B4CAE3' }, heroMark: { fontSize: 22, fontWeight: '700', color: '#8DE1C4', width: 40, height: 40, textAlign: 'center', lineHeight: 40, backgroundColor: '#234B62', borderRadius: 14 },
-  eyebrow: { color: '#9DCDFF', fontWeight: '600', fontSize: 14 }, title: { fontSize: 30, lineHeight: 39, fontWeight: '800', color: '#FFFFFF' },
-  heroNote: { color: '#BDCEE3', fontSize: 14, lineHeight: 23 }, heroStats: { flexDirection: 'row', alignItems: 'center', gap: 16, borderTopWidth: 1, borderColor: '#355170', paddingTop: 18, marginTop: 6 }, heroStat: { flex: 1, gap: 3 }, statValue: { color: '#FFFFFF', fontSize: 23, fontWeight: '700' }, statLabel: { color: '#BDCEE3', fontSize: 12, lineHeight: 18 }, statDivider: { width: 1, height: 34, backgroundColor: '#355170' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, heroKicker: { fontSize: 11, letterSpacing: 2, fontWeight: '700', color: colors.textSecondary }, heroMark: { fontSize: 22, fontWeight: '700', color: '#8DE1C4', width: 40, height: 40, textAlign: 'center', lineHeight: 40, backgroundColor: '#234B62', borderRadius: 14 },
+  eyebrow: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 }, title: { fontSize: 24, lineHeight: 32, fontWeight: '800', color: colors.navy },
+  heroNote: { color: colors.textSecondary, fontSize: 14, lineHeight: 23 }, heroStats: { flexDirection: 'row', alignItems: 'center', gap: 16, borderTopWidth: 1, borderColor: '#355170', paddingTop: 18, marginTop: 6 }, heroStat: { flex: 1, gap: 3 }, statValue: { color: '#FFFFFF', fontSize: 23, fontWeight: '700' }, statLabel: { color: colors.textSecondary, fontSize: 12, lineHeight: 18 }, statDivider: { width: 1, height: 34, backgroundColor: '#355170' },
   summary: { gap: 18 }, summaryWide: { flexDirection: 'row', alignItems: 'flex-start' }, progressColumn: { flex: 1, minWidth: 0 }, nextColumn: { minWidth: 0 }, nextColumnWide: { width: 340 },
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 6 }, stepNumber: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EEF3FA', alignItems: 'center', justifyContent: 'center' }, stepNumberText: { fontSize: 14, fontWeight: '800', color: '#536B89' }, stepPassed: { backgroundColor: '#E4F6EE' }, stepPassedText: { color: '#1B7854' }, stepBody: { flex: 1, minWidth: 0, gap: 5 }, actionEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: colors.primary },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, badge: { backgroundColor: colors.projectCompletedBackground, color: colors.projectCompleted, padding: 8, borderRadius: 8, fontWeight: '700' }, role: { color: colors.navy, padding: 8, borderRadius: 8, backgroundColor: colors.surface },
-  card: { padding: 22, gap: 16, backgroundColor: colors.surface, borderRadius: 20, borderWidth: 1, borderColor: '#E3EAF3', boxShadow: '0 5px 22px #16365B06' },
+  card: { padding: 18, gap: 14, backgroundColor: colors.surface, borderRadius: 20, borderWidth: 1, borderColor: '#E3EAF3', boxShadow: '0 5px 22px #16365B06' },
   heading: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: colors.navy }, label: { fontSize: 16, lineHeight: 24, fontWeight: '600', color: colors.navy }, body: { fontSize: 16, lineHeight: 25, color: colors.textPrimary }, small: { fontSize: 14, lineHeight: 22, color: colors.textSecondary },
   warning: { fontSize: 16, lineHeight: 24, color: colors.error }, notice: { padding: 14, backgroundColor: colors.primaryLight, borderRadius: 12, color: colors.navy, fontSize: 15, lineHeight: 24 },
   tabs: { flexDirection: 'row', gap: 4, backgroundColor: '#E9EFF7', borderRadius: 16, padding: 5 }, tab: { flex: 1, minHeight: 48, paddingHorizontal: 4, justifyContent: 'center', alignItems: 'center', borderRadius: 12 }, selectedTab: { backgroundColor: colors.surface, boxShadow: '0 2px 8px #16365B12' }, tabText: { fontSize: 14, color: colors.textSecondary, fontWeight: '600' }, selectedText: { color: colors.primary },

@@ -5,12 +5,12 @@ import { ArticleSection, CertificateSection, ExtraSection, JourneySection, Proje
 import { PortfolioLink, ui } from './PortfolioPrimitives';
 import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 
-export type DeveloperModernTemplateProps = { data: PortfolioResponse; theme: ProfileTheme; width: number; thumbnail?: boolean; onNavigate?: (id: string) => void; onSectionLayout?: (id: string, y: number) => void };
+export type DeveloperModernTemplateProps = { data: PortfolioResponse; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean; onNavigate?: (id: string) => void; onSectionLayout?: (id: string, y: number) => void };
 const defaultOrder = ['stats', 'skills', 'journey', 'other-projects', 'certificates', 'activities', 'articles'];
-export function DeveloperModernTemplate({ data, theme, width, thumbnail, onNavigate, onSectionLayout }: DeveloperModernTemplateProps) {
+export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = false, onNavigate, onSectionLayout }: DeveloperModernTemplateProps) {
   const editing = useProfileEditing();
   const compact = width < 720;
-  const props = { portfolio: data.portfolio, theme, compact, thumbnail };
+  const props = { portfolio: data.portfolio, theme, compact, thumbnail, demo };
   const appearance = data.portfolio.appearance?.profile;
   const sections: Record<string, React.ReactNode> = {
     stats: <Statistics {...props} />, skills: <SkillSection {...props} />, journey: <JourneySection {...props} />,

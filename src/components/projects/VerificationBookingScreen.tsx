@@ -1,3 +1,4 @@
+import { verificationDate, VERIFICATION_TIME_ZONE, VERIFICATION_TIME_LABEL } from '@/utils/verification-date';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -63,8 +64,8 @@ export function VerificationBookingScreen() {
         const from = new Date(Date.now() + week * 7 * 86400000);
         const result = await service.slots(resumed.verification.id, from.toISOString(), new Date(from.getTime() + 7 * 86400000).toISOString(), controller.signal);
         // Validate the server's zone before rendering dates; never silently substitute device time.
-        slotDate(new Date().toISOString(), result.timeZoneId);
-        if (!controller.signal.aborted) { setSlots(result); setDay(previous => result.slots.some(s => slotDate(s.startAt, result.timeZoneId) === previous) ? previous : result.slots[0] ? slotDate(result.slots[0].startAt, result.timeZoneId) : ''); }
+        slotDate(new Date().toISOString(), VERIFICATION_TIME_ZONE);
+        if (!controller.signal.aborted) { setSlots(result); setDay(previous => result.slots.some(s => slotDate(s.startAt, VERIFICATION_TIME_ZONE) === previous) ? previous : result.slots[0] ? slotDate(result.slots[0].startAt, VERIFICATION_TIME_ZONE) : ''); }
       } else {
         const level1 = await service.getLevel1(project.id, controller.signal);
         if (level1.status !== 2 || !level1.isCurrent) throw new Error('Cần kết quả cấp 1 đạt và còn hiện hành trước khi chọn gói.');
@@ -75,7 +76,7 @@ export function VerificationBookingScreen() {
     }
     void load().catch(cause => { if (!controller.signal.aborted) setError(errorMessage(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     const timer = setInterval(() => { if (AppState.currentState === 'active') setNow(Date.now()); }, 1000);
-    const subscription = AppState.addEventListener('change', state => { if (state === 'active') { setNow(Date.now()); reload(); } });
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') { setNow(Date.now()); } });
     return () => { controller.abort(); generation.current = current + 1; clearInterval(timer); subscription.remove(); };
   }, [id, account?.id, week, packagePage, revision]));
 
@@ -105,7 +106,7 @@ export function VerificationBookingScreen() {
       }
     } finally { lock.current = false; setBusy(false); }
   }
-  const dates = slots ? [...new Set(slots.slots.map(s => slotDate(s.startAt, slots.timeZoneId)))] : [];
+  const dates = slots ? [...new Set(slots.slots.map(s => slotDate(s.startAt, VERIFICATION_TIME_ZONE)))] : [];
   return <SafeAreaView style={s.safe}>
     <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} style={s.back}><Text style={s.backText}>‹</Text></Pressable><Text style={s.headerTitle}>{detail ? 'Chọn lịch xác minh' : 'Chọn gói cấp 2'}</Text></View>
     <ScrollView contentContainerStyle={s.content}>
@@ -123,7 +124,7 @@ export function VerificationBookingScreen() {
         <View style={s.card}><Text style={s.heading}>Điều kiện đăng ký</Text><Text style={s.body}>✓ Bạn là người tạo dự án đã hoàn thành.{ '\n' }✓ Kết quả cấp 1 đạt và còn hiện hành.</Text><Text style={s.small}>Kết quả cấp 2 do chuyên viên kết luận sau buổi xác minh. Đăng ký gói không bảo đảm dự án sẽ đạt.</Text></View>
       </>}
       {!loading && !error && detail && <>
-        <View style={s.card}><Text style={s.heading}>{level2Label(detail, true)}</Text>{detail.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {new Date(detail.verification.scheduledStartAt).toLocaleString('vi-VN', { timeZone: slots?.timeZoneId || 'Asia/Ho_Chi_Minh' })}{'\n'}{slots?.timeZoneId || 'Asia/Ho_Chi_Minh'}</Text>}
+        <View style={s.card}><Text style={s.heading}>{level2Label(detail, true)}</Text>{detail.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {verificationDate(detail.verification.scheduledStartAt)}{'\n'}{VERIFICATION_TIME_LABEL}</Text>}
           {held && <><Text accessibilityLiveRegion="none" style={s.price}>{Math.floor(remaining / 60).toString().padStart(2, '0')}:{(remaining % 60).toString().padStart(2, '0')}</Text><Text style={s.small}>Thời gian giữ lịch còn lại. Giữ lịch chưa phải xác nhận thanh toán.</Text></>}
           {(held || detail.payments.length > 0) && <Button title={detail.payments.length ? 'Xem thanh toán và kết quả' : 'Tiếp tục thanh toán'} onPress={() => router.push({ pathname: '/group/checkout/[id]', params: { id: detail.verification.id, projectId: id } } as never)} disabled={busy} />}
           {expired && <Text accessibilityRole="alert" style={s.error}>Đã hết thời gian giữ lịch. Chọn lại khung giờ khi hệ thống cho phép.</Text>}
@@ -132,12 +133,12 @@ export function VerificationBookingScreen() {
           <Button title="Xem hồ sơ cấp 2" variant="outline" disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />
         </View>
         {choosing && <>
-          <Text style={s.heading}>{held ? 'Đổi khung giờ' : 'Chọn ngày và khung giờ'}</Text><Text style={s.small}>Múi giờ: {slots?.timeZoneId || 'Đang tải từ hệ thống'}. Chỉ hiển thị lịch còn chỗ do hệ thống cung cấp.</Text>
+          <Text style={s.heading}>{held ? 'Đổi khung giờ' : 'Chọn ngày và khung giờ'}</Text><Text style={s.small}>Múi giờ: {VERIFICATION_TIME_LABEL}. Chỉ hiển thị lịch còn chỗ do hệ thống cung cấp.</Text>
           <View style={s.row}><Button title="Tuần trước" variant="outline" disabled={week === 0 || busy} onPress={() => setWeek(v => v - 1)} /><Text style={s.small}>Tuần {week + 1}</Text><Button title="Tuần sau" variant="outline" disabled={busy} onPress={() => setWeek(v => v + 1)} /></View>
           {!dates.length && <Text style={s.notice}>Không còn lịch trống trong khoảng này. Hãy xem tuần khác hoặc làm mới.</Text>}
           <View style={s.wrap}>{dates.map(d => <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: day === d }} onPress={() => { setDay(d); setSelectedSlot(null); }} style={[s.chip, day === d && s.selected]}><Text style={s.body}>{d.split('-').reverse().join('/')}</Text></Pressable>)}</View>
-          <View style={s.wrap}>{slots?.slots.filter(slot => slotDate(slot.startAt, slots.timeZoneId) === day && slot.remainingCapacity > 0 && Date.parse(slot.startAt) > now).map(slot => <Pressable key={slot.startAt} accessibilityRole="radio" accessibilityState={{ checked: selectedSlot?.startAt === slot.startAt }} onPress={() => setSelectedSlot(slot)} style={[s.slot, selectedSlot?.startAt === slot.startAt && s.selected]}><Text style={s.heading}>{slotTime(slot.startAt, slots.timeZoneId)} – {slotTime(slot.endAt, slots.timeZoneId)}</Text><Text style={s.small}>Còn {slot.remainingCapacity} chỗ</Text></Pressable>)}</View>
-          {selectedSlot && slots && <Text style={s.notice}>Đã chọn {slotTime(selectedSlot.startAt, slots.timeZoneId)} – {slotTime(selectedSlot.endAt, slots.timeZoneId)}, ngày {day.split('-').reverse().join('/')} ({slots.timeZoneId}). Lịch chỉ được giữ sau khi hệ thống xác nhận.</Text>}
+          <View style={s.wrap}>{slots?.slots.filter(slot => slotDate(slot.startAt, VERIFICATION_TIME_ZONE) === day && slot.remainingCapacity > 0 && Date.parse(slot.startAt) > now).map(slot => <Pressable key={slot.startAt} accessibilityRole="radio" accessibilityState={{ checked: selectedSlot?.startAt === slot.startAt }} onPress={() => setSelectedSlot(slot)} style={[s.slot, selectedSlot?.startAt === slot.startAt && s.selected]}><Text style={s.heading}>{slotTime(slot.startAt, VERIFICATION_TIME_ZONE)} – {slotTime(slot.endAt, VERIFICATION_TIME_ZONE)}</Text><Text style={s.small}>Còn {slot.remainingCapacity} chỗ</Text></Pressable>)}</View>
+          {selectedSlot && slots && <Text style={s.notice}>Đã chọn {slotTime(selectedSlot.startAt, VERIFICATION_TIME_ZONE)} – {slotTime(selectedSlot.endAt, VERIFICATION_TIME_ZONE)}, ngày {day.split('-').reverse().join('/')} ({VERIFICATION_TIME_LABEL}). Lịch chỉ được giữ sau khi hệ thống xác nhận.</Text>}
         </>}
       </>}
     </ScrollView>
@@ -147,5 +148,5 @@ export function VerificationBookingScreen() {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border }, back: { minWidth: 52, minHeight: 54, alignItems: 'center', justifyContent: 'center' }, backText: { fontSize: 34, color: colors.primary }, headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: colors.navy },
-  content: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: 20, gap: 20, paddingBottom: 32 }, hero: { backgroundColor: '#102E54', borderRadius: 24, padding: 26, gap: 14 }, kicker: { color: '#9DCDFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '700' }, title: { fontSize: 28, lineHeight: 36, fontWeight: '800', color: '#FFFFFF' }, heroText: { fontSize: 15, lineHeight: 24, color: '#BDCEE3' }, card: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface, padding: 22, gap: 14 }, selected: { borderColor: colors.primary, backgroundColor: '#EDF5FF', borderWidth: 2 }, heading: { color: colors.navy, fontSize: 18, lineHeight: 27, fontWeight: '700' }, body: { color: colors.textPrimary, fontSize: 16, lineHeight: 25 }, small: { color: colors.textSecondary, fontSize: 14, lineHeight: 22 }, price: { color: colors.primary, fontSize: 30, fontWeight: '800' }, kickerDark: { color: colors.primary, fontSize: 12, fontWeight: '700' }, notice: { backgroundColor: colors.primaryLight, padding: 16, borderRadius: 12, color: colors.navy, fontSize: 15, lineHeight: 24 }, error: { color: colors.error, fontSize: 16, lineHeight: 24 }, row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, chip: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface }, slot: { minWidth: 180, flexGrow: 1, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 6, borderRadius: 14, backgroundColor: colors.surface }, footer: { padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.border },
+  content: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: 20, gap: 20, paddingBottom: 32 }, hero: { backgroundColor: '#F0F4F8', borderRadius: 24, padding: 20, gap: 12 }, kicker: { color: colors.textSecondary, fontSize: 11, letterSpacing: 1.4, fontWeight: '700' }, title: { fontSize: 28, lineHeight: 36, fontWeight: '800', color: colors.navy }, heroText: { fontSize: 15, lineHeight: 24, color: colors.textSecondary }, card: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface, padding: 22, gap: 14 }, selected: { borderColor: colors.primary, backgroundColor: '#EDF5FF', borderWidth: 2 }, heading: { color: colors.navy, fontSize: 18, lineHeight: 27, fontWeight: '700' }, body: { color: colors.textPrimary, fontSize: 16, lineHeight: 25 }, small: { color: colors.textSecondary, fontSize: 14, lineHeight: 22 }, price: { color: colors.primary, fontSize: 30, fontWeight: '800' }, kickerDark: { color: colors.primary, fontSize: 12, fontWeight: '700' }, notice: { backgroundColor: colors.primaryLight, padding: 16, borderRadius: 12, color: colors.navy, fontSize: 15, lineHeight: 24 }, error: { color: colors.error, fontSize: 16, lineHeight: 24 }, row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, chip: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface }, slot: { minWidth: 180, flexGrow: 1, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 6, borderRadius: 14, backgroundColor: colors.surface }, footer: { padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.border },
 });
