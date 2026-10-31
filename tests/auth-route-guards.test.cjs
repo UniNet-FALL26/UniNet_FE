@@ -16,6 +16,9 @@ function renderLayout(group, state) {
     if (name === '@/constants/roles') return { ACCOUNT_ROLE: { STUDENT: 0, PARTNER: 1 } };
     if (name === 'expo-router') return { Redirect: 'Redirect', Slot: 'Slot' };
     if (name === 'react-native-safe-area-context') return { SafeAreaView: 'SafeAreaView' };
+    if (name === 'react-native') return { StyleSheet: { create: value => value }, Text: 'Text', View: 'View' };
+    if (name === '@/components/notifications/NotificationBell') return { NotificationBell: 'NotificationBell' };
+    if (name === '@/constants/colors') return { colors: {} };
     if (name === '@/components/company/company-ui') return { CompanyTabBar: 'CompanyTabBar' };
     if (name === '@/components/ui/Loading') return { Loading: 'Loading' };
     if (name === '@/components/app-tabs') return { __esModule: true, default: 'AppTabs' };

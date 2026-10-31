@@ -1,5 +1,5 @@
 import { verificationDate as date } from '@/utils/verification-date';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -13,6 +13,8 @@ import { loadVerificationCheckout } from '@/services/verification-checkout';
 import { verificationPaymentService as payments } from '@/services/verification-payment.service';
 import { canCreateCheckout, checkoutLink, paymentPresentation, paymentQrPayload } from '@/utils/verification-payment';
 import { holdSeconds } from '@/utils/verification-booking';
+import { rememberPayment } from '@/utils/payment-return';
+import { Loading } from '@/components/ui/Loading';
 
 type Snapshot = Awaited<ReturnType<typeof loadVerificationCheckout>>;
 const money = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
@@ -28,10 +30,12 @@ function errorText(cause: unknown) {
   return cause instanceof Error ? cause.message : 'Không thể tải trạng thái thanh toán. Vui lòng thử lại.';
 }
 
-export function VerificationCheckoutScreen() {
+export function VerificationCheckoutScreen({ verificationId, returnProjectId }: { verificationId?: string; returnProjectId?: string } = {}) {
   // Redirect query parameters (status, cancel, orderCode, etc.) never determine payment status.
-  const { id, projectId } = useLocalSearchParams<{ id: string; projectId?: string }>();
-  const { account } = useAuthStore();
+  const params = useLocalSearchParams<{ id: string; projectId?: string }>();
+  const id = verificationId ?? params.id;
+  const projectId = returnProjectId ?? params.projectId;
+  const { account, isLoading: restoring, isAuthenticated } = useAuthStore();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -46,42 +50,46 @@ export function VerificationCheckoutScreen() {
   const refresh = () => setRevision(v => v + 1);
 
   useFocusEffect(useCallback(() => {
+    if (restoring || !isAuthenticated || !account) return;
     active.current = true;
     generation.current++;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inFlight = false;
-    let lastLoad = 0;
+    let failures = 0;
     const visible = () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive' &&
       (Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState !== 'hidden');
     async function load() {
       if (controller.signal.aborted || inFlight || lock.current || !visible()) return;
-      inFlight = true; lastLoad = Date.now();
+      inFlight = true;
       if (timer) clearTimeout(timer);
       setLoading(true);
       let pending = true;
       try {
         const result = await loadVerificationCheckout(id ?? '', controller.signal);
         if (controller.signal.aborted) return;
+        failures = 0;
         setSnapshot(result); setError(null); setNow(Date.now());
-        pending = result.detail.verification.status === 0 && (result.transaction?.status === 0 || result.detail.payments.some(p => p.status === 0) ||
-          result.detail.verification.bookingStatus === 1 ||
-          (result.transaction?.status === 1 && result.detail.verification.bookingStatus !== 2));
+        const terminal = result.transaction?.status === 1 || result.transaction?.requiresReview || result.transaction?.reconciliationRequired ||
+          result.detail.payments.some(p => p.status === 1 || p.requiresManualReview);
+        if (terminal) setNotice(null);
+        pending = !terminal && (result.transaction?.status === 0 || result.detail.payments.some(p => p.status === 0) || result.detail.verification.bookingStatus === 1);
       } catch (cause) {
         if (controller.signal.aborted) return;
+        failures++;
         setError(errorText(cause));
-        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { setSnapshot(null); }
+        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { setSnapshot(null); pending = false; }
       } finally {
         inFlight = false;
         if (!controller.signal.aborted) {
           setLoading(false);
-
+          if (pending && failures < 3) timer = setTimeout(() => { void load(); }, 12000);
         }
       }
     }
     refreshRef.current = load;
     void load();
-    const foreground = () => { if (timer) clearTimeout(timer); if (visible() && Date.now() - lastLoad > 1500) void load(); };
+    const foreground = () => { if (timer) clearTimeout(timer); if (visible()) { failures = 0; void load(); } };
     const subscription = AppState.addEventListener('change', foreground);
     const returning = Linking.addEventListener('url', foreground);
     if (Platform.OS === 'web' && typeof document !== 'undefined') { document.addEventListener('visibilitychange', foreground); window.addEventListener('focus', foreground); }
@@ -94,7 +102,11 @@ export function VerificationCheckoutScreen() {
       subscription.remove(); returning.remove();
       if (Platform.OS === 'web' && typeof document !== 'undefined') { document.removeEventListener('visibilitychange', foreground); window.removeEventListener('focus', foreground); }
     };
-  }, [id, account?.id, revision]));
+  }, [id, account?.id, revision, restoring, isAuthenticated]));
+
+  useEffect(() => {
+    if (account && snapshot?.transaction) void rememberPayment({ accountId: account.id, verificationId: id, transactionId: snapshot.transaction.id, projectId });
+  }, [account?.id, id, projectId, snapshot?.transaction?.id]);
 
   async function createCheckout() {
     if (lock.current || loading || error || !snapshot || !canCreateCheckout(snapshot.detail, snapshot.transaction, Date.now())) return;
@@ -108,6 +120,7 @@ export function VerificationCheckoutScreen() {
       setSnapshot(latest);
       if (canCreateCheckout(latest.detail, latest.transaction, Date.now())) {
         const transaction = await payments.create(id);
+        if (isCurrent() && account) await rememberPayment({ accountId: account.id, verificationId: id, transactionId: transaction.id, projectId });
         if (isCurrent()) { setSnapshot({ ...latest, transaction }); setNotice('Giao dịch đã sẵn sàng. Quét mã QR bên dưới hoặc mở PayOS để thanh toán.'); }
       }
     } catch (cause) {
@@ -138,6 +151,8 @@ export function VerificationCheckoutScreen() {
   const canCreate = !!snapshot && canCreateCheckout(snapshot.detail, transaction, now);
   const amount = transaction?.amountVnd ?? snapshot?.packageData?.price;
   const backToBooking = () => projectId ? router.dismissTo({ pathname: '/group/verification/[id]', params: { id: projectId } } as never) : router.back();
+  if (restoring) return <Loading />;
+  if (!isAuthenticated) return <SafeAreaView style={s.safe}><View style={s.content}><Text style={s.heading}>Đăng nhập để kiểm tra thanh toán</Text><Button title="Đăng nhập" onPress={() => router.push({ pathname: '/(auth)/login', params: { paymentReturn: id } } as never)} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}>
     <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" style={s.back} onPress={() => router.back()}><Text style={s.backText}>‹</Text></Pressable><Text style={s.headerTitle}>Thanh toán xác minh</Text></View>
     <ScrollView contentContainerStyle={s.content}>
@@ -154,12 +169,11 @@ export function VerificationCheckoutScreen() {
           {detail?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(detail.verification.scheduledStartAt)}{detail.verification.scheduledEndAt ? ` – ${date(detail.verification.scheduledEndAt)}` : ''}{'\n'}Giờ Việt Nam (UTC+7)</Text>}
           {remaining > 0 && <><Text style={s.small}>Thời gian giữ lịch còn lại</Text><Text style={s.countdown}>{Math.floor(remaining / 60).toString().padStart(2, '0')}:{(remaining % 60).toString().padStart(2, '0')}</Text></>}
           {transaction?.expiredAt && <Text style={s.small}>Hạn checkout: {date(transaction.expiredAt)} (giờ Việt Nam, UTC+7)</Text>}
-          {transaction && <Text selectable style={s.small}>Mã giao dịch: {transaction.id}</Text>}
         </View>
-        <View style={s.card}><Text style={s.heading}>Thanh toán qua PayOS</Text>
+        {transaction?.status !== 1 && !transaction?.requiresReview && !transaction?.reconciliationRequired && <View style={s.card}><Text style={s.heading}>Thanh toán qua PayOS</Text>
           {qrPayload ? <><Text style={s.body}>Mở ứng dụng ngân hàng và quét mã QR để thanh toán đúng số tiền của giao dịch này.</Text><PaymentQrCode value={qrPayload} /><Text style={s.small}>Trạng thái thanh toán sẽ tự cập nhật sau khi hệ thống ghi nhận giao dịch. Bạn cũng có thể mở PayOS bằng nút bên dưới.</Text></>
             : <Text style={s.body}>{!transaction && canCreate ? 'Chọn “Tạo mã QR thanh toán” bên dưới để tạo giao dịch và hiển thị mã QR.' : link ? 'Giao dịch này chưa có dữ liệu QR. Chọn “Mở PayOS để thanh toán” bên dưới để xem mã QR trên PayOS.' : 'Mã QR chỉ hiển thị khi giao dịch đang chờ thanh toán và lịch giữ còn hiệu lực. Kiểm tra trạng thái để nhận kết quả mới nhất.'}</Text>}
-          <Text style={s.small}>Thanh toán thành công chưa phải kết quả đạt xác minh cấp 2.</Text></View>
+          <Text style={s.small}>Thanh toán thành công chưa phải kết quả đạt xác minh cấp 2.</Text></View>}
       </>}
       <Button title="Kiểm tra trạng thái" variant="outline" onPress={refresh} disabled={busy || loading} />
       {detail && <Button title="Xem hồ sơ và kết quả cấp 2" variant="outline" disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />}
