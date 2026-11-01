@@ -14,6 +14,7 @@ export type EvidenceModeration = {
   attempts: { number: number; transient: boolean; errorCode: string | null; results: EvidenceCheck[] }[];
 };
 export type Verification = {
+  bookingConfirmedAt?: string | null;
   projectId?: string; projectTitle?: string; submittedAt?: string; createdAt?: string; updatedAt?: string;
   id: string; status: number; bookingStatus: number; reservedUntil: string | null;
   scheduledStartAt: string | null; scheduledEndAt: string | null;
