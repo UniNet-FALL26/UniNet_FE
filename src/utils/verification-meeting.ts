@@ -17,7 +17,17 @@ export function meetingState(detail: VerificationDetail, meeting: MeetingRespons
   else if (!assignment) message = 'Đang chờ phân công chuyên gia thẩm định.';
   else if (!v.scheduledStartAt || !v.scheduledEndAt || !Number.isFinite(Date.parse(v.scheduledStartAt)) || Date.parse(v.scheduledEndAt) <= Date.parse(v.scheduledStartAt) || !Number.isFinite(Date.parse(v.scheduledEndAt))) message = 'Lịch thẩm định không hợp lệ. Vui lòng liên hệ hỗ trợ.';
   const canRead = !message && !!assignment;
-  const early = canRead && Date.parse(v.scheduledStartAt!) > now;
-  return { assignment, result, canRead, canJoin: canRead && !early,
+  const waitingSeconds = canRead ? Math.max(0, Math.ceil((Date.parse(v.scheduledStartAt!) - now) / 1000)) : 0;
+  const early = waitingSeconds > 0;
+  const completed = result || v.status !== 0 || !!detail.meetingEndAt || !!meeting?.meetingEndAt;
+  return { assignment, result, completed, waitingSeconds, canRead, canJoin: canRead && !early,
     message: message || (early ? 'Chưa đến giờ hẹn. Bạn có thể tham gia khi đến giờ.' : detail.meetingStartAt || meeting?.meetingStartAt ? 'Buổi thẩm định đang diễn ra.' : meeting?.roomName ? 'Phòng đã sẵn sàng. Đang chờ chuyên gia bắt đầu phiên.' : 'Đã đến giờ hẹn. Bạn có thể chuẩn bị và tham gia.') };
+}
+
+export function meetingWaitLabel(seconds: number) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remaining = Math.floor(seconds % 60);
+  return `${days ? `${days} ngày ` : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remaining).padStart(2, '0')}`;
 }
