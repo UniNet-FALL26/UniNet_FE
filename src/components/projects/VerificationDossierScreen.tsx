@@ -133,11 +133,8 @@ export function VerificationDossierScreen() {
   }
   const v = detail?.verification;
   const projectId = detail?.project?.id ?? v?.projectId;
-  const activeAssignment = detail?.assignments
-    .filter((a) => a.status === 0 || a.status === 2)
-    .sort(
-      (a, b) => Date.parse(b.assignedAt ?? "") - Date.parse(a.assignedAt ?? ""),
-    )[0];
+  const activeAssignments = detail?.assignments.filter(a => a.status === 0 || a.status === 2) ?? [];
+  const activeAssignment = activeAssignments.length === 1 ? activeAssignments[0] : undefined;
   const canAct = !loading && !error && !busy;
   const remaining = detail ? holdSeconds(detail, Date.now()) : 0;
   const final = v?.status === 1 || v?.status === 2;
@@ -221,12 +218,9 @@ export function VerificationDossierScreen() {
                 chưa cung cấp tên chuyên viên trong hồ sơ.
               </Text>
             )}
-            {activeAssignment && !detail.meetingEndAt && (
-              <Text style={ds.notice}>
-                Thông tin vào phòng sẽ được cung cấp ở màn hình tham gia
-                meeting. Sinh viên không điều khiển bắt đầu hoặc kết thúc buổi
-                xác minh.
-              </Text>
+            {v.status === 0 && !detail.finalResult && (
+              <Button title="Tham gia buổi thẩm định" disabled={!canAct}
+                onPress={() => router.push({ pathname: '/group/verification-meeting/[id]', params: { id } } as never)} />
             )}
             {detail.meetingEndAt && !final && (
               <Text style={ds.notice}>
