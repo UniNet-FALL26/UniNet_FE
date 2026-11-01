@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { useVerificationMeeting } from "@/hooks/useVerificationMeeting";
-import { meetingState } from "@/utils/verification-meeting";
+import { meetingState, meetingWaitLabel } from "@/utils/verification-meeting";
 import { router, useLocalSearchParams } from "expo-router";
 import { Text } from "react-native";
 import {
@@ -12,9 +12,9 @@ import {
 
 export function VerificationMeetingScreen() {
   const { id = "" } = useLocalSearchParams<{ id: string }>();
-  const { detail, meeting, loading, busy, error, notice, refresh, join } =
+  const { detail, meeting, loading, busy, error, notice, refresh, join, now } =
     useVerificationMeeting(id);
-  const state = detail ? meetingState(detail, meeting) : null;
+  const state = detail ? meetingState(detail, meeting, now) : null;
   const dossier = () =>
     router.replace({
       pathname: "/group/verification-dossier/[id]",
@@ -48,6 +48,9 @@ export function VerificationMeetingScreen() {
             }
           >
             <Text style={ds.notice}>{state.message}</Text>
+            {state.waitingSeconds > 0 && (
+              <Text style={ds.body}>Còn {meetingWaitLabel(state.waitingSeconds)} đến giờ tham gia.</Text>
+            )}
             <Text style={ds.body}>
               Dự kiến bắt đầu:{" "}
               {date(
@@ -59,6 +62,7 @@ export function VerificationMeetingScreen() {
                 meeting?.scheduledEndAt ?? detail.verification.scheduledEndAt,
               )}
             </Text>
+            <Text style={ds.small}>Giờ Việt Nam (UTC+7)</Text>
             {!!(detail.meetingStartAt || meeting?.meetingStartAt) && (
               <Text style={ds.body}>
                 Bắt đầu thực tế:{" "}
@@ -93,7 +97,7 @@ export function VerificationMeetingScreen() {
                       ? "Tham gia lại"
                       : "Chuẩn bị và tham gia"
                 }
-                disabled={!state.canJoin || loading || busy || !!error}
+                disabled={!state.canJoin || loading || busy}
                 onPress={() => {
                   void join();
                 }}
@@ -101,6 +105,7 @@ export function VerificationMeetingScreen() {
               <Text style={ds.small}>
                 Chuyên gia sẽ bắt đầu và kết thúc phiên thẩm định. Giờ kết thúc
                 dự kiến không tự đóng phiên.
+                {"\n"}Đóng tab Jitsi hoặc rời phòng không kết thúc phiên thẩm định.
               </Text>
             </DossierCard>
           )}
