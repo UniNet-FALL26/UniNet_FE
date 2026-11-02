@@ -1,0 +1,8 @@
+const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), ts = require('typescript');
+const out = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/components/assessor/AssessmentForm.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, { exports: out, require: () => ({}) });
+const rubric = { code: 'test', version: '1', passingScore: 65, criteria: [{ code: 'quality', name: 'Chất lượng', weight: 100 }], conditions: [{ code: 'core', description: 'Chức năng cốt lõi' }] };
+function valid() { const v = out.emptyAssessment(rubric); v.scores[0].reason = 'Đã kiểm tra'; v.conditions[0].reason = 'Đã xác minh'; return v; }
+test('null scores and conditions remain unknown and accept reasons', () => { const v = valid(); assert.equal(v.scores[0].score, null); assert.equal(v.conditions[0].passed, null); assert.equal(out.assessmentError(rubric, v), ''); });
+test('scored criteria require evidence and reject invalid precision/range', () => { const v = valid(); v.scores[0].score = 80; assert.ok(out.assessmentError(rubric, v)); v.scores[0].evidence = 'Demo'; assert.equal(out.assessmentError(rubric, v), ''); for (const score of [-1, 101, 1.234, NaN]) { v.scores[0].score = score; assert.ok(out.assessmentError(rubric, v)); } });
+test('rubric version, complete unique codes and reasons are mandatory', () => { const v = valid(); v.rubricVersion = '2'; assert.ok(out.assessmentError(rubric, v)); v.rubricVersion = '1'; v.scores[0].code = 'unknown'; assert.ok(out.assessmentError(rubric, v)); v.scores[0].code = 'quality'; v.conditions[0].reason = ' '; assert.ok(out.assessmentError(rubric, v)); });

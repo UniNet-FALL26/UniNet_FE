@@ -35,6 +35,16 @@ export function profileSectionInput(profile: AssessorProfile, section: AssessorP
     }
     input.assessorJson = Object.values(details).some(value => Array.isArray(value) ? value.length > 0 : !!value) ? details : null;
   }
+  const details = input.assessorJson;
+  if (details) {
+    details.expertise = [...new Map(details.expertise.map(value => [value.toLocaleLowerCase(), value])).values()];
+    if (details.expertise.length > 30 || details.expertise.some(value => value.length > 100)) throw new Error('Tối đa 30 lĩnh vực, mỗi lĩnh vực tối đa 100 ký tự.');
+    for (const key of ['linkedInUrl', 'gitHubUrl', 'portfolioUrl'] as const) {
+      if (!details[key]) continue;
+      try { const url = new URL(details[key]); if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || details[key].length > 2048) throw new Error(); }
+      catch { throw new Error('Liên kết phải là URL http/https hợp lệ, không chứa thông tin đăng nhập.'); }
+    }
+  }
   return input;
 }
 export const assessorProfileService = {
