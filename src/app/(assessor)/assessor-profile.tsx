@@ -21,6 +21,7 @@ export default function AssessorProfileScreen() {
   const { account } = useAuthStore(); const { width } = useWindowDimensions(); const wide = width >= 1200;
   const [loaded, setLoaded] = useState<{ owner: string; profile: ExpertProfile | null } | null>(null), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState<{ owner: string; section: AssessorProfileSection } | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false), [clearing, setClearing] = useState(false);
   const [editingNameOwner, setEditingNameOwner] = useState<string | null>(null);
   const [photo, setPhoto] = useState<{ owner: string; target: 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null), [choosingPhoto, setChoosingPhoto] = useState(false);
   const choosing = useRef(false), alive = useRef(true);
@@ -66,6 +67,12 @@ export default function AssessorProfileScreen() {
     }, signal);
     if (!signal.aborted && alive.current && identity.current === owner) { setLoaded({ owner, profile: updated.profile }); authStore.updateAccount(updated); }
   };
+  const clearExpertise = async () => {
+    if (clearing) return; const owner = account?.id; if (!owner) return; setClearing(true);
+    try { const result = await assessorProfileService.clear(); if (alive.current && identity.current === owner) { setLoaded({ owner, profile: result.profile }); authStore.updateAccount(result); setConfirmClear(false); } }
+    catch (cause) { if (alive.current && identity.current === owner) setError(cause instanceof Error ? cause.message : 'Chưa xóa được dữ liệu chuyên môn.'); }
+    finally { if (alive.current && identity.current === owner) setClearing(false); }
+  };
   return <View style={shared.page} testID="assessor-profile-page">
     {!wide && <View style={s.mobileHeader}><View style={s.pageHeading}><Text style={s.eyebrow}>KHÔNG GIAN CHUYÊN GIA</Text><Text style={shared.sectionTitle}>Hồ sơ của bạn</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={s.settingsButton}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={22} tintColor={colors.navy} /></Pressable></View>}
     <View style={[s.columns, wide && s.desktopColumns]}><ScrollView testID="assessor-profile-main-column" style={s.mainColumn} showsVerticalScrollIndicator={false} contentContainerStyle={[s.content, wide && s.desktopContent]}>
@@ -74,6 +81,7 @@ export default function AssessorProfileScreen() {
       {!!error && <AssessorState error={error} retry={() => setAttempt(v => v + 1)} />}
       {!data && !error && <AssessorState loading />}
       {data && <AssessorProfileCards profile={data} accountEmail={account?.email} onEdit={section => { if (account) setEditing({ owner: account.id, section }); }} />}
+      {data?.assessorJson && <View style={[shared.card, { marginHorizontal: 20 }]}><Text style={shared.sectionTitle}>Dữ liệu chuyên môn</Text><Text style={shared.muted}>{confirmClear ? 'Xác nhận xóa toàn bộ dữ liệu chuyên môn? Thông tin cá nhân và ảnh được giữ lại.' : 'Bạn có thể xóa toàn bộ thông tin chuyên môn đã khai báo.'}</Text><Pressable accessibilityRole="button" disabled={clearing} onPress={() => { if (confirmClear) void clearExpertise(); else setConfirmClear(true); }} style={shared.secondaryButton}><Text style={shared.error}>{clearing ? 'Đang xóa…' : confirmClear ? 'Xác nhận xóa dữ liệu chuyên môn' : 'Xóa dữ liệu chuyên môn'}</Text></Pressable>{confirmClear && <Pressable accessibilityRole="button" disabled={clearing} onPress={() => setConfirmClear(false)}><Text style={shared.link}>Giữ lại thông tin</Text></Pressable>}</View>}
     </ScrollView>{wide && <View testID="assessor-profile-settings-column" style={s.settingsRail}><SettingsPanel embedded /></View>}</View>
     {editing && editing.owner === account?.id && !!data && <AssessorSectionEditor key={`${editing.owner}:${editing.section}`} section={editing.section} profile={data} onSave={(values, signal) => saveSection(editing.section, values, signal)} onClose={() => setEditing(null)} />}
     {editingNameOwner === account?.id && !!data && <AssessorNameEditor key={editingNameOwner} fullName={data.fullName} onSave={saveName} onClose={() => setEditingNameOwner(null)} />}
