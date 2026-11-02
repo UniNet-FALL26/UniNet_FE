@@ -3,13 +3,16 @@ import type { PortfolioResponse } from '@/types/portfolio';
 
 export type OpportunityView = 'all' | 'saved' | 'applied';
 export type OpportunityWorkType = 0 | 1 | 2;
+export type OpportunityEmploymentType = 0 | 1;
 export type OpportunityPartnerType = 0 | 1 | 2 | 3 | 4;
-export type OpportunitySkill = { skillId: string | null; name: string; category: number | null; requirementType: 0 | 1 };
+export type OpportunitySkill = { skillId: string | null; name: string; category: number | null; requirementType: 0 | 1; iconUrl: string | null };
 export type OpportunityBenefit = { title: string; description: string; icon?: string | null };
 export type OpportunityJob = {
   id: string;
   title: string;
   workType: OpportunityWorkType;
+  employmentType: OpportunityEmploymentType;
+  jobField: string;
   minSalaryVnd: number | null;
   maxSalaryVnd: number | null;
   location: string | null;
@@ -33,7 +36,6 @@ export type OpportunityJob = {
   companyContactEmail: string | null;
   companyPhone: string | null;
   companyPartnerType?: OpportunityPartnerType | null;
-  applicantCount: number;
   isSaved: boolean;
   isApplied: boolean;
   applicationStatus: number | null;
@@ -42,7 +44,7 @@ export type OpportunityJob = {
 };
 export type OpportunityJobsPage = { page: number; pageSize: number; totalItems: number; totalPages: number; jobs: OpportunityJob[] };
 export type SubmittedApplication = { id: string; applicationRound: number; appliedAt: string; status: number; submittedPortfolio: PortfolioResponse | null };
-export type PublicPartnerJob = { id: string; title: string; workType: OpportunityWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null; location: string | null; deadline: string | null };
+export type PublicPartnerJob = { id: string; title: string; workType: OpportunityWorkType; employmentType: OpportunityEmploymentType; jobField: string; minSalaryVnd: number | null; maxSalaryVnd: number | null; location: string | null; deadline: string | null };
 export type PublicPartnerProfile = { id: string; organizationName: string; partnerType: OpportunityPartnerType | null; avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; industry: string | null; bio: string | null; address: string | null; contactEmail: string | null; phone: string | null; websites: string[]; openJobs: PublicPartnerJob[] };
 
 export const opportunitiesService = {

@@ -5,8 +5,9 @@ import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, PageTitle, Tag } from '@/components/company/company-ui';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
-import { companyJobApplicationStatusLabel, companyJobStatusLabel, companyJobWorkTypeLabel, formatCompanyDate, companyService, type CompanyApplicant, type CompanyJob, type CompanyJobApplicationStatus } from '@/services/company.service';
+import { companyJobApplicationStatusLabel, companyJobEmploymentTypeLabel, companyJobStatusLabel, companyJobWorkTypeLabel, formatCompanyDate, companyService, type CompanyApplicant, type CompanyJob, type CompanyJobApplicationStatus } from '@/services/company.service';
 import type { PortfolioResponse } from '@/types/portfolio';
+import { jobApplicationIcons as jobIcons } from '@/constants/job-application-icons';
 
 const statuses: CompanyJobApplicationStatus[] = [0, 1, 2, 3, 4];
 const canMoveToStatus = (current: CompanyJobApplicationStatus, next: CompanyJobApplicationStatus) =>
@@ -91,7 +92,7 @@ export default function CompanyApplicants() {
     {!loading && !error && selectedJob && <>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickerOpen }} onPress={() => setPickerOpen(value => !value)} style={s.jobPicker}>
         <View style={s.codeIcon}><CompanyIcon name={{ ios: 'briefcase.fill', android: 'work', web: 'work' }} color={c.blue} /></View>
-        <View style={s.jobInfo}><Text style={s.jobTitle}>{selectedJob.title}</Text><Text style={s.jobSub}>{companyJobWorkTypeLabel[selectedJob.workType]} · {selectedJob.location || 'Chưa có địa điểm'}</Text><View style={s.metaRow}><Tag tone="green">{companyJobStatusLabel[selectedJob.status]}</Tag><Text style={s.meta}>Hạn ứng tuyển: {formatCompanyDate(selectedJob.deadline)}</Text></View></View>
+        <View style={s.jobInfo}><Text style={s.jobTitle}>{selectedJob.title}</Text><Text style={s.jobSub}>{companyJobEmploymentTypeLabel[selectedJob.employmentType]} · {selectedJob.jobField || 'Chưa cập nhật lĩnh vực'}</Text><Text style={s.jobSub}>{companyJobWorkTypeLabel[selectedJob.workType]} · {selectedJob.location || 'Chưa có địa điểm'}</Text><View style={s.metaRow}><Tag tone="green">{companyJobStatusLabel[selectedJob.status]}</Tag><Text style={s.meta}>Hạn ứng tuyển: {formatCompanyDate(selectedJob.deadline)}</Text></View></View>
         <CompanyIcon name={{ ios: pickerOpen ? 'chevron.up' : 'chevron.down', android: pickerOpen ? 'expand_less' : 'expand_more', web: pickerOpen ? 'expand_less' : 'expand_more' }} size={17} color={c.muted} />
       </Pressable>
       {pickerOpen && <Card style={s.jobOptions}>{jobs.map(job => <Pressable key={job.id} onPress={() => { setSelectedJobId(job.id); setPickerOpen(false); }} style={[s.jobOption, job.id === selectedJob.id && s.jobOptionActive]}><View style={s.jobOptionText}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.jobSub}>{job.applicantCount} ứng viên · {formatCompanyDate(job.deadline)}</Text></View>{job.id === selectedJob.id && <CompanyIcon name={{ ios: 'checkmark', android: 'check', web: 'check' }} color={c.blue} size={18} />}</Pressable>)}</Card>}
@@ -109,7 +110,7 @@ export default function CompanyApplicants() {
         </View>
         {!!applicant.coverMessage && <View style={s.message}><Text style={s.messageLabel}>LỜI NHẮN</Text><Text style={s.messageText}>{applicant.coverMessage}</Text></View>}
         {applicant.aiMatchScore != null && <Text style={s.match}>Điểm phù hợp: {Math.round(applicant.aiMatchScore)}%</Text>}
-        {applicant.submittedPortfolio ? <Pressable accessibilityRole="button" onPress={() => { setSubmittedCv(applicant.submittedPortfolio); setSubmittedCvOwner(applicant.fullName); }} style={({ pressed }) => [s.viewCvButton, pressed && { opacity: 0.7 }]}><CompanyIcon name={{ ios: 'doc.text', android: 'description', web: 'description' }} size={15} color={c.blue} /><Text style={s.viewCvText}>Xem CV đã nộp</Text></Pressable> : <Text style={s.noSnapshot}>Hồ sơ này được nộp trước khi lưu bản CV đã nộp.</Text>}
+        {applicant.submittedPortfolio ? <Pressable accessibilityRole="button" onPress={() => { setSubmittedCv(applicant.submittedPortfolio); setSubmittedCvOwner(applicant.fullName); }} style={({ pressed }) => [s.viewCvButton, pressed && { opacity: 0.7 }]}><CompanyIcon name={jobIcons.viewCv} size={15} color={c.blue} /><Text style={s.viewCvText}>Xem CV đã nộp</Text></Pressable> : <Text style={s.noSnapshot}>Hồ sơ này được nộp trước khi lưu bản CV đã nộp.</Text>}
         <Text style={s.statusLabel}>CẬP NHẬT TRẠNG THÁI</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.statusOptions}>
           {statuses.map(status => {
