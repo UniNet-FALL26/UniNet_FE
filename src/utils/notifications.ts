@@ -2,11 +2,12 @@ import type { AccountNotification, NotificationPage } from '@/types/notification
 
 const guid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const businessPath = new RegExp(`^/(?:settings|\\(company\\)/profile|(?:\\(company\\)/)?(?:verification|jobs|applicants)|\\(tabs\\)/opportunities|opportunities|group/(?:${guid}|(?:verification|verification-result|verification-dossier)/${guid})|workspace/${guid})$`);
+const assessorPath = new RegExp(`^/assessor-(?:community|messages|notifications|profile|availability|assessments(?:/${guid})?)$`);
 
 export function safeNotificationTarget(value: unknown): string | null {
   if (typeof value !== 'string' || !value.startsWith('/') || /[\\\u0000-\u0020#]/.test(value) || /%[0-9a-f]{2}/i.test(value)) return null;
   const [path, query] = value.split('?');
-  if (!businessPath.test(path) || value.split('?').length > 2) return null;
+  if ((!businessPath.test(path) && !assessorPath.test(path)) || value.split('?').length > 2) return null;
   if (query && !query.split('&').every(pair => /^(?:account|jobId|applicationId|view|tab|taskId|invitationId|id)=[a-zA-Z0-9_-]+$/.test(pair))) return null;
   return value;
 }

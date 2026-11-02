@@ -8,9 +8,10 @@ import { TextLink } from '@/components/ui/TextLink';
 import { GoogleMark } from './GoogleMark';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeEmail, validEmail } from '@/utils/validation';
+import { colors } from '@/constants/colors';
 
 export function LoginForm() {
-  const { paymentReturn } = useLocalSearchParams<{ paymentReturn?: string }>();
+  const { paymentReturn, registered } = useLocalSearchParams<{ paymentReturn?: string; registered?: string }>();
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [lastAction, setLastAction] = useState<'login' | 'google'>('login');
@@ -21,11 +22,12 @@ export function LoginForm() {
     setErrors(next); if (next.email || next.password) return;
     if (await login({ email: normalizeEmail(email), password })) {
       if (typeof paymentReturn === 'string' && paymentReturn.length <= 128) router.replace({ pathname: '/payment/result', params: paymentReturn === 'resume' ? {} : { verificationId: paymentReturn } } as never);
-      else router.replace('/(tabs)');
+      else router.replace('/');
     }
   }
   return <AuthScreen backTo="/(auth)/welcome" title="Chào mừng trở lại" subtitle="Đăng nhập để tiếp tục với UniNet.">
     <View style={authStyles.form}>
+      {registered === '1' && <Text accessibilityRole="alert" style={styles.success}>Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.</Text>}
       <Input label="Email" placeholder="example@gmail.com" value={email} onChangeText={value => { setEmail(value); setErrors(previous => ({ ...previous, email: undefined })); clearError(); }} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} textContentType="emailAddress" leftIcon="email" error={errors.email} />
       <Input label="Mật khẩu" placeholder="Nhập mật khẩu" value={password} onChangeText={value => { setPassword(value); setErrors(previous => ({ ...previous, password: undefined })); clearError(); }} secureTextEntry={!showPassword} textContentType="password" leftIcon="password" passwordVisibility={{ visible: showPassword, onToggle: () => setShowPassword(value => !value) }} error={errors.password ?? (lastAction === 'login' ? error ?? undefined : undefined)} />
       <Pressable onPress={() => router.push('/(auth)/forgot-password')} accessibilityRole="link" style={styles.forgot}><Text style={authStyles.link}>Quên mật khẩu?</Text></Pressable>
@@ -41,4 +43,4 @@ export function LoginForm() {
     </View>
   </AuthScreen>;
 }
-const styles = StyleSheet.create({ forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: -8 }, footerRow: { flexDirection: 'row', alignItems: 'center', gap: 2 } });
+const styles = StyleSheet.create({ success: { padding: 14, borderRadius: 10, backgroundColor: colors.primaryLight, color: colors.success, fontSize: 14, lineHeight: 22 }, forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: -8 }, footerRow: { flexDirection: 'row', alignItems: 'center', gap: 2 } });

@@ -1,3 +1,6 @@
+import { ToastHost } from '@/components/ui/ToastHost';
+import { reportApiFailure } from '@/services/api';
+import { toast } from '@/store/toast.store';
 // src/app/company/ads/index.tsx
 import { Button } from "@/components/ui/Button";
 import { colors } from "@/constants/colors";
@@ -12,7 +15,6 @@ import { SymbolView } from "expo-symbols";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -85,7 +87,7 @@ export default function CompanyAdvertisementScreen() {
   // Xử lý tạo chiến dịch và chuyển hướng thanh toán PayOS
   const handleSubscribe = async () => {
     if (!selectedPackage || !form.title.trim() || !form.content.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ tiêu đề và nội dung quảng cáo.");
+      toast.error("Vui lòng nhập đầy đủ tiêu đề và nội dung quảng cáo.");
       return;
     }
 
@@ -112,11 +114,11 @@ export default function CompanyAdvertisementScreen() {
         setForm({ title: "", content: "", mediaUrl: "", destinationUrl: "" });
         await Linking.openURL(checkoutUrl);
       } else {
-        Alert.alert("Lỗi", "Không nhận được đường dẫn thanh toán từ hệ thống.");
+        toast.error("Không nhận được đường dẫn thanh toán. Vui lòng thử lại.");
       }
     } catch (cause) {
       console.error("Lỗi đăng ký gói:", cause);
-      Alert.alert("Lỗi", "Không thể khởi tạo thanh toán. Vui lòng thử lại.");
+      reportApiFailure(cause, "Không thể khởi tạo thanh toán. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
@@ -276,7 +278,7 @@ export default function CompanyAdvertisementScreen() {
         animationType="fade"
         onRequestClose={() => setSelectedPackage(null)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.modalOverlay}>{!!selectedPackage && <ToastHost modal />}
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Thiết lập nội dung quảng cáo</Text>
             <Text style={styles.modalSubtitle}>

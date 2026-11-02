@@ -1,3 +1,4 @@
+import { ToastHost } from '@/components/ui/ToastHost';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { Input } from '@/components/ui/Input';
@@ -13,7 +14,7 @@ export function ProfileFieldForm({ data, field, onConfirm, onClose, label }: { d
   const numeric = 'kind' in definition && definition.kind === 'number';
   const image = field === 'avatarUrl' || field === 'coverUrl';
   const confirm = () => { try { onConfirm(updateProfileField(data, field, value)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Thông tin không hợp lệ.'); } };
-  return <Modal visible transparent animationType="fade" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.overlay}><View style={s.dialog} accessibilityViewIsModal>
+  return <Modal visible transparent animationType="fade" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.overlay}><ToastHost modal /><View style={s.dialog} accessibilityViewIsModal>
     <Text role="heading" aria-level={2} style={s.title}>{label || definition.label}</Text>
     <Input label={image ? 'Liên kết ảnh' : definition.label} value={value} onChangeText={next => { setValue(next); setError(''); }} autoFocus multiline={'multiline' in definition && definition.multiline} keyboardType={numeric ? 'decimal-pad' : image ? 'url' : field === 'contactEmail' ? 'email-address' : 'default'} autoCapitalize={image || field === 'contactEmail' ? 'none' : 'sentences'} maxLength={numeric ? undefined : definition.max} />
     {image && <Text style={s.hint}>Nhập liên kết ảnh HTTP hoặc HTTPS. Để trống để bỏ ảnh.</Text>}

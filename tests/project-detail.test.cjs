@@ -21,6 +21,8 @@ function harness(project, operations = {}) {
   const native = require('react-native-web');
   const exports = {};
   vm.runInNewContext(source, { exports, Error, require(name) {
+    if (name === '@/components/ui/ToastHost') return { ToastHost: () => null };
+    if (name === '@/components/ui/ActionFeedback') return { ActionFeedback: () => null };
     if (name === 'react') return { ...React, useState: (initial) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; }, useEffect: () => {}, useMemo: fn => fn(), useRef: () => ref };
     if (name === 'react-native') return { ...native, Modal: ({ visible, children }) => visible ? React.createElement('div', null, children) : null };
     if (name === 'expo-router') return { router: { back() {}, replace() {} }, useLocalSearchParams: () => ({ id: 'project' }) };

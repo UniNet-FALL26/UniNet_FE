@@ -1,3 +1,7 @@
+import { apiRequest } from '@/services/api';
+import { accountProfile } from '@/utils/role-navigation';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
+import { ToastHost } from '@/components/ui/ToastHost';
 import { colors } from "@/constants/colors";
 import { communityService } from "@/services/community.service";
 import { portfolioService } from "@/services/portfolio.service";
@@ -47,16 +51,12 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
   useEffect(() => {
     const request = new AbortController();
     setAvatar(null);
-    if (account?.id)
-      portfolioService
-        .getMine(request.signal)
-        .then((data) => {
-          if (!request.signal.aborted && data.isOwner) {
-            const url = data.profile.avatarUrl;
-            setAvatar(url && url !== "string" ? url : null);
-          }
-        })
-        .catch(() => {});
+    if (account?.id) {
+      const loadAvatar = account.role === 0
+        ? portfolioService.getMine(request.signal).then(data => data.isOwner ? data.profile.avatarUrl : null)
+        : apiRequest<{ profile: { avatarUrl?: string | null } | null }>('/profile/me', { signal: request.signal, feedback: false }).then(data => data.profile?.avatarUrl);
+      loadAvatar.then(url => { if (!request.signal.aborted) setAvatar(url && url !== "string" ? url : null); }).catch(() => {});
+    }
     return () => {
       request.abort();
       controller.current?.abort();
@@ -186,7 +186,7 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Mở hồ sơ cá nhân"
-          onPress={() => router.navigate("/(tabs)/profile")}
+          onPress={() => router.navigate(accountProfile(account?.role) as never)}
           style={s.avatarPlaceholder}
         >
           {avatar ? (
@@ -258,7 +258,7 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
           style={s.overlay}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View accessibilityViewIsModal style={s.dialog}>
+          {open && <ToastHost modal />}<View accessibilityViewIsModal style={s.dialog}>
             <View style={s.dialogHeader}>
               <View style={{ width: 36 }} />
               <Text role="heading" aria-level={2} style={s.title}>
@@ -356,9 +356,7 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
               </Pressable>
 
               {!!error && (
-                <Text accessibilityRole="alert" style={s.error}>
-                  {error}
-                </Text>
+                <ActionFeedback type="error" message={error} />
               )}
 
               <Pressable

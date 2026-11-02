@@ -13,7 +13,7 @@ function setup(os, picker, request) {
       constructor(uri) { this.uri = uri; this.size = 100; this.type = uri.endsWith('.webp') ? 'image/webp' : uri.endsWith('.png') ? 'image/png' : 'image/jpeg'; }
       async bytes() { return Uint8Array.from([7, 8, 9]); }
     } };
-    if (name === '@/services/api') return { apiRequest: request };
+    if (name === '@/services/api' || name === './api') return { apiRequest: request };
     const module = {};
     vm.runInNewContext(ts.transpileModule(fs.readFileSync(`src/${name.replace('@/', '')}.ts`, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
       exports: module, FormData: os === 'web' ? FormData : NativeFormData, fetch, require: load,
@@ -36,11 +36,11 @@ test('web sends the selected file as multipart and returns the persistent URL', 
   const file = new File(['image bytes'], 'photo.png', { type: 'image/png' });
   const signal = new AbortController().signal;
   const env = setup('web', {}, async (path, options) => {
-    assert.equal(path, '/profile/images'); assert.equal(options.signal, signal);
+    assert.equal(path, '/images'); assert.equal(options.signal, signal);
     assert.equal(options.body.get('file').name, 'photo.png'); assert.equal(await options.body.get('file').text(), 'image bytes');
-    return { url: 'https://api.example.test/api/profile/images/photo.png' };
+    return { imageUrl: 'https://res.cloudinary.com/fixture/image/upload/v1/photo.png', publicId: 'photo', format: 'png' };
   });
-  assert.equal(await env.uploadProfileImage({ uri: 'blob:photo', file, fileName: file.name }, signal), 'https://api.example.test/api/profile/images/photo.png');
+  assert.equal(await env.uploadProfileImage({ uri: 'blob:photo', file, fileName: file.name }, signal), 'https://res.cloudinary.com/fixture/image/upload/v1/photo.png');
 });
 test('unsupported or oversized files fail before any upload', async () => {
   const env = setup('web', {}, () => { throw Error('must not upload'); });
@@ -52,7 +52,7 @@ test('native multipart retains the local URI and rejects temporary response URLs
   const env = setup('android', {}, async (_, options) => {
     assert.equal(options.body.entries[0][1].uri, 'file:///device/photo.jpg');
     assert.equal(options.body.entries[0][1].type, 'image/jpeg');
-    return { url: 'blob:temporary' };
+    return { imageUrl: 'blob:temporary', publicId: 'photo', format: 'jpg' };
   });
   await assert.rejects(env.uploadProfileImage({ uri: 'file:///device/photo.jpg', mimeType: 'image/jpeg', fileSize: 100 }, new AbortController().signal), /thử lại/);
 });
@@ -66,7 +66,7 @@ test('native image multipart is readable by the installed Expo fetch converter',
     const encoded = new TextDecoder().decode(result.body);
     assert.match(encoded, /name="file"/); assert.match(encoded, /image\/png/);
     assert.ok(result.body.includes(7));
-    return { url: 'https://api.example.test/photo.png' };
+    return { imageUrl: 'https://res.cloudinary.com/fixture/image/upload/v1/photo.png', publicId: 'photo', format: 'png' };
   });
   await env.uploadProfileImage({ uri: 'file:///device/photo.png', mimeType: 'image/png', fileSize: 100 }, new AbortController().signal);
 });

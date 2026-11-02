@@ -1,3 +1,4 @@
+import { ToastHost } from '@/components/ui/ToastHost';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -32,7 +33,7 @@ export function ProfileEntryForm({ section, data, onAdd, onClose }: Props) {
   };
   return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View accessibilityViewIsModal style={s.dialog}>
+      <ToastHost modal /><View accessibilityViewIsModal style={s.dialog}>
         <View style={s.header}><Text role="heading" aria-level={2} style={s.title}>{section.id === 'basic' ? 'Cập nhật' : 'Thêm'} {section.title.toLowerCase()}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng biểu mẫu" onPress={onClose} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.fields}>
           {section.fields.filter(field => section.id !== 'skills' || field.kind === 'skill').map((field, index) => field.kind === 'skill' ? <View key={field.key} style={s.skillField}>

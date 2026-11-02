@@ -6,7 +6,3 @@ export function hasStudentPortfolioContent(data: PortfolioResponse): boolean {
   if (content.yearsOfExperience != null) return true;
   return [content.skills, content.projects, content.education, content.experience, content.certificates, content.articles, content.socialLinks, content.activities, content.languages].some(items => !!items?.length);
 }
-
-export function shouldShowPortfolio(data: PortfolioResponse): boolean {
-  return data.portfolio.appearance.profile.showPortfolio !== false && hasStudentPortfolioContent(data);
-}

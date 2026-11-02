@@ -5,6 +5,9 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
 const account = { id: 'banner-student', email: 'banner@example.test', role: 0, createdAt: '2020-01-01T00:00:00Z', profileComplete: true, profile: { id: 'banner-profile', fullName: 'Banner Test', displayName: 'Banner Test', nickname: 'banner', isVerified: false } };
 const portfolio = { ...structuredClone(sample), isOwner: true, profile: { ...sample.profile, ...account.profile } };
 const verification = { id: null, status: null, isVerified: false, fullName: null, schoolName: null, studentCode: null, submittedAt: null, reviewedAt: null, rejectReason: null, documentName: null };
+portfolio.profile.bio = null;
+for (const field of ['headline', 'careerObjective', 'location', 'availability', 'contactEmail', 'cvUrl', 'yearsOfExperience', 'gpa']) portfolio.portfolio[field] = null;
+for (const field of ['skills', 'projects', 'education', 'experience', 'certificates', 'articles', 'socialLinks', 'activities', 'languages']) portfolio.portfolio[field] = [];
 
 (async () => {
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
@@ -44,6 +47,23 @@ const verification = { id: null, status: null, isVerified: false, fullName: null
       await panel.waitFor({ state: 'detached' });
       assert.equal(page.url(), before, `closing keeps profile at ${width}px`);
       await page.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).waitFor();
+    }
+    await page.getByTestId('student-profile-starter').waitFor();
+    for (const width of [320, 390, 768, 1024, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForFunction(() => {
+        const starter = document.querySelector('[data-testid="student-profile-starter"]');
+        return starter && starter.getBoundingClientRect().width > 0 && window.innerWidth === window.visualViewport.width;
+      });
+      const card = await page.getByTestId('student-profile-starter').locator(':scope > div').first().boundingBox();
+      const banner = await page.getByTestId('verification-banner').boundingBox();
+      const edit = await page.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).boundingBox();
+      const actions = await page.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).locator('..').boundingBox();
+      assert.ok(Math.abs(banner.x - card.x) <= 1, `banner left aligns with profile at ${width}px: ${JSON.stringify({ banner, card })}`);
+      assert.ok(Math.abs(actions.x + actions.width - card.x - card.width) <= 1, `actions right aligns with profile at ${width}px: ${JSON.stringify({ banner, card, edit })}`);
+      assert.ok(edit.x + edit.width <= card.x + card.width, `edit stays inside profile at ${width}px`);
+      assert.ok(banner.x + banner.width <= edit.x, `banner leaves room for edit at ${width}px`);
+      if (width === 1440) await page.screenshot({ path: 'dist/profile-verification/banner-alignment-desktop.png' });
     }
     assert.deepEqual(errors, []);
     console.log('Verification banner opens account popup over profile on desktop and mobile.');

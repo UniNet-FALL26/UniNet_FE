@@ -3,13 +3,18 @@ import type { AuthAccount, LoginResponse } from '@/types/auth';
 import { authService } from '@/services/auth.service';
 import { ApiError } from '@/services/api';
 import { tokenStorage } from '@/utils/storage';
+import { assessorReportDrafts } from '@/store/assessor-report-drafts';
 
 type AuthState = { account: AuthAccount | null; accessToken: string | null; isAuthenticated: boolean; isLoading: boolean };
 let state: AuthState = { account: null, accessToken: null, isAuthenticated: false, isLoading: true };
 const listeners = new Set<() => void>();
 const update = (next: Partial<AuthState>) => { state = { ...state, ...next }; listeners.forEach(listener => listener()); };
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
+let draftOwner: string | null = null;
 tokenStorage.subscribe(session => {
+  const owner = session?.account?.id ?? state.account?.id ?? null;
+  if (!session || owner && owner !== draftOwner) assessorReportDrafts.clear();
+  draftOwner = session ? owner : null;
   if (!session) update({ account: null, accessToken: null, isAuthenticated: false, isLoading: false });
   else update({ account: session.account ?? state.account, accessToken: session.accessToken, isAuthenticated: !!(session.account ?? state.account), isLoading: !session.account && state.isLoading });
 });

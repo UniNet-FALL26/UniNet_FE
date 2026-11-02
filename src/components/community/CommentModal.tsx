@@ -1,4 +1,6 @@
 import { colors } from "@/constants/colors";
+import { reportApiFailure } from '@/services/api';
+import { ToastHost } from '@/components/ui/ToastHost';
 import {
   communityService,
   type CommentResponse,
@@ -7,7 +9,6 @@ import { SymbolView } from "expo-symbols";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -219,8 +220,8 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
         ]);
       }
       setInputText("");
-    } catch {
-      Alert.alert("Lỗi", "Không thể gửi bình luận.");
+    } catch (error) {
+      reportApiFailure(error, "Không thể gửi bình luận.");
     } finally {
       setSending(false);
     }
@@ -256,6 +257,7 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
           style={styles.modalOverlay}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+          {!!postId && <ToastHost modal />}
           <Animated.View
             style={[styles.backdrop, { opacity: backdropOpacity }]}
           >

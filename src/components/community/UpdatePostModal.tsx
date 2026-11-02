@@ -1,3 +1,5 @@
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
+import { ToastHost } from '@/components/ui/ToastHost';
 import { colors } from "@/constants/colors";
 import {
   communityService,
@@ -147,7 +149,7 @@ export function UpdatePostModal({
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.dialog}>
+        {visible && <ToastHost modal />}<View style={styles.dialog}>
           <View style={styles.dialogHeader}>
             <View style={{ width: 36 }} />
             <Text style={styles.title}>Chỉnh sửa bài viết</Text>
@@ -253,7 +255,7 @@ export function UpdatePostModal({
               <Text style={styles.attachMediaText}>Thêm ảnh hoặc video</Text>
             </Pressable>
 
-            {!!error && <Text style={styles.error}>{error}</Text>}
+            {!!error && <ActionFeedback type="error" message={error} />}
 
             <Pressable
               style={[

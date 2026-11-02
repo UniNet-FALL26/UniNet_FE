@@ -9,7 +9,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 function load(file, imports = {}) {
   const exports = {};
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  vm.runInNewContext(source, { exports, AbortController, setTimeout, clearTimeout, require: name => name in imports ? imports[name] : require(name) });
+  vm.runInNewContext(source, { exports, AbortController, setTimeout, clearTimeout, require: name => name in imports ? imports[name] : name === '@/utils/verification-date' ? load('src/utils/verification-date.ts') : require(name) });
   return exports;
 }
 const helpers = load('src/utils/project-verification.ts');

@@ -1,5 +1,7 @@
 # Student personal profile starter
 
+Phone layout update: compact starter content has no outer horizontal/top padding. Identity/cover, introduction and information panels have square corners with no side borders; readable inner padding, round avatar and compact cover-edit action remain. Browser inspection at 320/390px confirms the profile reaches both screen edges with 0px corners; desktop retains its prior inset and rounded card. Identity-photo tests and TypeScript pass.
+
 Replaced the student's placeholder personal tab with actual owner profile presentation. `StudentProfileStarter` shows cover/avatar/full name/nickname and a Vietnamese invitation explaining skills, projects and community connections; Choose template opens the existing template gallery. Missing/broken photos use decorative cover artwork or initials, never sample people/data. Desktop benefits form three columns; mobile stacks them.
 
 `hasStudentPortfolioContent` ignores identity/photos/default template settings. Saved introduction, portfolio text, manual metrics or entries transition to the native renderer using saved appearance and expose its editor link. The API currently emits a default template even without a saved portfolio; onboarding is therefore based on content, not that default template string. Nonstudent ModulePage behavior remains in place.
@@ -27,3 +29,10 @@ Starter now matches the supplied blue introduction / purple strengths / blue pro
 User covers still preserve the full image over a blurred copy. Null/failed covers use `assets/images/student-starter-cover.png`, generated with built-in ImageGen from this prompt brief: panoramic blue sky and clouds, glass campus on the right, translucent circular arcs on the left, handwritten Build / Learn / Grow / Together. Avatars use real images or initials. No automatic profile writes.
 
 Verification: identity-photo render tests, profile-content tests, hero-media tests and TypeScript pass. `tests/student-starter-refresh-browser-check.cjs` verifies 320/440/768/1440px, fixed-header bounds while scrolling, template/editor navigation, custom and broken covers, no horizontal overflow, no runtime errors and zero writes. Screenshots: ignored `dist/profile-verification/starter-refresh-*.png`.
+# Cover edit button reference update
+
+- Phone/compact cover action now uses a 28px-high pill, 12px camera glyph, 9px text and 8px horizontal padding, with additional hit slop. Desktop sizes and both lower-right positions are retained.
+
+- The starter profile cover action is a bottom-right pill (12px inset), 32px high, with a 14px camera icon and 10px bold “Chỉnh sửa ảnh bìa” label. Its white background is 65% opaque, matching the Partner cover action's position and translucent background.
+- Existing cover picker callback, busy state, accessible “Đổi ảnh bìa” action and avatar camera remain unchanged.
+- TypeScript and 5 identity-photo render/action tests pass. The Settings browser suite passes. Inspected the updated starter screenshot at 320px; the full starter-refresh suite reaches its desktop case then fails because it still expects the mobile Settings gear on desktop, where the sidebar replaces it.

@@ -26,7 +26,7 @@ export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = 
     <View style={[s.footer, { marginHorizontal: compact ? 18 : 32, backgroundColor: theme.heroBackground, borderColor: theme.heroBorder }]}>
       <View>
         <Text style={[s.footerName, { color: theme.heroText }]}>{data.profile.fullName}</Text>
-        <Text style={[ui.small, { color: theme.heroMuted, marginTop: 4 }]}>{data.profile.nickname} · {data.portfolio.headline}</Text>
+        {!!(data.profile.nickname || data.portfolio.headline) && <Text style={[ui.small, { color: theme.heroMuted, marginTop: 4 }]}>{[data.profile.nickname, data.portfolio.headline].filter(value => value?.trim()).join(' · ')}</Text>}
       </View>
       <View style={ui.chips}>{data.portfolio.socialLinks.map(link => <PortfolioLink key={link.label} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View>
     </View>

@@ -1,3 +1,5 @@
+import { ToastHost } from '@/components/ui/ToastHost';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Loading } from "@/components/ui/Loading";
@@ -520,7 +522,7 @@ export function ProjectDetailScreen() {
         </View>
       )}
 
-      {notice ? <Text accessibilityRole="alert" style={styles.descriptionText}>{notice}</Text> : null}
+      {notice ? <ActionFeedback type="success" message={notice} /> : null}
 
       {!isCreator && isMember && isActive && <Button title="Rời dự án" variant="outline" disabled={acting} onPress={() => askConfirmation("Rời dự án", "Bạn muốn rời dự án này?", () => projectService.leaveProject(project.id))} />}
 
@@ -588,7 +590,7 @@ export function ProjectDetailScreen() {
         </View>
       )}
       <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => { if (!acting) setConfirmation(null); }}>
-        <View style={styles.confirmOverlay}>
+        <View style={styles.confirmOverlay}>{!!confirmation && <ToastHost modal />}
           <View style={styles.confirmCard} accessibilityViewIsModal>
             <Text style={styles.actionCardTitle}>{confirmation?.title}</Text>
             <Text style={styles.descriptionText}>{confirmation?.message}</Text>

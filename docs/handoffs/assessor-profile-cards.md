@@ -1,0 +1,9 @@
+# Assessor profile cards — 2026-11-02
+
+- Replaces the flat profile table and single details editor with five cards: Giới thiệu, Liên hệ, Công việc & chuyên môn, Học vấn, Liên kết. `AssessorProfileCards` measures available width: biography spans all columns; remaining cards use two columns at >=700px, one column below. Desktop cards align with the existing hero and settings rail.
+- Each compact pencil opens `AssessorSectionEditor` with only that group's fields. Add/update use the existing owner PUT API; confirmed clear blanks only that group. No name/nickname inputs or global clear in card popups. The old all-in-one AssessorProfileEditor is replaced.
+- `assessor-profile-sections.ts` defines labels/groups. `assessorProfileService.saveSection` reads the latest profile, merges only allowed fields, preserves common identity/images and other JSON groups, then PUTs. Last cleared professional group becomes null instead of resurrecting legacy fallback fields. Aborted/account-switched responses cannot update another session.
+- URLs appear only in link editing inputs. Display uses LinkedIn, GitHub and Website / Portfolio with real local GitHub/LinkedIn SVG marks and a colored globe; valid HTTP(S) entries open the actual target. Missing/unsafe-scheme entries are disabled. Other icons use colored semantic tiles; expertise uses wrapped tags.
+- Brand assets/attribution/MIT licenses: assets/images/brands. Existing partner icons were not changed.
+- Verification: TypeScript; `tests/assessor-profile-crud-browser-check.cjs` covers five separate popups and field counts, all nine professional fields, latest-profile merge, failed saves/clears and retries, per-group clears, named links/brand assets, popup target and 320/390/768/1024/1440px layouts. Hero/name/photo regression also passes. Screenshots: ignored dist/assessor-profile-cards.
+- No backend/schema changes, real profile writes, commit or deployment.

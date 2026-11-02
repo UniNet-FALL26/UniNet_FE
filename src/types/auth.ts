@@ -6,7 +6,7 @@ export type AuthAccount = {
   createdAt?: string;
   role: AccountRole;
   profileComplete: boolean;
-  profile: { id: string; fullName: string; nickname: string; organizationName: string | null; partnerType?: number | null; displayName: string; isVerified: boolean } | null;
+  profile: { id: string; fullName: string; nickname: string; organizationName: string | null; partnerType?: number | null; displayName: string; isVerified: boolean; avatarUrl?: string | null; coverUrl?: string | null } | null;
 };
 export type LoginRequest = { email: string; password: string };
 export type LoginResponse = { account: AuthAccount; accessToken: string; refreshToken: string; expiresAt?: string; requiresProfileCompletion: boolean };

@@ -1,4 +1,5 @@
 import { apiRequest } from '@/services/api';
+import type { AuthAccount } from '@/types/auth';
 import { skillService } from '@/services/skill.service';
 import { Platform } from 'react-native';
 import { File as NativeFile } from 'expo-file-system';
@@ -51,7 +52,11 @@ export type CompanyJobsPage = {
   page: number; pageSize: number; totalItems: number; totalPages: number; totalJobs: number;
   publishedJobs: number; draftJobs: number; closingSoonJobs: number; jobs: CompanyJob[];
 };
-export type PartnerVerificationStatus = { id: string | null; status: VerificationStatus | null; rejectReason: string | null; submittedAt: string | null };
+export type PartnerVerificationStatus = {
+  id: string | null; status: VerificationStatus | null; rejectReason: string | null; submittedAt: string | null;
+  reviewedAt?: string | null; organizationName?: string | null;
+  taxCode?: string | null; representativeName?: string | null;
+};
 export type PartnerVerificationDocument = { type: VerificationDocumentType; fileName: string; url: string };
 export type PartnerVerificationUploadDocument = { type: VerificationDocumentType; fileName: string; url?: string | null; document?: VerificationDocument | null };
 export type PartnerVerificationInput = { taxCode?: string | null; representativeName?: string | null; documents: PartnerVerificationUploadDocument[] };
@@ -80,16 +85,21 @@ async function getProfile(signal?: AbortSignal): Promise<CompanyProfile> {
   };
 }
 
-export const companyService = {
-  getProfile,
-  updateProfile: async (input: CompanyProfileInput, signal?: AbortSignal) => {
-    await apiRequest('/profile/partner', {
+async function savePartnerProfile(input: CompanyProfileInput, signal?: AbortSignal): Promise<AuthAccount> {
+    return apiRequest<AuthAccount>('/profile/partner', {
       method: 'PUT', body: JSON.stringify({
         organizationName: input.companyName, partnerType: input.partnerType, avatarUrl: input.avatarUrl,
         coverUrl: input.coverUrl, bio: input.description, industry: input.industry, website: input.websites[0] ?? input.website, websites: input.websites,
         contactEmail: input.contactEmail, phone: input.phone, address: input.address,
       }), signal,
     });
+}
+
+export const companyService = {
+  getProfile,
+  saveProfile: savePartnerProfile,
+  updateProfile: async (input: CompanyProfileInput, signal?: AbortSignal) => {
+    await savePartnerProfile(input, signal);
     return getProfile(signal);
   },
   getDashboard: async (signal?: AbortSignal): Promise<CompanyDashboard> => {

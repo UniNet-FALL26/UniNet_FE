@@ -1,7 +1,7 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');const ts=require('typescript');
 const login=(prefix='old')=>({accessToken:prefix+'-access',refreshToken:prefix+'-refresh',expiresAt:'2026-10-04T12:30:00Z',account:{id:prefix==='other'?'other':'owner',email:'test@example.com',role:0,profileComplete:true,profile:null},requiresProfileCompletion:false});
 function setup(fetch){
- const cache=new Map();function load(name){if(name==='@/utils/session-persistence')return {sessionPersistence:{read:async()=>null,write:async()=>{}}};if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController,FormData});return exports;}
+ const cache=new Map();function load(name){if(name==='@/utils/session-persistence')return {sessionPersistence:{read:async()=>null,write:async()=>{}}};if(name==='@/store/toast.store')return {toast:{success(){},error(){}}};if(name==='react')return {useSyncExternalStore:(_,get)=>get()};if(name==='@/constants/config')return {API_URL:'https://api.example.test/api'};if(cache.has(name))return cache.get(name);const exports={};cache.set(name,exports);const source=fs.readFileSync(path.join(__dirname,'../src/'+name.replace('@/','')+'.ts'),'utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:load,fetch,Headers,Response,AbortController,FormData});return exports;}
  return {storage:load('@/utils/storage').tokenStorage,api:load('@/services/api'),auth:load('@/services/auth.service').authService,...load('@/store/auth.store')};
 }
 test('logout clears the entire current session and auth state without network access', async () => {
@@ -136,7 +136,7 @@ test('shared project error codes follow route, method and permission cause', asy
 test('project fallback is Vietnamese and other APIs and successful moderation content stay intact', async () => {
   const env = setup(async () => Response.json({ code: 'UNKNOWN', message: 'Internal failure' }, { status: 500 }));
   await assert.rejects(env.api.apiRequest('/projects/id'), /Không thể thực hiện thao tác với dự án/);
-  await assert.rejects(env.api.apiRequest('/profile/me'), /Internal failure/);
+  await assert.rejects(env.api.apiRequest('/profile/me'), /Không thể xử lý hồ sơ/);
   const success = setup(async () => Response.json({ status: 'Error', violationReason: 'Dynamic AI reason' }));
   assert.equal((await success.api.apiRequest('/projects/id/moderation')).violationReason, 'Dynamic AI reason');
 });

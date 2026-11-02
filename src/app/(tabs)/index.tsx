@@ -1,4 +1,5 @@
 import { CommentModal } from "@/components/community/CommentModal";
+import { reportApiFailure } from '@/services/api';
 import { CommunityComposer } from "@/components/community/CommunityComposer";
 import { UpdatePostModal } from "@/components/community/UpdatePostModal";
 import { colors } from "@/constants/colors";
@@ -131,8 +132,8 @@ export default function CommunityScreen() {
       setPosts((prev) => prev.filter((p) => p.id !== deleteConfirmPostId));
       if (adPost?.id === deleteConfirmPostId) setAdPost(null);
       setDeleteConfirmPostId(null);
-    } catch {
-      Alert.alert("Lỗi", "Không thể xóa bài viết.");
+    } catch (error) {
+      reportApiFailure(error, "Không thể xóa bài viết.");
     }
   };
 
@@ -143,12 +144,8 @@ export default function CommunityScreen() {
       setPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isSaved: isNowSaved } : p)),
       );
-      Alert.alert(
-        "Thành công",
-        isNowSaved ? "Đã lưu bài viết." : "Đã hủy lưu bài viết.",
-      );
     } catch (error) {
-      Alert.alert("Lỗi", "Không thể thực hiện lưu bài viết.");
+      reportApiFailure(error, "Không thể thực hiện lưu bài viết.");
     }
   };
 
@@ -171,7 +168,7 @@ export default function CommunityScreen() {
         }),
       );
     } catch (error) {
-      Alert.alert("Lỗi", "Không thể thực hiện thích bài viết.");
+      reportApiFailure(error, "Không thể thực hiện thích bài viết.");
     }
   };
 
