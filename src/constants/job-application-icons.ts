@@ -1,0 +1,20 @@
+/** Shared icon meanings for partner recruitment and student applications. */
+export const jobApplicationIcons = {
+  job: { ios: 'briefcase.fill', android: 'work', web: 'work' },
+  organization: { ios: 'building.2', android: 'business', web: 'business' },
+  workMode: { ios: 'building.2', android: 'business', web: 'business' },
+  employmentType: { ios: 'clock', android: 'schedule', web: 'schedule' },
+  field: { ios: 'square.grid.2x2', android: 'category', web: 'category' },
+  location: { ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' },
+  salary: { ios: 'banknote.fill', android: 'payments', web: 'payments' },
+  deadline: { ios: 'calendar', android: 'event', web: 'event' },
+  updatedAt: { ios: 'arrow.clockwise', android: 'update', web: 'update' },
+  applicants: { ios: 'person.2.fill', android: 'groups', web: 'groups' },
+  views: { ios: 'eye', android: 'visibility', web: 'visibility' },
+  description: { ios: 'doc.text', android: 'description', web: 'description' },
+  requirements: { ios: 'checklist', android: 'fact_check', web: 'fact_check' },
+  skills: { ios: 'chart.bar', android: 'bar_chart', web: 'bar_chart' },
+  benefitsSection: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' },
+  viewCv: { ios: 'eye', android: 'visibility', web: 'visibility' },
+  changeStatus: { ios: 'arrow.triangle.2.circlepath', android: 'sync_alt', web: 'sync_alt' },
+} as const;

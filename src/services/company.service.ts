@@ -9,19 +9,20 @@ export type { SkillCatalogItem } from '@/services/skill.service';
 
 export type CompanyJobStatus = 0 | 1 | 2 | 3;
 export type CompanyJobWorkType = 0 | 1 | 2;
+export type CompanyJobEmploymentType = 0 | 1;
 export type CompanyJobApplicationStatus = 0 | 1 | 2 | 3 | 4;
 export type JobSkillRequirementType = 0 | 1;
 export type PartnerType = 0 | 1 | 2 | 3 | 4;
 export type VerificationStatus = 0 | 1 | 2 | 3;
 export type VerificationDocumentType = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type CompanyJobSkill = { skillId: string | null; name: string; category: number | null; requirementType: JobSkillRequirementType };
+export type CompanyJobSkill = { skillId: string | null; name: string; category: number | null; requirementType: JobSkillRequirementType; iconUrl: string | null };
 export type CompanyJobBenefit = { title: string; description: string; icon?: string };
 export type CompanyJob = {
-  id: string; title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
+  id: string; title: string; workType: CompanyJobWorkType; employmentType: CompanyJobEmploymentType; jobField: string; minSalaryVnd: number | null; maxSalaryVnd: number | null;
   location: string | null; description: string | null; status: CompanyJobStatus; startAt: string | null; deadline: string | null;
   responsibilities: string[]; requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
-  skills: CompanyJobSkill[]; benefits: CompanyJobBenefit[]; applicantCount: number; createdAt: string; updatedAt: string;
+  skills: CompanyJobSkill[]; benefits: CompanyJobBenefit[]; applicantCount: number; viewCount: number; createdAt: string; updatedAt: string;
 };
 export type CompanyApplicant = {
   id: string; jobId: string; studentUserId: string; fullName: string; nickname: string;
@@ -31,7 +32,7 @@ export type CompanyApplicant = {
   applicationRound: number;
 };
 export type CompanyJobInput = {
-  title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
+  title: string; workType: CompanyJobWorkType; employmentType: CompanyJobEmploymentType; jobField: string; minSalaryVnd: number | null; maxSalaryVnd: number | null;
   location: string; description: string; startAt: string | null; deadline: string; status: Exclude<CompanyJobStatus, 3>;
   requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
   skills: { skillId?: string; name?: string; requirementType: JobSkillRequirementType }[]; benefits: CompanyJobBenefit[];
@@ -149,6 +150,7 @@ export const companyService = {
 export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đã đăng', 2: 'Đã đóng', 3: 'Hết hạn' };
 export const companyJobApplicationStatusLabel: Record<CompanyJobApplicationStatus, string> = { 0: 'Chờ xem', 1: 'Đã xem', 2: 'Phỏng vấn', 3: 'Đã nhận', 4: 'Từ chối' };
 export const companyJobWorkTypeLabel: Record<CompanyJobWorkType, string> = { 0: 'Tại văn phòng', 1: 'Kết hợp', 2: 'Từ xa' };
+export const companyJobEmploymentTypeLabel: Record<CompanyJobEmploymentType, string> = { 0: 'Toàn thời gian', 1: 'Bán thời gian' };
 export function formatCompanyDate(value: string | null): string {
   if (!value) return 'Chưa đặt'; const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'Chưa đặt' : new Intl.DateTimeFormat('vi-VN', { timeZone: 'UTC' }).format(date);
