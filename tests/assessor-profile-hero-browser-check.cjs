@@ -84,7 +84,7 @@ const file = { name: 'profile.png', mimeType: 'image/png', buffer: fs.readFileSy
     await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click(); await page.getByTestId('action-toast').getByText(/Không thể xử lý ảnh/).waitFor();
     assert.equal(writes, nameWrites + 3); await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
     await page.reload(); await hero.getByRole('img', { name: 'Ảnh đại diện của bạn', exact: true }).waitFor();
-    for (const width of [1440, 768, 390, 320]) {
+    for (const width of [1440, 1024, 768, 600, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 }); await hero.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
       const cover = await hero.getByTestId('assessor-profile-cover').boundingBox(), avatar = await hero.getByTestId('assessor-profile-avatar').boundingBox();
@@ -92,6 +92,23 @@ const file = { name: 'profile.png', mimeType: 'image/png', buffer: fs.readFileSy
       const name = await hero.getByRole('heading', { name: profile.fullName, exact: true }).boundingBox(), tick = await hero.getByTestId('assessor-profile-verified').boundingBox();
       assert.ok(tick.x >= name.x + name.width - 1); fs.mkdirSync('dist/assessor-profile-hero', { recursive: true });
       await hero.screenshot({ path: `dist/assessor-profile-hero/hero-${width}.png` });
+      const header = page.getByTestId('assessor-profile-header');
+      if (width >= 1200) assert.equal(await header.count(), 0);
+      else {
+        const edit = header.getByRole('button', { name: 'Chỉnh sửa họ tên', exact: true }), settings = header.getByRole('button', { name: 'Mở cài đặt', exact: true });
+        const headerBox = await header.boundingBox(), editBox = await edit.boundingBox(), settingsBox = await settings.boundingBox();
+        assert.equal(headerBox.height, width < 600 ? 52 : 60);
+        assert.equal(editBox.width, width < 600 ? 32 : 44); assert.equal(settingsBox.width, editBox.width);
+        assert.ok(editBox.x + editBox.width <= settingsBox.x); assert.ok(Math.abs(settingsBox.x + settingsBox.width - width + 16) < 2);
+        assert.equal(await page.getByText('KHÔNG GIAN CHUYÊN GIA', { exact: true }).count(), 0);
+        await edit.click(); await editor.waitFor(); assert.equal(await editor.getByRole('textbox').count(), 1); await editor.getByRole('button', { name: 'Hủy', exact: true }).click();
+        await page.screenshot({ path: `dist/assessor-profile-hero/header-${width}.png` });
+        const before = await hero.getByTestId('assessor-profile-cover').boundingBox();
+        await page.mouse.move(width / 2, Math.min(before.y + 100, 800)); await page.mouse.wheel(0, 350);
+        await page.waitForFunction(top => document.querySelector('[data-testid="assessor-profile-cover"]').getBoundingClientRect().top < top - 20, before.y);
+        assert.ok(Math.abs((await header.boundingBox()).y - headerBox.y) < 1, 'header remains fixed while profile content scrolls');
+        if (width === 390) { await settings.click(); await page.waitForURL(/settings/); await page.goBack(); await hero.getByRole('heading', { name: profile.fullName, exact: true }).waitFor(); }
+      }
     }
     profile.isVerified = false; await page.reload(); await hero.getByRole('heading', { name: profile.fullName, exact: true }).waitFor();
     assert.equal(await hero.getByTestId('assessor-profile-verified').count(), 0); assert.deepEqual(errors, []);

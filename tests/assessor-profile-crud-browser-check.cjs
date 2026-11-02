@@ -26,10 +26,23 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
     await page.waitForFunction(() => [...document.querySelectorAll('input')].length >= 2 && [...document.querySelectorAll('input')].every(input => Object.keys(input).some(key => key.startsWith('__reactProps') && typeof input[key]?.onChange === 'function')));
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email); await page.getByRole('textbox', { name: 'Mật khẩu', exact: true }).fill('fixture-password');
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(/assessor-community/);
-    await page.goto(origin + '/assessor-profile'); await page.getByTestId('assessor-profile-cards').waitFor();
+    await page.goto(origin + '/assessor-profile'); await page.getByTestId('assessor-profile-summary').waitFor();
     const open = async (section, title, count) => {
+      const tabs = { bio: 'Giới thiệu', contact: 'Giới thiệu', work: 'Công việc & chuyên môn', education: 'Học vấn', links: 'Liên kết' };
+      await page.getByRole('tab', { name: tabs[section], exact: true }).click();
       await page.getByTestId('assessor-card-' + section).getByRole('button', { name: 'Chỉnh sửa ' + title, exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Chỉnh sửa ' + title, exact: true }); await dialog.waitFor(); assert.equal(await dialog.getByRole('textbox').count(), count);
+      await dialog.getByRole('button', { name: 'Đóng chỉnh sửa', exact: true }).waitFor();
+      for (const input of await dialog.getByRole('textbox').all()) assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+      if (section === 'bio') {
+        const input = dialog.getByRole('textbox').first(), value = await input.inputValue(), before = await input.boundingBox();
+        await input.fill(Array(20).fill('Nội dung giới thiệu nhiều dòng.').join('\n'));
+        await page.waitForFunction(() => { const input = document.querySelector('[aria-label="Giới thiệu bản thân"]'); return input && input.clientHeight > 300 && input.scrollHeight <= input.clientHeight + 2; });
+        assert.ok((await input.boundingBox()).height > before.height); await input.fill(value);
+      }
+      fs.mkdirSync('dist/assessor-profile-cards', { recursive: true });
+      await page.waitForFunction(() => { const dialog = document.querySelector('[role="dialog"]'); if (!dialog) return false; for (let el=dialog; el; el=el.parentElement) if (Number(getComputedStyle(el).opacity)<1) return false; return true; });
+      await dialog.screenshot({ path: `dist/assessor-profile-cards/editor-${section}-${page.viewportSize().width}.png` });
       for (const name of ['Họ và tên', 'Biệt danh']) assert.equal(await dialog.getByRole('textbox', { name, exact: true }).count(), 0); return dialog;
     };
     const fill = async (dialog, values) => { for (const [name, value] of Object.entries(values)) await dialog.getByRole('textbox', { name, exact: true }).fill(value); };
@@ -53,17 +66,15 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
     await target.waitForURL('https://github.com/expert'); await target.close();
     fs.mkdirSync('dist/assessor-profile-cards', { recursive: true });
     for (const width of [1440, 1024, 768, 390, 320]) {
-      await page.setViewportSize({ width, height: 1000 }); await page.getByTestId('assessor-card-contact').scrollIntoViewIfNeeded();
+      await page.setViewportSize({ width, height: 1000 }); await links.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
-      const grid = await page.getByTestId('assessor-profile-cards').boundingBox(), contact = await page.getByTestId('assessor-card-contact').boundingBox(), job = await page.getByTestId('assessor-card-work').boundingBox();
-      if (grid.width >= 700) assert.ok(Math.abs(contact.y - job.y) < 2 && job.x > contact.x); else assert.ok(job.y > contact.y && Math.abs(contact.x - job.x) < 2);
       await page.screenshot({ path: `dist/assessor-profile-cards/layout-${width}.png` }); await links.screenshot({ path: `dist/assessor-profile-cards/links-${width}.png` });
     }
     dialog = await open('work', 'Công việc & chuyên môn', 4); await dialog.getByRole('textbox', { name: 'Số năm kinh nghiệm', exact: true }).fill('-1');
     const before = mutations.length; await dialog.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click(); await dialog.getByRole('alert').waitFor(); assert.equal(mutations.length, before); await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
     dialog = await open('contact', 'Liên hệ', 3); await fill(dialog, { 'Email liên hệ': 'new@example.test', 'Điện thoại': '0987654321', 'Địa chỉ': 'Ha Noi' }); await save(dialog); assert.equal(profile.assessorJson.gitHubUrl, 'https://github.com/expert');
     dialog = await open('bio', 'Giới thiệu', 1); await fill(dialog, { 'Giới thiệu bản thân': 'New biography' }); await save(dialog); assert.equal(profile.bio, 'New biography');
-    await page.reload(); await page.getByText('Senior Engineer', { exact: true }).waitFor();
+    await page.reload(); await page.getByTestId('assessor-profile-summary').waitFor(); await page.getByText('Senior Engineer', { exact: true }).waitFor();
     const clear = async (section, title, count, fail = false) => {
       const d = await open(section, title, count); await d.getByRole('button', { name: 'Xóa thông tin ' + title, exact: true }).click();
       if (fail) { failNext = true; await d.getByRole('button', { name: 'Xác nhận xóa', exact: true }).click(); await d.getByRole('alert').waitFor(); assert.equal(profile.assessorJson.gitHubUrl, 'https://github.com/expert'); }
@@ -74,7 +85,7 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
     await clear('work', 'Công việc & chuyên môn', 4); assert.equal(profile.assessorJson, null); assert.equal(profile.contactEmail, 'new@example.test');
     await clear('bio', 'Giới thiệu', 1); assert.equal(profile.bio, null); assert.equal(profile.phone, '0987654321');
     await clear('contact', 'Liên hệ', 3); assert.equal(profile.contactEmail, null); assert.equal(profile.phone, null); assert.equal(profile.address, null); assert.equal(profile.fullName, 'Profile Expert');
-    await page.reload(); await page.getByTestId('assessor-profile-cards').waitFor(); assert.equal(await page.getByText('Legacy Expertise', { exact: true }).count(), 0);
+    await page.reload(); await page.getByTestId('assessor-profile-summary').waitFor(); assert.equal(await page.getByText('Legacy Expertise', { exact: true }).count(), 0);
     assert.deepEqual(errors, []); console.log('Assessor cards: five isolated CRUD popups, all nine fields, latest-profile preservation, clear/failure/retry, named brand links, targets and responsive columns passed.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

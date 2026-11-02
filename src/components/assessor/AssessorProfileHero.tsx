@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -8,8 +8,9 @@ import { splitProfileImageUrl } from '@/utils/profile-image-crop';
 type Props = {
   fullName: string; avatarUrl?: string | null; coverUrl?: string | null; isVerified: boolean;
   disabled: boolean; onEditCover: () => void; onEditAvatar: () => void; onEditProfile: () => void;
+  children?: ReactNode;
 };
-export function AssessorProfileHero({ fullName, avatarUrl, coverUrl, isVerified, disabled, onEditCover, onEditAvatar, onEditProfile }: Props) {
+export function AssessorProfileHero({ fullName, avatarUrl, coverUrl, isVerified, disabled, onEditCover, onEditAvatar, onEditProfile, children }: Props) {
   const { width } = useWindowDimensions(); const mobile = width < 700;
   const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
   const cover = coverUrl ? { uri: splitProfileImageUrl(coverUrl).source } : require('@/assets/images/student-starter-cover.png');
@@ -40,6 +41,7 @@ export function AssessorProfileHero({ fullName, avatarUrl, coverUrl, isVerified,
       {!mobile && editButton}
     </View>
     {mobile && <View style={s.mobileActions}>{editButton}</View>}
+    {children}
   </View>;
 }
 const s = StyleSheet.create({

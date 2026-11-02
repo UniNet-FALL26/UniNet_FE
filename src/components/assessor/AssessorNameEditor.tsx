@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { ProfileTextInput } from '@/components/profile/ProfileTextInput';
 import { Button } from '@/components/ui/Button';
 import { colors } from '@/constants/colors';
 import { assessorStyles as shared } from './assessor-ui';
@@ -22,7 +23,7 @@ export function AssessorNameEditor({ fullName, onSave, onClose }: Props) {
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel="Chỉnh sửa họ tên" style={s.dialog}>
         <Text role="heading" style={shared.sectionTitle}>Chỉnh sửa họ tên</Text>
-        <View style={s.field}><Text style={shared.label}>Họ và tên</Text><TextInput accessibilityLabel="Họ và tên" autoFocus maxLength={255} editable={!busy} value={name} onChangeText={setName} style={shared.input} /></View>
+        <ProfileTextInput label="Họ và tên" autoFocus maxLength={255} editable={!busy} value={name} onChangeText={setName} />
         {!!error && <Text accessibilityRole="alert" style={shared.error}>{error}</Text>}
         <View style={s.actions}><Button title="Hủy" variant="outline" disabled={busy} onPress={close} style={s.cancelAction} textStyle={s.cancelLabel} /><Button title="Lưu họ tên" loading={busy} onPress={() => void save()} style={s.saveAction} textStyle={s.actionLabel} /></View>
       </View>

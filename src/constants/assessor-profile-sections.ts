@@ -7,3 +7,16 @@ export const assessorProfileSections = {
 } as const;
 export type AssessorProfileSection = keyof typeof assessorProfileSections;
 export type AssessorProfileSectionValues = Record<string, string>;
+export function assessorCardSection(section: AssessorProfileSection, summary = false) {
+  const config = assessorProfileSections[section];
+  if (!summary) return config;
+  if (section === 'bio') return { ...config, fields: [
+    ...assessorProfileSections.bio.fields,
+    ...assessorProfileSections.work.fields.filter(([key]) => key === 'jobTitle' || key === 'companyName'),
+    assessorProfileSections.education.fields[1],
+    assessorProfileSections.contact.fields[2],
+  ] };
+  if (section === 'work') return { ...config, title: 'Kỹ năng chuyên môn', fields: [assessorProfileSections.work.fields[3]] };
+  if (section === 'contact') return { ...config, fields: config.fields.filter(([key]) => key !== 'address') };
+  return config;
+}

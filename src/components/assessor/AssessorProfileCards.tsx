@@ -4,7 +4,7 @@ import { Linking, Pressable, StyleSheet, Text, View, useWindowDimensions } from 
 import { SymbolView } from 'expo-symbols';
 import { colors } from '@/constants/colors';
 import { toast } from '@/store/toast.store';
-import { assessorProfileSections, type AssessorProfileSection } from '@/constants/assessor-profile-sections';
+import { assessorCardSection, assessorProfileSections, type AssessorProfileSection } from '@/constants/assessor-profile-sections';
 import type { AssessorProfile } from '@/services/assessor-profile.service';
 
 type Icon = ComponentProps<typeof SymbolView>['name'];
@@ -16,32 +16,35 @@ function Field({ label, value, icon, color, background }: { label: string; value
   return <View style={s.field}><View style={[s.fieldIcon, { backgroundColor: background }]}><SymbolView name={icon} size={16} tintColor={color} /></View><View style={s.fieldCopy}><Text style={s.fieldLabel}>{label}</Text><Text selectable style={[s.value, !value && s.empty]}>{value || 'Chưa cập nhật'}</Text></View></View>;
 }
 const linkFields = [{ key: 'linkedInUrl', label: 'LinkedIn', icon: require('@/assets/images/brands/linkedin.svg'), color: '#0A66C2' }, { key: 'gitHubUrl', label: 'GitHub', icon: require('@/assets/images/brands/github.svg'), color: '#24292F' }, { key: 'portfolioUrl', label: 'Website / Portfolio', icon: null, color: '#7853B6' }] as const;
-export function AssessorProfileCards({ profile, accountEmail, onEdit }: { profile: AssessorProfile; accountEmail?: string; onEdit: (section: AssessorProfileSection) => void }) {
-  const [width, setWidth] = useState(0); const columns = width >= 700;
+export function AssessorProfileCards({ profile, accountEmail, onEdit, sections, summary = false, embedded = false, joinedAt }: { profile: AssessorProfile; accountEmail?: string; onEdit: (section: AssessorProfileSection) => void; sections?: AssessorProfileSection[]; summary?: boolean; embedded?: boolean; joinedAt?: string }) {
+  const [width, setWidth] = useState(0); const columns = !summary && width >= 700;
   const desktop = useWindowDimensions().width >= 1200;
   const d = profile.assessorJson;
   const expertise = d?.expertise ?? (d === undefined && profile.major ? [profile.major] : []);
   const university = d?.university ?? (d === undefined ? profile.universityName : null);
   const work = assessorProfileSections.work, contact = assessorProfileSections.contact, education = assessorProfileSections.education;
   const row = (label: string, value: string | null | undefined, icon: Icon, section: { color: string; background: string }) => <Field key={label} label={label} value={value} icon={icon} color={section.color} background={section.background} />;
-  return <View testID="assessor-profile-cards" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={[s.grid, desktop && s.desktopGrid]}>
-    {(Object.keys(assessorProfileSections) as AssessorProfileSection[]).map(section => {
-      const config = assessorProfileSections[section];
-      return <View testID={`assessor-card-${section}`} key={section} style={[s.card, columns && section !== 'bio' && s.half]}>
-        <View style={s.header}><View style={[s.headingIcon, { backgroundColor: config.background }]}><SymbolView name={icons[section]} size={21} tintColor={config.color} /></View><Text role="heading" aria-level={2} style={s.title}>{config.title}</Text>
+  return <View testID={summary ? 'assessor-profile-summary' : 'assessor-profile-cards'} onLayout={event => setWidth(event.nativeEvent.layout.width)} style={[s.grid, (desktop || embedded) && s.desktopGrid]}>
+    {(sections ?? Object.keys(assessorProfileSections) as AssessorProfileSection[]).map(section => {
+      const config = assessorCardSection(section, summary);
+      return <View testID={`assessor-${summary ? 'summary' : 'card'}-${section}`} key={section} style={[s.card, columns && section !== 'bio' && s.half, summary && s.summaryCard]}>
+        <View style={[s.header, summary && s.summaryHeader]}><View style={[s.headingIcon, summary && s.summaryIcon, { backgroundColor: config.background }]}><SymbolView name={icons[section]} size={summary ? 17 : 21} tintColor={config.color} /></View><Text role="heading" aria-level={2} style={[s.title, summary && s.summaryTitle]}>{summary && section === 'work' ? 'Kỹ năng chuyên môn' : config.title}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={`Chỉnh sửa ${config.title}`} hitSlop={6} onPress={() => onEdit(section)} style={({ hovered, pressed }) => [s.edit, hovered && s.editHovered, pressed && s.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={17} tintColor={colors.primary} /></Pressable>
         </View>
-        {section === 'bio' && <Text selectable style={[s.bio, !profile.bio && s.empty]}>{profile.bio || 'Thêm vài dòng giới thiệu về bản thân và kinh nghiệm của bạn.'}</Text>}
+        {section === 'bio' && <View style={s.fields}><Text selectable numberOfLines={summary ? 4 : undefined} style={[s.bio, !profile.bio && s.empty]}>{profile.bio || 'Thêm vài dòng giới thiệu về bản thân và kinh nghiệm của bạn.'}</Text>{summary && <>
+          {d?.jobTitle && row('Chức danh', d.jobTitle, icons.work, work)}
+          {(d?.companyName || university) && row('Đơn vị / trường', d?.companyName || university, { ios: 'building.2.fill', android: 'business', web: 'business' }, education)}
+          {profile.address && row('Địa chỉ', profile.address, { ios: 'mappin.circle.fill', android: 'location_on', web: 'location_on' }, contact)}
+          {joinedAt && Number.isFinite(Date.parse(joinedAt)) && row('Tham gia UniNet', new Date(joinedAt).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }), { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, contact)}
+        </>}</View>}
         {section === 'contact' && <View style={s.fields}>
           {row('Email', profile.contactEmail || accountEmail, { ios: 'envelope.fill', android: 'mail', web: 'mail' }, contact)}
           {row('Điện thoại', profile.phone, { ios: 'phone.fill', android: 'call', web: 'call' }, { color: '#23845D', background: '#EBF8F1' })}
-          {row('Địa chỉ', profile.address, { ios: 'mappin.circle.fill', android: 'location_on', web: 'location_on' }, { color: '#C15C58', background: '#FDF0EE' })}
+          {!summary && row('Địa chỉ', profile.address, { ios: 'mappin.circle.fill', android: 'location_on', web: 'location_on' }, { color: '#C15C58', background: '#FDF0EE' })}
         </View>}
         {section === 'work' && <View style={s.fields}>
-          {row('Chức danh', d?.jobTitle, icons.work, work)}
-          {row('Công ty', d?.companyName, { ios: 'building.2.fill', android: 'business', web: 'business' }, work)}
-          {row('Kinh nghiệm', d && (d.jobTitle || d.companyName || expertise.length || d.yearsOfExperience) ? `${d.yearsOfExperience} năm` : null, { ios: 'clock.fill', android: 'history', web: 'history' }, work)}
-          <View style={s.expertise}><Text style={s.fieldLabel}>Lĩnh vực chuyên môn</Text>{expertise.length ? <View style={s.tags}>{expertise.map((value, index) => <View key={`${value}-${index}`} style={s.tag}><Text style={s.tagLabel}>{value}</Text></View>)}</View> : <Text style={s.empty}>Chưa cập nhật</Text>}</View>
+          {!summary && <>{row('Chức danh', d?.jobTitle, icons.work, work)}{row('Công ty', d?.companyName, { ios: 'building.2.fill', android: 'business', web: 'business' }, work)}{row('Kinh nghiệm', d && (d.jobTitle || d.companyName || expertise.length || d.yearsOfExperience) ? `${d.yearsOfExperience} năm` : null, { ios: 'clock.fill', android: 'history', web: 'history' }, work)}</>}
+          <View style={!summary && s.expertise}>{!summary && <Text style={s.fieldLabel}>Lĩnh vực chuyên môn</Text>}{expertise.length ? <View style={s.tags}>{expertise.map((value, index) => <View key={`${value}-${index}`} style={s.tag}><Text style={s.tagLabel}>{value}</Text></View>)}</View> : <Text style={s.empty}>Chưa cập nhật</Text>}</View>
         </View>}
         {section === 'education' && <View style={s.fields}>{row('Trình độ học vấn', d?.education, icons.education, education)}{row('Trường đại học', university, { ios: 'building.columns.fill', android: 'account_balance', web: 'account_balance' }, education)}</View>}
         {section === 'links' && <View style={s.links}>{linkFields.map(link => {
@@ -59,6 +62,7 @@ export function AssessorProfileCards({ profile, accountEmail, onEdit }: { profil
 const s = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginHorizontal: 20 },
   desktopGrid: { marginHorizontal: 0 },
+  summaryCard: { padding: 14, borderRadius: 12 }, summaryHeader: { gap: 7, paddingBottom: 10 }, summaryIcon: { width: 28, height: 28, borderRadius: 8 }, summaryTitle: { fontSize: 13, lineHeight: 19 },
   card: { width: '100%', minWidth: 0, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, half: { width: '47%', flexGrow: 1, flexBasis: '47%' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 16, marginBottom: 2 }, headingIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, minWidth: 0, color: colors.navy, fontSize: 16, lineHeight: 23, fontWeight: '700' },
