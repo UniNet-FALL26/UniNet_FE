@@ -198,7 +198,7 @@ export function ProfilePhotoForm({ initialAsset, onConfirm, onClose, portrait = 
       </View>
       {asset && <Pressable accessibilityRole="button" disabled={uploading || choosing} onPress={() => { setUrl(''); setPreview(null); setAsset(null); setCropReady(true); }} style={s.removeAction}><Text style={s.removeText}>Bỏ ảnh</Text></Pressable>}
     </ScrollView>
-    <View style={s.actions}><Button title="Hủy" variant="outline" disabled={uploading} onPress={close} style={{ ...s.footerButton, flex: 1 }} /><Button title="Xác nhận" loading={uploading} disabled={choosing || processing || (!!asset && portrait ? !preview : url === null)} onPress={() => { void confirm(); }} style={{ ...s.footerButton, flex: 1 }} /></View>
+    <View style={[s.actions, { justifyContent: 'flex-end' }]}><Button title="Hủy" variant="outline" disabled={uploading} onPress={close} style={{ ...s.footerButton, minWidth: 80, paddingHorizontal: 16, borderRadius: 8 }} textStyle={{ fontSize: 13, fontWeight: '600' }} /><Button title="Xác nhận" loading={uploading} disabled={choosing || processing || (!!asset && portrait ? !preview : url === null)} onPress={() => { void confirm(); }} style={{ ...s.footerButton, minWidth: 80, paddingHorizontal: 16, borderRadius: 8 }} textStyle={{ fontSize: 13, fontWeight: '600' }} /></View>
   </View></View></Modal>;
 }
 
