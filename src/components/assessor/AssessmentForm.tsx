@@ -50,7 +50,7 @@ export function AssessmentForm({ rubric, value, onChange, disabled = false }: { 
     {rubric.criteria.map((c, index) => {
       const row = value.scores.find(r => r.code === c.code); if (!row) return null;
       const change = (patch: Partial<typeof row>) => onChange?.({ ...value, scores: value.scores.map(r => r.code === c.code ? { ...r, ...patch } : r) });
-      return <View key={c.code} style={[s.divider, { gap: 10 }]}><Text style={s.label}>{index + 1}. {c.name} · Trọng số {c.weight}%</Text>
+      return <View key={c.code} style={s.detailCriterion}><Text style={s.label}>{index + 1}. {c.name} · Trọng số {c.weight}%</Text>
         <ScoreInput name={c.name} score={row.score} disabled={disabled || !onChange} onChange={score => change({ score })} />
         <Text style={s.muted}>Điểm quy đổi: {row.score === null ? 'Chưa đủ minh chứng' : displayPoints(row.score * c.weight / 100) + ' / ' + c.weight + ' điểm'}</Text>
         <Text style={s.label}>Lý do đánh giá *</Text>
@@ -63,7 +63,7 @@ export function AssessmentForm({ rubric, value, onChange, disabled = false }: { 
     {rubric.conditions.map(c => {
       const row = value.conditions.find(r => r.code === c.code); if (!row) return null;
       const change = (patch: Partial<typeof row>) => onChange?.({ ...value, conditions: value.conditions.map(r => r.code === c.code ? { ...r, ...patch } : r) });
-      return <View key={c.code} style={[s.divider, { gap: 10 }]}><Text style={s.label}>{c.description}</Text><View style={s.actions}>{[{ label: 'Đạt', passed: true }, { label: 'Không đạt', passed: false }, { label: 'Chưa đủ cơ sở', passed: null }].map(option => <Pressable key={option.label} accessibilityRole="radio" accessibilityState={{ checked: row.passed === option.passed }} disabled={disabled || !onChange} onPress={() => change({ passed: option.passed })} style={[s.secondaryButton, row.passed === option.passed && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}><Text style={s.link}>{option.label}</Text></Pressable>)}</View><TextInput accessibilityLabel={`Lý do ${c.description}`} placeholder="Lý do kết luận (bắt buộc)" multiline maxLength={4000} value={row.reason} editable={!disabled && !!onChange} onChangeText={reason => change({ reason })} style={s.input} /></View>;
+      return <View key={c.code} style={s.detailCriterion}><Text style={s.label}>{c.description}</Text><View style={s.actions}>{[{ label: 'Đạt', passed: true }, { label: 'Không đạt', passed: false }, { label: 'Chưa đủ cơ sở', passed: null }].map(option => <Pressable key={option.label} accessibilityRole="radio" accessibilityState={{ checked: row.passed === option.passed }} disabled={disabled || !onChange} onPress={() => change({ passed: option.passed })} style={[s.secondaryButton, row.passed === option.passed && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}><Text style={s.link}>{option.label}</Text></Pressable>)}</View><TextInput accessibilityLabel={`Lý do ${c.description}`} placeholder="Lý do kết luận (bắt buộc)" multiline maxLength={4000} value={row.reason} editable={!disabled && !!onChange} onChangeText={reason => change({ reason })} style={s.input} /></View>;
     })}
   </View>;
 }
@@ -73,7 +73,7 @@ function ScoreInput({ name, score, disabled, onChange }: { name: string; score: 
   return <View style={{ gap: 8 }}>
     <Text style={s.label}>Điểm {name}: {score === null ? 'Chưa đủ minh chứng' : displayPoints(score / 10) + '/10'}</Text>
     <View accessibilityRole="radiogroup" accessibilityLabel={'Điểm ' + name + ' (0–10)'} style={s.actions}>
-      {Array.from({ length: 11 }, (_, point) => <Pressable key={point} accessibilityRole="radio" accessibilityLabel={name + ': ' + point + '/10'} accessibilityState={{ checked: score === point * 10 }} onPress={() => onChange(scoreFromTen(point))} style={[s.secondaryButton, { minWidth: 44, paddingHorizontal: 10 }, score === point * 10 && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}><Text style={s.link}>{point}</Text></Pressable>)}
+      {Array.from({ length: 11 }, (_, point) => <Pressable key={point} accessibilityRole="radio" accessibilityLabel={name + ': ' + point + '/10'} accessibilityState={{ checked: score === point * 10 }} onPress={() => onChange(scoreFromTen(point))} style={[s.secondaryButton, { minWidth: 44, paddingHorizontal: 10 }, score === point * 10 && { borderColor: colors.primary, backgroundColor: colors.primary }]}><Text style={[s.link, score === point * 10 && { color: colors.surface }]}>{point}</Text></Pressable>)}
       <Pressable accessibilityRole="radio" accessibilityLabel={name + ': Chưa đủ minh chứng'} accessibilityState={{ checked: score === null }} onPress={() => onChange(null)} style={[s.secondaryButton, score === null && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}><Text style={s.link}>Chưa đủ minh chứng</Text></Pressable>
     </View>
   </View>;
