@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActionButton, companyColors as c, Card, CompanyIcon, CompanyPage, PageScroll, Tag } from '@/components/company/company-ui';
+import { jobApplicationIcons as jobIcons } from '@/constants/job-applicant-icons';
+import { companyJobEmploymentTypeLabel, companyJobStatusLabel, companyJobWorkTypeLabel, companyService, formatCompanyDate, formatCompanySalary, type CompanyJob, type CompanyJobsPage, type CompanyJobStatus } from '@/services/company.service';
 import { router, useFocusEffect } from 'expo-router';
-import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, Tag } from '@/components/company/company-ui';
-import { companyService, companyJobStatusLabel, companyJobWorkTypeLabel, companyJobEmploymentTypeLabel, formatCompanyDate, formatCompanySalary, type CompanyJob, type CompanyJobsPage, type CompanyJobStatus } from '@/services/company.service';
-import { jobApplicationIcons as jobIcons } from '@/constants/job-application-icons';
+import { useCallback, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
-const filters = ['Tất cả', 'Đã đăng', 'Bản nháp', 'Đã đóng', 'Hết hạn'];
+const filters = ['Tất cả', 'Đang tuyển', 'Bản nháp', 'Đã đóng', 'Hết hạn'];
 const statusTone = { 0: 'gray', 1: 'green', 2: 'gray', 3: 'amber' } as const;
 
 export default function CompanyJobs() {
@@ -32,7 +32,7 @@ export default function CompanyJobs() {
       setLoading(true);
       setError('');
       const statuses: Record<string, CompanyJobStatus | undefined> = {
-        'Tất cả': undefined, 'Đã đăng': 1, 'Bản nháp': 0, 'Đã đóng': 2, 'Hết hạn': 3,
+        'Tất cả': undefined, 'Đang tuyển': 1, 'Bản nháp': 0, 'Đã đóng': 2, 'Hết hạn': 3,
       };
       void companyService.listJobs({ status: statuses[filter], keyword: query, page, pageSize }, controller.signal)
         .then(result => {
@@ -113,18 +113,18 @@ export default function CompanyJobs() {
       </View>
       {isWideWeb && <ScrollView horizontal contentContainerStyle={s.tableScroll}>
         <View style={s.table}>
-          <View style={[s.tableRow, s.tableHeader]}>{['Bài đăng tuyển dụng', 'Địa điểm', 'Mức lương', 'Hạn ứng tuyển', 'Ứng viên', 'Cập nhật', 'Thao tác'].map((label, index) => <Text key={label} style={[s.tableHeadText, index === 0 ? s.colTitle : index === 2 ? s.colSalary : index === 6 ? s.colActions : s.col]}>{label}</Text>)}</View>
+          <View style={[s.tableRow, s.tableHeader]}>{['Bài đăng tuyển dụng', 'Địa điểm', 'Mức lương', 'Hạn ứng tuyển', 'Ứng viên', 'Cập nhật', 'Trạng thái', 'Thao tác'].map((label, index) => <Text key={label} style={[s.tableHeadText, index === 0 ? s.colTitle : index === 2 ? s.colSalary : index === 6 ? s.colStatus : index === 7 ? s.colActions : s.col]}>{label}</Text>)}</View>
           {!loading && !error && visibleJobs.map(job => <View key={job.id} style={s.tableRow}>
             <View style={s.colTitle}>
               <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/(company)/job-detail' as never, params: { jobId: job.id } as never })}><Text style={s.jobTitle}>{job.title}</Text></Pressable>
               <Text style={s.jobSubtitle}>{companyJobWorkTypeLabel[job.workType]} · {job.location || 'Chưa có địa điểm'}</Text>
-              {job.status !== 1 && <View style={s.statusTag}><Tag tone={statusTone[job.status]}>{companyJobStatusLabel[job.status]}</Tag></View>}
             </View>
             <View style={[s.col, s.cell]}><CompanyIcon name={jobIcons.location} size={18} color={c.muted} /><Text style={s.cellText}>{job.location || '—'}</Text></View>
             <View style={[s.colSalary, s.cell]}><CompanyIcon name={jobIcons.salary} size={18} color={c.muted} /><Text style={s.cellText}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></View>
             <View style={[s.col, s.cell]}><CompanyIcon name={jobIcons.deadline} size={18} color={c.muted} /><Text style={s.cellText}>{formatCompanyDate(job.deadline)}</Text></View>
             <Pressable accessibilityRole="link" accessibilityLabel={`Xem ${job.applicantCount} hồ sơ của ${job.title}`} style={[s.col, s.cell]} onPress={() => router.push({ pathname: '/(company)/job-detail', params: { jobId: job.id } })}><CompanyIcon name={jobIcons.applicants} size={17} color={c.blue} /><Text style={s.link}>{job.applicantCount} hồ sơ</Text></Pressable>
             <Text style={[s.col, s.cellText]}>{formatCompanyDate(job.updatedAt)}</Text>
+            <View style={s.colStatus}><Tag tone={statusTone[job.status]}>{companyJobStatusLabel[job.status]}</Tag></View>
             <View style={[s.buttons, s.colActions]}>
               <Pressable accessibilityRole="button" accessibilityLabel="Xem chi tiết bài đăng" style={s.iconButton} onPress={() => router.push({ pathname: '/(company)/job-detail' as never, params: { jobId: job.id } as never })}><CompanyIcon name={jobIcons.views} size={17} color={c.ink} /></Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa bài đăng" style={s.iconButton} onPress={() => router.push({ pathname: '/(company)/create', params: { jobId: job.id } })}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={17} color={c.ink} /></Pressable>
@@ -200,17 +200,17 @@ const s = StyleSheet.create({
   filterText: { color: c.ink, fontSize: 12, fontWeight: '600' },
   filterTextActive: { color: c.blue },
   tableScroll: { flexGrow: 1 },
-  table: { flex: 1, minWidth: 960 },
+  table: { flex: 1, minWidth: 1060 },
   tableRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line, paddingHorizontal: 14, gap: 10, paddingVertical: 12 },
   tableHeader: { minHeight: 40, paddingVertical: 10, borderBottomWidth: 0, borderRadius: 6, backgroundColor: '#EAF1F9' },
   tableHeadText: { color: c.ink, fontSize: 12, fontWeight: '700' },
   colTitle: { flex: 2.1, minWidth: 170, gap: 5, justifyContent: 'center' },
   col: { flex: 1, minWidth: 85 },
   colSalary: { flex: 1.6, minWidth: 145 },
+  colStatus: { width: 100, flexShrink: 0 },
   colActions: { width: 146, flexDirection: 'row', alignItems: 'center', gap: 6 },
   cell: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   cellText: { color: c.ink, fontSize: 12, lineHeight: 18, flexShrink: 1 },
-  statusTag: { alignSelf: 'flex-start', marginTop: 3 },
   iconButton: { width: 32, height: 34, borderRadius: 7, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
   deleteButton: { backgroundColor: '#FFF5F5', borderColor: '#F6E5E5' },
   link: { color: c.blue, fontSize: 12, fontWeight: '700', flexShrink: 1 },

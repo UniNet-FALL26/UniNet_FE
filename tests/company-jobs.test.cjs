@@ -43,7 +43,7 @@ function setup(width = 1440, reply = {}, detail = false) {
     if (name === '@/components/profile/ProfileTemplateRenderer') return { ProfileTemplateRenderer: box };
     if (name === '@/data/profile-templates') return { getProfileTemplate: () => ({ id: 'default' }), getProfileTheme: () => ({}) };
     if (name === '@/services/company.service') return services;
-    if (name === '@/constants/job-application-icons') return { jobApplicationIcons: new Proxy({}, { get: () => ({ web: 'work' }) }) };
+    if (name === '@/constants/job-applicant-icons') return { jobApplicationIcons: new Proxy({}, { get: () => ({ web: 'work' }) }) };
     if (name === '@/components/company/company-ui') return {
       CompanyPage: ({ children }) => React.createElement(web.View, { style: { flex: 1, minHeight: 0 } }, children),
       PageTitle: ({ title, subtitle }) => React.createElement(web.View, null, React.createElement(web.Text, null, title), React.createElement(web.Text, null, subtitle)),
