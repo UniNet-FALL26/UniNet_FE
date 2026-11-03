@@ -3,7 +3,7 @@ import { type CommentResponse } from "@/services/community.service";
 import { useAuthStore } from "@/store/auth.store";
 import { SymbolView } from "expo-symbols";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface CommentItemProps {
   comment: CommentResponse;
@@ -34,7 +34,22 @@ export function CommentItem({
     account?.id === comment.authorUserId ||
     (account as any)?.profile?.id === comment.authorUserId;
   const safeReplies = Array.isArray(comment.replies) ? comment.replies : [];
-  const replyToName = (comment as any)?.replyToUserName;
+
+  // Ưu tiên hiển thị Nickname của tác giả bình luận
+  const displayName =
+    (comment as any)?.authorNickname ||
+    (isOwner
+      ? (account as any)?.profile?.nickname ||
+        (account as any)?.profile?.fullName
+      : null) ||
+    comment.authorName;
+
+  // Ưu tiên hiển thị Nickname của người được trả lời (fallback về Username/Name)
+  const replyToName =
+    (comment as any)?.replyToNickname ||
+    (comment as any)?.replyToUserNickname ||
+    (comment as any)?.replyToUserName ||
+    comment.replyToUserName;
 
   const isThisCommentOpen = optionsCommentId === comment.id;
   const isTreeOpen =
@@ -44,6 +59,7 @@ export function CommentItem({
     <View
       style={[
         styles.commentRow,
+        { overflow: "visible" },
         isTreeOpen && { zIndex: 9999, elevation: 10 },
         optionsCommentId === comment.id && { zIndex: 9999, elevation: 10 },
       ]}
@@ -54,10 +70,17 @@ export function CommentItem({
           isThisCommentOpen && { zIndex: 9999, elevation: 10 },
         ]}
       >
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>
-            {comment.authorName?.charAt(0).toUpperCase()}
-          </Text>
+        <View style={[styles.avatarPlaceholder, { overflow: "hidden" }]}>
+          {comment.authorAvatarUrl ? (
+            <Image
+              source={{ uri: comment.authorAvatarUrl }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Text style={styles.avatarText}>
+              {displayName?.charAt(0).toUpperCase()}
+            </Text>
+          )}
         </View>
         <View style={styles.commentBody}>
           <View
@@ -71,7 +94,7 @@ export function CommentItem({
             ]}
           >
             <View style={styles.bubble}>
-              <Text style={styles.authorName}>{comment.authorName}</Text>
+              <Text style={styles.authorName}>{displayName}</Text>
               <Text style={styles.commentContent}>
                 {replyToName && (
                   <Text style={styles.mentionText}>@{replyToName} </Text>
@@ -159,7 +182,7 @@ export function CommentItem({
             </Text>
             <Pressable
               onPress={() =>
-                onReply(comment.id, comment.authorName, comment.authorUserId)
+                onReply(comment.id, displayName, comment.authorUserId)
               }
             >
               <Text style={styles.replyBtnText}>Phản hồi</Text>
@@ -210,6 +233,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight || "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
   avatarText: { fontSize: 14, fontWeight: "700", color: colors.primary },
   commentBody: { flex: 1, gap: 4 },

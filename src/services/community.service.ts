@@ -13,6 +13,7 @@ export interface PostResponse {
   authorUserId: string;
   authorName: string;
   authorAvatar?: string | null;
+  authorNickname?: string;
   authorActorType: CommunityActorType;
   description: string;
   mediaUrls: string[];
@@ -51,6 +52,7 @@ export interface CommentResponse {
   content: string;
   replyToUserId?: string | null;
   replyToUserName?: string | null;
+  replyToNickname?: string | null;
   createdAt: string;
   updatedAt: string;
   replies?: CommentResponse[];
