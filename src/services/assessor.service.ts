@@ -1,6 +1,6 @@
 import { apiRequest } from '@/services/api';
 export interface AssessorAssignment { id: string; projectVerificationId: string; assignedToUserId: string; status: number; assignedAt: string; assignmentDueAt: string | null; reportDueAt: string | null; scheduledStartAt: string | null; scheduledEndAt: string | null; meetingStartAt: string | null; meetingEndAt: string | null; completedAt: string | null; replacementReason: string | null }
-export interface AssessorProject { id: string; title: string; projectField: string; description: string; status: number; leaderId: string }
+export interface AssessorProject { imageUrl?: string | null; id: string; title: string; projectField: string; description: string; status: number; leaderId: string }
 export interface AssessmentRubric { code: string; version: string; passingScore: number; criteria: { code: string; name: string; weight: number }[]; conditions: { code: string; description: string }[] }
 export interface AssessmentInput { rubricVersion: string; scores: { code: string; score: number | null; reason: string; evidence: string | null }[]; conditions: { code: string; passed: boolean | null; reason: string }[] }
 export interface AssessmentResult extends Omit<AssessmentInput, 'rubricVersion'> { rubric: AssessmentRubric; totalScore: number | null; outcome: number }
