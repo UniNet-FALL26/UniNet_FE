@@ -48,6 +48,7 @@ export function ProjectCreateScreen() {
   const [customTechInput, setCustomTechInput] = useState("");
 
   const [memberTarget, setMemberTarget] = useState("");
+  const [minimumQuantity, setMinimumQuantity] = useState("");
   const [roles, setRoles] = useState([emptyRole()]);
 
   const [recruitmentDeadline, setRecruitmentDeadline] = useState<Date | null>(
@@ -240,9 +241,18 @@ export function ProjectCreateScreen() {
     }
 
     const parsedTarget = Number(memberTarget);
-    if (!memberTarget || Number.isNaN(parsedTarget) || parsedTarget < 2) {
+    if (!memberTarget || !Number.isInteger(parsedTarget) || parsedTarget < 2) {
       nextErrors.memberTarget =
         "Số thành viên mục tiêu phải lớn hơn 1 và bao gồm người tạo.";
+    }
+
+    const parsedMinimum = Number(minimumQuantity);
+    if (!minimumQuantity || !Number.isInteger(parsedMinimum) || parsedMinimum < 2) {
+      nextErrors.minimumQuantity =
+        "Số thành viên tối thiểu phải là số nguyên từ 2 và bao gồm người tạo.";
+    } else if (parsedMinimum > parsedTarget) {
+      nextErrors.minimumQuantity =
+        "Số thành viên tối thiểu không được vượt quá số thành viên mục tiêu.";
     }
 
     if (roles.length === 0) {
@@ -304,6 +314,7 @@ export function ProjectCreateScreen() {
         .filter((skill) => technologies.includes(skill.name))
         .map((skill) => skill.id),
       memberTarget: Number(memberTarget),
+      minimumQuantity: Number(minimumQuantity),
       roleRequirements: roles.map((role) => ({
         role: role.role.trim(),
         quantity: Number(role.quantity),
@@ -624,6 +635,18 @@ export function ProjectCreateScreen() {
 
             <Text style={styles.helperText}>
               Số này bao gồm cả người tạo dự án.
+            </Text>
+
+            <Input appearance="project"
+              label="Số thành viên tối thiểu *"
+              value={minimumQuantity}
+              onChangeText={setMinimumQuantity}
+              keyboardType="numeric"
+              placeholder="Ví dụ: 2"
+              error={errors.minimumQuantity}
+            />
+            <Text style={styles.helperText}>
+              Bao gồm người tạo và không vượt quá số thành viên mục tiêu.
             </Text>
 
             <View style={styles.roleSectionHeader}>

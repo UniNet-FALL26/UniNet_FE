@@ -4,11 +4,9 @@ import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
-import { StudentProfileStarter } from '@/components/profile/StudentProfileStarter';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
 import { portfolioService } from '@/services/portfolio.service';
-import { shouldShowPortfolio } from '@/utils/student-profile';
 import { colors } from '@/constants/colors';
 import type { PortfolioResponse } from '@/types/portfolio';
 import { useAuthStore } from '@/store/auth.store';
@@ -34,7 +32,7 @@ export default function StudentProfileViewer() {
   return <SafeAreaView style={s.safe}>
     <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/community')} style={s.back}><SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={22} tintColor={colors.textPrimary} /></Pressable><Text role="heading" aria-level={1} style={s.title}>Hồ sơ sinh viên</Text></View>
     {error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ sinh viên" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content}>
-      {shouldShowPortfolio(data) ? <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={Math.min(frameWidth || width, 1120)} /></View> : <StudentProfileStarter profile={data.profile} width={width} />}
+      <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={Math.min(frameWidth || width, 1120)} /></View>
     </ScrollView>}
   </SafeAreaView>;
 }

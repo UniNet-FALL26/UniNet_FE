@@ -1,3 +1,4 @@
+import { desktopHeaderStyles } from '@/components/ui/desktop-header.styles';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { router, Slot, usePathname, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -144,7 +145,7 @@ export default function AppTabs() {
 }
 
 const styles = StyleSheet.create({
-  desktopHeader: { marginHorizontal: 16, marginTop: 14, marginBottom: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E0EDFD', borderRadius: 18, zIndex: 2, boxShadow: '0 5px 22px rgba(39, 110, 190, 0.07)', experimental_backgroundImage: 'linear-gradient(115deg, #F0F7FF 0%, #FFFFFF 22%, #FFFFFF 80%, #F0F7FF 100%)' },
+  desktopHeader: desktopHeaderStyles.frame,
   headerInner: { width: '100%', maxWidth: 1600, alignSelf: 'center', minHeight: 68, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flexShrink: 0 },
   brandMark: { width: 30, height: 34 }, brandName: { color: colors.navy, fontSize: 23, fontWeight: '800', letterSpacing: -0.8 },

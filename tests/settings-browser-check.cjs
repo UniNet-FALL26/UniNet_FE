@@ -75,7 +75,8 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8083';
     displayCalls = 0;
     await page.evaluate(() => { history.pushState({}, '', '/settings'); dispatchEvent(new PopStateEvent('popstate')); });
     const button = name => page.getByRole('button', { name, exact: true });
-    await page.getByRole('switch', { name: 'Hiển thị mẫu hồ sơ' }).waitFor();
+    await button('Đổi mẫu hồ sơ').waitFor();
+    assert.equal(await page.getByRole('switch', { name: 'Hiển thị mẫu hồ sơ' }).count(), 0);
     fs.mkdirSync('dist/settings-verification', { recursive: true });
     for (const width of [320, 768, 1440]) {
       await page.setViewportSize({ width, height: 1100 });
@@ -90,9 +91,7 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8083';
     }
     assert.equal(await button('Chỉnh sửa hồ sơ').count(), 0);
     assert.equal(await page.getByText('Không gian của bạn. Theo cách của bạn.', { exact: true }).count(), 0);
-    await page.getByRole('switch', { name: 'Hiển thị mẫu hồ sơ' }).click();
-    await page.getByText('Đã cập nhật cách hiển thị hồ sơ.', { exact: true }).waitFor();
-    assert.equal(displayCalls, 1); assert.equal(data.portfolio.appearance.profile.showPortfolio, false);
+    assert.equal(displayCalls, 0);
     await button('Thông tin tài khoản').click();
     await page.getByRole('dialog').getByText(account.email, { exact: true }).waitFor();
     await page.setViewportSize({ width: 320, height: 900 });

@@ -1,24 +1,57 @@
+import { CompanyAboutCard } from '@/components/company/CompanyAboutCard';
+import { PartnerVerification } from '@/components/company/PartnerVerification';
+import { VerificationBanner } from '@/components/profile/VerificationBanner';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
+import { ToastHost } from '@/components/ui/ToastHost';
+import { CompanyProfileHero } from '@/components/company/CompanyProfileHero';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { Button } from '@/components/ui/Button';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import type { ImagePickerAsset } from 'expo-image-picker';
-import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, PageTitle, SectionTitle, Tag } from '@/components/company/company-ui';
-import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
+import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, SectionTitle, Tag } from '@/components/company/company-ui';
+import { CompanyPhotoDialog } from '@/components/company/CompanyPhotoDialog';
 import { ProfileFramedImage } from '@/components/profile/ProfileFramedImage';
 import { useAuth } from '@/hooks/useAuth';
-import { companyService, formatCompanySalary, type CompanyProfile, type CompanyProfileInput, type PartnerVerificationStatus } from '@/services/company.service';
+import { companyService, companyJobEmploymentTypeLabel, formatCompanySalary, type CompanyProfile, type CompanyProfileInput, type PartnerVerificationStatus } from '@/services/company.service';
 import { pickProfileImage } from '@/utils/profile-image-picker';
+import { WebsiteBrandIcon } from '@/components/company/WebsiteBrandIcon';
+import { imageBody } from '@/utils/image-picker';
+import { authStore } from '@/store/auth.store';
 
-const verificationLabel = (status: PartnerVerificationStatus['status'] | undefined) => status === 0 ? 'Đang chờ admin duyệt' : status === 1 ? 'Đã xác minh' : status === 2 ? 'Cần bổ sung hồ sơ' : status === 3 ? 'Cần gửi xác minh lại' : 'Chưa gửi xác minh';
+async function openWebsite(value: string | null | undefined) {
+  const website = value?.trim();
+  if (!website) return;
+  const href = /^https?:\/\//i.test(website) ? website : `https://${website}`;
+  try {
+    const url = new URL(href);
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error('invalid URL');
+    await Linking.openURL(url.toString());
+  } catch {
+    Alert.alert('Không mở được website', 'Liên kết website không hợp lệ hoặc không thể mở.');
+  }
+}
 
-function ProfileEditField({ label, value, onChangeText, multiline = false, error }: { label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean; error?: string }) {
-  return <View style={s.editField}><Text style={s.editLabel}>{label}</Text><TextInput value={value} onChangeText={onChangeText} multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} style={[s.editInput, multiline && s.editTextarea, !!error && s.editInputError]} />{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}</View>;
+function ProfileEditField({ label, value, onChangeText, multiline = false, error, disabled = false, keyboardType = 'default', half = false }: { label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean; error?: string; disabled?: boolean; keyboardType?: 'default' | 'email-address' | 'phone-pad'; half?: boolean }) {
+  const [focused, setFocused] = useState(false);
+  return <View style={[editStyles.field, half && editStyles.halfField]}><Text style={editStyles.label}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} multiline={multiline} editable={!disabled} keyboardType={keyboardType} autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} textAlignVertical={multiline ? 'top' : 'center'} style={[editStyles.input, multiline && editStyles.textarea, focused && editStyles.focused, !!error && s.editInputError]} />{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}</View>;
 }
 
 export default function CompanyProfile() {
+  const { width } = useWindowDimensions();
+  const mobile = width < 700;
+  const desktop = Platform.OS === 'web' && width >= 1200;
+  const [profileWidth, setProfileWidth] = useState(0);
+  const [dismissedVerification, setDismissedVerification] = useState<string | null>(null);
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [verification, setVerification] = useState<PartnerVerificationStatus | null>(null);
+  const [verificationOpen, setVerificationOpen] = useState(false);
+  const applyVerificationStatus = useCallback((next: PartnerVerificationStatus) => {
+    setVerification(next);
+    if (next.status !== null) setProfile(current => current ? { ...current, isVerified: next.status === 1 } : current);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
@@ -30,7 +63,7 @@ export default function CompanyProfile() {
   const [editNotice, setEditNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
   const [profileNotice, setProfileNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
   const [reload, setReload] = useState(0);
-  const [photo, setPhoto] = useState<{ target: 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset; editExisting?: boolean } | null>(null);
+  const [photo, setPhoto] = useState<{ target: 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null);
   const [choosingPhoto, setChoosingPhoto] = useState<'avatarUrl' | 'coverUrl' | null>(null);
   const [previewPhotoTarget, setPreviewPhotoTarget] = useState<'avatarUrl' | 'coverUrl' | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -59,6 +92,7 @@ export default function CompanyProfile() {
       description: profile.description ?? '',
       industry: profile.industry ?? '',
       website: profile.website ?? '',
+      websites: profile.websites.length ? [...profile.websites] : profile.website ? [profile.website] : [],
       phone: profile.phone ?? '',
       address: profile.address ?? '',
       contactEmail: profile.contactEmail ?? '',
@@ -71,6 +105,7 @@ export default function CompanyProfile() {
   const saveProfile = async () => {
     if (!draft || !profile || saving) return;
     const errors: Record<string, string> = {};
+    let normalizedWebsites = (draft.websites ?? []).map(value => value.trim()).filter(Boolean);
     if (!draft.companyName.trim()) errors.companyName = 'Vui lòng nhập tên tổ chức.';
     else if (draft.companyName.trim().length > 255) errors.companyName = 'Tên tổ chức không được dài quá 255 ký tự.';
     if (editSection === 'profile') {
@@ -85,13 +120,16 @@ export default function CompanyProfile() {
       }
       if ((draft.address?.length ?? 0) > 2000) errors.address = 'Địa chỉ không được dài quá 2.000 ký tự.';
     } else {
-      if ((draft.website?.length ?? 0) > 2048) errors.website = 'Website không được dài quá 2.048 ký tự.';
-      else if (draft.website?.trim()) {
-        try {
-          const website = new URL(draft.website.trim());
-          if (!['http:', 'https:'].includes(website.protocol) || !website.hostname) errors.website = 'Website phải là URL http hoặc https hợp lệ.';
-        } catch { errors.website = 'Website phải là URL http hoặc https hợp lệ.'; }
-      }
+      if (normalizedWebsites.length > 10) errors.websites = 'Tối đa 10 liên kết website.';
+      normalizedWebsites = normalizedWebsites.map(value => /^https?:\/\//i.test(value) ? value : `https://${value}`);
+      if (normalizedWebsites.some(value => value.length > 2048)) errors.websites = 'Mỗi liên kết website tối đa 2.048 ký tự.';
+      else if (normalizedWebsites.some(value => {
+        try { const website = new URL(value); return !['http:', 'https:'].includes(website.protocol) || !website.hostname; }
+        catch { return true; }
+      })) errors.websites = 'Mỗi liên kết phải là URL http hoặc https hợp lệ.';
+      normalizedWebsites = [...new Set(normalizedWebsites.map(value => {
+        try { return new URL(value).toString(); } catch { return value; }
+      }))];
     }
     setCompanyNameError(errors.companyName ?? '');
     setProfileFieldErrors(errors);
@@ -102,7 +140,7 @@ export default function CompanyProfile() {
     setEditNotice(null);
     setSaving(true);
     try {
-      setProfile(await companyService.updateProfile(draft));
+      setProfile(await companyService.updateProfile({ ...draft, website: normalizedWebsites[0] ?? null, websites: normalizedWebsites }));
       setVerification(await companyService.getVerificationStatus());
       setEditOpen(false);
       setProfileNotice({ type: 'success', title: 'Đã lưu', message: 'Hồ sơ đối tác đã được cập nhật.' });
@@ -113,49 +151,43 @@ export default function CompanyProfile() {
     }
   };
 
-  const setField = (key: Exclude<keyof CompanyProfileInput, 'partnerType'>, value: string) => {
+  const setField = (key: Exclude<keyof CompanyProfileInput, 'partnerType' | 'websites'>, value: string) => {
     setDraft(current => current ? { ...current, [key]: value } : current);
     if (key === 'companyName') setCompanyNameError('');
     setProfileFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
     setEditNotice(null);
   };
+  const setWebsiteAt = (index: number, value: string) => setDraft(current => current ? { ...current, websites: current.websites.map((website, i) => i === index ? value : website) } : current);
+  const addWebsite = () => setDraft(current => current && current.websites.length < 10 ? { ...current, websites: [...current.websites, ''] } : current);
+  const removeWebsite = (index: number) => setDraft(current => current ? { ...current, websites: current.websites.filter((_, i) => i !== index) } : current);
   const choosePhoto = async (target: 'avatarUrl' | 'coverUrl') => {
-    if (choosingPhoto) return;
+    if (choosingPhoto || saving) return;
     setChoosingPhoto(target);
     try {
       const asset = await pickProfileImage(target);
-      if (asset) setPhoto({ target, asset });
+      if (asset) { await imageBody(asset); setPhoto({ target, asset }); }
     } catch (cause) {
-      Alert.alert('Không chọn được ảnh', cause instanceof Error ? cause.message : 'Vui lòng thử lại.');
+      setProfileNotice({ type: 'error', title: 'Không chọn được ảnh', message: cause instanceof Error ? cause.message : 'Vui lòng thử lại.' });
     } finally {
       setChoosingPhoto(null);
     }
   };
-  const editPhotoPosition = (target: 'avatarUrl' | 'coverUrl') => {
-    const uri = profile?.[target];
-    if (!uri) { void choosePhoto(target); return; }
-    const width = target === 'coverUrl' ? 1200 : 800;
-    const height = target === 'coverUrl' ? 400 : 800;
-    setPreviewPhotoTarget(null);
-    setPhoto({ target, editExisting: true, asset: { uri, width, height, type: 'image' } as ImagePickerAsset });
-  };
-  const savePhoto = async (url: string) => {
-    if (!profile || !photo || saving) return;
+  const savePhoto = async (url: string, signal: AbortSignal) => {
+    if (!profile || !photo || saving) throw new Error('Không thể lưu ảnh lúc này. Vui lòng thử lại.');
     const target = photo.target;
-    setPhoto(null);
     setSaving(true);
     try {
-      const updated = await companyService.updateProfile({
+      const updated = await companyService.saveProfile({
         companyName: profile.companyName, partnerType: profile.partnerType, description: profile.description,
-        industry: profile.industry, website: profile.website, phone: profile.phone, address: profile.address,
+        industry: profile.industry, website: profile.website, websites: profile.websites, phone: profile.phone, address: profile.address,
         contactEmail: profile.contactEmail, avatarUrl: target === 'avatarUrl' ? url || null : profile.avatarUrl,
         coverUrl: target === 'coverUrl' ? url || null : profile.coverUrl,
-      });
-      setProfile(updated);
+      }, signal);
+      if (signal.aborted) return;
+      authStore.updateAccount(updated);
+      setProfile({ ...profile, [target]: url, isVerified: updated.profile?.isVerified ?? profile.isVerified });
       setPreviewPhotoTarget(null);
-      Alert.alert('Đã cập nhật ảnh', 'Ảnh hồ sơ đối tác đã được lưu.');
-    } catch (cause) {
-      Alert.alert('Không lưu được ảnh', cause instanceof Error ? cause.message : 'Vui lòng thử lại.');
+      setProfileNotice({ type: 'success', title: 'Đã cập nhật ảnh', message: 'Ảnh hồ sơ đối tác đã được lưu.' });
     } finally {
       setSaving(false);
     }
@@ -170,51 +202,107 @@ export default function CompanyProfile() {
     setLogoutOpen(false);
     router.replace('/(auth)/login');
   };
-  return <CompanyPage><PageScroll>
-    <PageTitle title="Hồ sơ đối tác" subtitle="Giới thiệu tổ chức với cộng đồng sinh viên UniNet." />
-    {!!profileNotice && <View accessibilityRole="alert" style={[s.saveNotice, profileNotice.type === 'success' ? s.saveNoticeSuccess : s.saveNoticeError]}><Text style={s.saveNoticeTitle}>{profileNotice.title}</Text><Text style={s.saveNoticeText}>{profileNotice.message}</Text></View>}
+  const compactReminder = (profileWidth || width) < 600;
+  const showVerificationReminder = !!profile && !profile.isVerified && verification?.status !== 1 && dismissedVerification !== profile.id;
+  const verificationDescription = verification?.status === 0 ? 'Hồ sơ xác minh tổ chức đang được xét duyệt. Nhấn để xem trạng thái.' : verification?.status === 2 ? 'Hồ sơ cần bổ sung thông tin. Nhấn xác minh để xem lý do và cập nhật.' : verification?.status === 3 ? 'Hồ sơ đã hủy. Vui lòng gửi lại thông tin xác minh tổ chức.' : 'Xác minh thông tin tổ chức và tăng độ tin cậy với sinh viên.';
+  const profileHeader = (showVerificationReminder || !desktop) && <View testID={mobile ? 'company-profile-mobile-header' : undefined} style={[layoutStyles.verificationHeader, mobile && layoutStyles.fixedMobileHeader]}>
+    <View style={layoutStyles.reminderSlot}>{showVerificationReminder && <VerificationBanner compact={compactReminder} title="Xác minh tài khoản đối tác" description={verificationDescription} actionLabel={verification?.status === 0 ? compactReminder ? 'Xem' : 'Xem trạng thái' : undefined} showHint={verification?.status !== 0} onVerify={() => setVerificationOpen(true)} onDismiss={() => setDismissedVerification(profile.id)} />}</View>
+    <View style={layoutStyles.headerActions}>
+      {mobile && <Pressable testID="company-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" disabled={!profile || loading || saving} onPress={() => edit('profile')} style={({ pressed }) => [layoutStyles.settingsButton, compactReminder && layoutStyles.compactSettingsButton, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} color={c.ink} /></Pressable>}
+      {!desktop && <Pressable testID="company-profile-settings-action" accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [layoutStyles.settingsButton, compactReminder && layoutStyles.compactSettingsButton, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} color={c.ink} /></Pressable>}
+    </View>
+  </View>;
+  return <CompanyPage><View style={[layoutStyles.body, desktop && layoutStyles.desktopBody]}><View style={layoutStyles.main} onLayout={event => setProfileWidth(event.nativeEvent.layout.width)}>{mobile && profileHeader}<PageScroll contentStyle={desktop ? layoutStyles.desktopScroll : mobile ? layoutStyles.mobileScroll : undefined}>
+    {!mobile && profileHeader}
+    {!!profileNotice && <ActionFeedback type={profileNotice.type} message={profileNotice.message} />}
     {loading && <Card><ActivityIndicator color={c.purple} /><Text style={s.helper}>Đang tải hồ sơ đối tác…</Text></Card>}
     {!!error && <Card><Text style={s.error}>{error}</Text><ActionButton title="Thử lại" onPress={() => setReload(value => value + 1)} variant="outline" /></Card>}
       {!!profile && <>
-    <Card style={s.profileCard}>
-        <Pressable accessibilityRole="button" accessibilityLabel={profile.coverUrl ? 'Xem ảnh bìa' : 'Thêm ảnh bìa'} onPress={() => profile.coverUrl ? setPreviewPhotoTarget('coverUrl') : void choosePhoto('coverUrl')} style={s.cover}>{profile.coverUrl ? <ProfileFramedImage uri={profile.coverUrl} accessibilityLabel="Ảnh bìa đối tác" /> : <><View style={s.coverBlockA} /><View style={s.coverBlockB} /><View style={s.coverWindow}><CompanyIcon name={{ ios: 'building.2.fill', android: 'business', web: 'business' }} size={34} color="#FFFFFF" /></View><View style={s.coverSun} /></>}</Pressable>
-      <View style={s.companyTitleRow}><Pressable accessibilityRole="button" accessibilityLabel={profile.avatarUrl ? 'Xem ảnh đại diện' : 'Thêm ảnh đại diện'} onPress={() => profile.avatarUrl ? setPreviewPhotoTarget('avatarUrl') : void choosePhoto('avatarUrl')} style={s.companyLogo}>{profile.avatarUrl ? <ProfileFramedImage uri={profile.avatarUrl} accessibilityLabel="Ảnh đại diện đối tác" /> : <Text style={s.logoText}>{profile.companyName.trim().charAt(0).toUpperCase() || 'C'}</Text>}</Pressable><View style={s.companyTitle}><View style={s.companyHeading}><Text style={s.companyName}>{profile.companyName}</Text><Tag tone={profile.isVerified ? 'green' : 'amber'}>{profile.isVerified ? 'Đã xác minh' : 'Chưa xác minh'}</Tag></View>{profile.industry ? <Tag tone="gray">{profile.industry}</Tag> : null}</View><Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" onPress={() => edit('profile')} style={s.editIconButton}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} color={c.blue} /></Pressable></View>
-      <View style={s.profileContacts}>
-        {profile.contactEmail ? <View style={s.profileContactRow}><CompanyIcon name={{ ios: 'envelope', android: 'mail', web: 'mail' }} size={14} color={c.muted} /><Text style={s.profileContactText}>{profile.contactEmail}</Text></View> : null}
-        {profile.phone ? <View style={s.profileContactRow}><CompanyIcon name={{ ios: 'phone', android: 'call', web: 'call' }} size={14} color={c.muted} /><Text style={s.profileContactText}>{profile.phone}</Text></View> : null}
-        {profile.address ? <View style={s.profileContactRow}><CompanyIcon name={{ ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' }} size={14} color={c.muted} /><Text style={s.profileContactText}>{profile.address}</Text></View> : null}
-        {profile.website ? <View style={s.profileContactRow}><CompanyIcon name={{ ios: 'link', android: 'link', web: 'link' }} size={14} color={c.muted} /><Text style={s.profileContactText}>{profile.website}</Text></View> : null}
-        {!profile.contactEmail && !profile.phone && !profile.address && !profile.website ? <Text style={s.profileContactEmpty}>Chưa thêm thông tin liên hệ.</Text> : null}
-      </View>
-    </Card>
-    <Card><View style={s.sectionHeading}><SectionTitle title={`Về ${profile.companyName}`} /><Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa phần giới thiệu" onPress={() => edit('about')} style={s.editIconButton}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} color={c.blue} /></Pressable></View><Text style={s.body}>{profile.description || 'Đối tác chưa thêm phần giới thiệu.'}</Text><View style={s.chips}>{profile.website ? <Tag tone="purple">{profile.website}</Tag> : null}</View></Card>
-    <Card><SectionTitle title="Cơ hội đang mở" action="Quản lý bài đăng" onAction={() => router.push('/(company)/jobs')} /><Text style={s.helper}>Dành cho sinh viên và người mới tốt nghiệp</Text>{profile.openJobs.map((job) => <View key={job.id} style={s.job}><View style={s.jobHead}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} size={17} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.helper}>{job.location || 'Chưa có địa điểm'} · {job.workType === 0 ? 'Tại văn phòng' : job.workType === 1 ? 'Kết hợp' : 'Từ xa'}</Text></View><Tag tone="green">Đã đăng</Tag></View><Text style={s.salary}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></View>)}{profile.openJobs.length === 0 && <Text style={s.helper}>Hiện chưa có bài tuyển dụng đang mở.</Text>}</Card>
-    <Card><SectionTitle title="Xác minh tài khoản đối tác" /><View style={s.verificationRow}><CompanyIcon name={{ ios: 'checkmark.shield', android: 'verified_user', web: 'verified_user' }} color={c.blue} /><View style={{ flex: 1 }}><Text style={s.personName}>{verificationLabel(verification?.status)}</Text><Text style={s.helper}>{verification?.status === 0 ? 'Admin đang xem hồ sơ của tổ chức.' : verification?.status === 1 ? 'Tài khoản đã được admin xác minh. Bạn có thể chủ động đăng tuyển.' : verification?.status === 2 ? verification.rejectReason || 'Hồ sơ cần được bổ sung trước khi gửi lại.' : 'Gửi giấy tờ để admin xác minh tài khoản trước khi đăng tuyển công khai.'}</Text></View></View><ActionButton title={verification?.status === 0 ? 'Xem trạng thái' : verification?.status === 1 ? 'Đã xác minh' : 'Gửi hồ sơ xác minh'} onPress={() => router.push('/(company)/verification')} variant={verification?.status === 1 ? 'outline' : 'soft'} /></Card>
-    <Pressable accessibilityRole="button" onPress={() => setLogoutOpen(true)} style={s.logoutButton}><CompanyIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={17} color={c.rose} /><Text style={s.logoutText}>Đăng xuất</Text></Pressable>
+    <CompanyProfileHero
+      profile={profile}
+      onViewCover={() => profile.coverUrl ? setPreviewPhotoTarget('coverUrl') : void choosePhoto('coverUrl')}
+      onEditCover={() => void choosePhoto('coverUrl')}
+      onViewAvatar={() => profile.avatarUrl ? setPreviewPhotoTarget('avatarUrl') : void choosePhoto('avatarUrl')}
+      onEditAvatar={() => void choosePhoto('avatarUrl')}
+      onEditProfile={() => edit('profile')}
+      photoBusy={!!choosingPhoto || saving}
+    />
+    <CompanyAboutCard name={profile.companyName} description={profile.description} websites={profile.websites} onEdit={() => edit('about')} onOpenWebsite={website => void openWebsite(website)} />
+    <Card style={mobile ? layoutStyles.mobileCard : undefined}><SectionTitle title="Cơ hội đang mở" action="Quản lý bài đăng" onAction={() => router.push('/(company)/jobs')} /><Text style={s.helper}>Dành cho sinh viên và người mới tốt nghiệp</Text>{profile.openJobs.map((job) => <View key={job.id} style={s.job}><View style={s.jobHead}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} size={17} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.helper}>{companyJobEmploymentTypeLabel[job.employmentType]} · {job.jobField || 'Chưa cập nhật lĩnh vực'}</Text><Text style={s.helper}>{job.location || 'Chưa có địa điểm'} · {job.workType === 0 ? 'Tại văn phòng' : job.workType === 1 ? 'Kết hợp' : 'Từ xa'}</Text></View><Tag tone="green">Đã đăng</Tag></View><Text style={s.salary}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></View>)}{profile.openJobs.length === 0 && <Text style={s.helper}>Hiện chưa có bài tuyển dụng đang mở.</Text>}</Card>
+    {!desktop && <Pressable accessibilityRole="button" onPress={() => setLogoutOpen(true)} style={s.logoutButton}><CompanyIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={17} color={c.rose} /><Text style={s.logoutText}>Đăng xuất</Text></Pressable>}
     </>}
     <Modal visible={logoutOpen} transparent animationType="fade" onRequestClose={() => setLogoutOpen(false)}>
       <View style={s.modalBackdrop}><View style={s.confirmCard}><Text style={s.modalTitle}>Đăng xuất?</Text><Text style={s.body}>Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng tài khoản đối tác.</Text><View style={s.modalActions}><ActionButton title="Ở lại" onPress={() => setLogoutOpen(false)} variant="outline" /><ActionButton title={authLoading ? 'Đang đăng xuất…' : 'Đăng xuất'} onPress={() => void confirmLogout()} /></View></View></View>
     </Modal>
-    <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
-      <View style={s.modalBackdrop}><View style={s.modalCard}><Text style={s.modalTitle}>{editSection === 'profile' ? 'Chỉnh sửa thông tin tổ chức' : 'Chỉnh sửa phần giới thiệu'}</Text>{!!editNotice && <View accessibilityRole="alert" style={[s.saveNotice, editNotice.type === 'success' ? s.saveNoticeSuccess : s.saveNoticeError]}><Text style={s.saveNoticeTitle}>{editNotice.title}</Text><Text style={s.saveNoticeText}>{editNotice.message}</Text></View>}<ScrollView keyboardShouldPersistTaps="handled" style={s.modalScroll}>
+    <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => { if (!saving) setEditOpen(false); }}>
+      <KeyboardAvoidingView style={editStyles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>{editOpen && <ToastHost modal />}<View testID="company-profile-edit-dialog" role="dialog" aria-modal accessibilityLabel={editSection === 'profile' ? 'Chỉnh sửa thông tin tổ chức' : 'Chỉnh sửa phần giới thiệu'} accessibilityViewIsModal style={editStyles.card}>
+        <View style={editStyles.header}>
+          {width >= 480 && <View style={editStyles.headerIcon}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={20} /></View>}
+          <View style={editStyles.heading}><Text style={editStyles.title}>{editSection === 'profile' ? 'Chỉnh sửa thông tin tổ chức' : 'Chỉnh sửa phần giới thiệu'}</Text><Text style={editStyles.subtitle}>{editSection === 'profile' ? 'Cập nhật thông tin để mọi người dễ dàng kết nối.' : 'Giới thiệu tổ chức và các kênh liên hệ của bạn.'}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Đóng chỉnh sửa" disabled={saving} onPress={() => setEditOpen(false)} style={({ pressed }) => [editStyles.close, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} color={c.muted} /></Pressable>
+        </View>
+        {!!editNotice && <ActionFeedback type={editNotice.type} message={editNotice.message} />}<ScrollView keyboardShouldPersistTaps="handled" style={s.modalScroll} contentContainerStyle={editStyles.content}>
         {draft && editSection === 'profile' && <>
-          <ProfileEditField label="Tên tổ chức *" value={draft.companyName} onChangeText={value => setField('companyName', value)} error={companyNameError} />
-          <ProfileEditField label="Lĩnh vực" value={draft.industry ?? ''} onChangeText={value => setField('industry', value)} error={profileFieldErrors.industry} />
-          <ProfileEditField label="Email liên hệ" value={draft.contactEmail ?? ''} onChangeText={value => setField('contactEmail', value)} error={profileFieldErrors.contactEmail} />
-          <ProfileEditField label="Số điện thoại" value={draft.phone ?? ''} onChangeText={value => setField('phone', value)} error={profileFieldErrors.phone} />
-          <ProfileEditField label="Địa chỉ" value={draft.address ?? ''} onChangeText={value => setField('address', value)} multiline error={profileFieldErrors.address} />
+          <ProfileEditField label="Tên tổ chức *" value={draft.companyName} onChangeText={value => setField('companyName', value)} error={companyNameError} disabled={saving} />
+          <ProfileEditField label="Lĩnh vực" value={draft.industry ?? ''} onChangeText={value => setField('industry', value)} error={profileFieldErrors.industry} disabled={saving} />
+          <View style={[editStyles.contactFields, width < 600 && editStyles.stackedFields]}>
+            <ProfileEditField label="Email liên hệ" value={draft.contactEmail ?? ''} onChangeText={value => setField('contactEmail', value)} error={profileFieldErrors.contactEmail} disabled={saving} keyboardType="email-address" half={width >= 600} />
+            <ProfileEditField label="Số điện thoại" value={draft.phone ?? ''} onChangeText={value => setField('phone', value)} error={profileFieldErrors.phone} disabled={saving} keyboardType="phone-pad" half={width >= 600} />
+          </View>
+          <ProfileEditField label="Địa chỉ" value={draft.address ?? ''} onChangeText={value => setField('address', value)} multiline error={profileFieldErrors.address} disabled={saving} />
         </>}
         {draft && editSection === 'about' && <>
-          <ProfileEditField label="Giới thiệu" value={draft.description ?? ''} onChangeText={value => setField('description', value)} multiline />
-          <ProfileEditField label="Website (URL)" value={draft.website ?? ''} onChangeText={value => setField('website', value)} error={profileFieldErrors.website} />
+          <ProfileEditField label="Giới thiệu" value={draft.description ?? ''} onChangeText={value => setField('description', value)} multiline disabled={saving} />
+          <View style={s.editField}><Text style={s.editLabel}>Liên kết website</Text>{draft.websites.map((website, index) => <View key={index} style={s.websiteEditRow}><WebsiteBrandIcon url={website} size={17} /><TextInput value={website} onChangeText={value => setWebsiteAt(index, value)} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://facebook.com/..." style={[s.editInput, s.websiteEditInput, !!profileFieldErrors.websites && s.editInputError]} /><Pressable accessibilityRole="button" accessibilityLabel="Xóa liên kết" onPress={() => removeWebsite(index)} style={s.websiteRemove}><CompanyIcon name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} size={20} color={c.muted} /></Pressable></View>)}{!!profileFieldErrors.websites && <Text accessibilityRole="alert" style={s.error}>{profileFieldErrors.websites}</Text>}<Pressable accessibilityRole="button" disabled={draft.websites.length >= 10} onPress={addWebsite} style={s.addWebsite}><CompanyIcon name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={16} color={draft.websites.length >= 10 ? c.muted : c.blue} /><Text style={[s.addWebsiteText, draft.websites.length >= 10 && { color: c.muted }]}>Thêm liên kết</Text></Pressable></View>
         </>}
-      </ScrollView><View style={s.modalActions}><ActionButton title="Hủy" onPress={() => setEditOpen(false)} variant="outline" /><ActionButton title={saving ? 'Đang lưu…' : 'Lưu thay đổi'} onPress={() => void saveProfile()} /></View></View></View>
+      </ScrollView><View style={editStyles.footer}><Button title="Hủy" onPress={() => setEditOpen(false)} variant="outline" disabled={saving} style={editStyles.footerButton} textStyle={editStyles.footerLabel} /><Button title="Lưu thay đổi" loading={saving} onPress={() => void saveProfile()} style={editStyles.footerButton} textStyle={editStyles.footerLabel} /></View></View></KeyboardAvoidingView>
     </Modal>
       <Modal visible={!!previewPhotoTarget} transparent animationType="fade" onRequestClose={() => setPreviewPhotoTarget(null)}>
-        <View style={s.photoPreviewOverlay}><Pressable style={s.photoPreviewBackdrop} onPress={() => setPreviewPhotoTarget(null)} /><View style={[s.photoPreviewFrame, { width: '100%', maxWidth: 520, minHeight: undefined, aspectRatio: previewPhotoTarget === 'avatarUrl' ? 1 : 3, overflow: 'hidden' }]}>{previewPhotoTarget && profile?.[previewPhotoTarget] ? <ProfileFramedImage uri={profile[previewPhotoTarget]!} accessibilityLabel={previewPhotoTarget === 'avatarUrl' ? 'Ảnh đại diện' : 'Ảnh bìa'} /> : null}<Pressable accessibilityRole="button" accessibilityLabel="Chỉnh vị trí ảnh" disabled={!!choosingPhoto || saving} onPress={() => { const target = previewPhotoTarget; if (target) editPhotoPosition(target); }} style={s.photoPreviewEdit}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={18} color={c.blue} /></Pressable></View></View>
+        <View style={s.photoPreviewOverlay}><Pressable style={s.photoPreviewBackdrop} onPress={() => setPreviewPhotoTarget(null)} /><View style={[s.photoPreviewFrame, { width: '100%', maxWidth: 520, minHeight: undefined, aspectRatio: previewPhotoTarget === 'avatarUrl' ? 1 : 3, overflow: 'hidden' }]}>{previewPhotoTarget && profile?.[previewPhotoTarget] ? <ProfileFramedImage uri={profile[previewPhotoTarget]!} accessibilityLabel={previewPhotoTarget === 'avatarUrl' ? 'Ảnh đại diện' : 'Ảnh bìa'} /> : null}<Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh" disabled={!!choosingPhoto || saving} onPress={() => { const target = previewPhotoTarget; if (target) { setPreviewPhotoTarget(null); void choosePhoto(target); } }} style={s.photoPreviewEdit}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={18} color={c.blue} /></Pressable></View></View>
     </Modal>
-      {photo && <ProfilePhotoForm key={`${photo.target}-${photo.editExisting ? 'position' : 'new'}`} initialAsset={photo.asset} cropFor={photo.target} editExisting={photo.editExisting} onClose={() => setPhoto(null)} onConfirm={url => void savePhoto(url)} />}
-  </PageScroll></CompanyPage>;
+      {verificationOpen && <PartnerVerification onClose={() => setVerificationOpen(false)} onStatusChange={applyVerificationStatus} />}
+      {photo && <CompanyPhotoDialog key={photo.target} initialAsset={photo.asset} target={photo.target} onClose={() => setPhoto(null)} onSave={savePhoto} />}
+  </PageScroll></View>{desktop && <View testID="company-profile-settings-column" style={layoutStyles.settingsColumn}><SettingsPanel embedded onPartnerVerificationStatusChange={applyVerificationStatus} /></View>}</View></CompanyPage>;
 }
 
-const s = StyleSheet.create({ profileCard: { padding: 0, overflow: 'hidden' }, cover: { height: 132, backgroundColor: '#DCE8E6', overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center' }, coverImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' }, coverBlockA: { width: '28%', height: 78, backgroundColor: '#A7C4BE', marginHorizontal: 2 }, coverBlockB: { width: '25%', height: 102, backgroundColor: '#8AAFA9', marginHorizontal: 2 }, coverWindow: { width: '30%', height: 117, borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: '#5D8580', alignItems: 'center', justifyContent: 'center' }, coverSun: { position: 'absolute', top: 18, right: 25, width: 32, height: 32, borderRadius: 16, backgroundColor: '#F6DCA1' }, companyTitleRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, marginTop: 12, alignItems: 'center' }, companyLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatarImage: { width: '100%', height: '100%' }, editIconButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#EAF3FF', alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontSize: 25, fontWeight: '900' }, companyTitle: { flex: 1, alignItems: 'flex-start', gap: 5 }, companyHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 }, sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, companyName: { color: c.ink, fontSize: 17, fontWeight: '900' }, description: { color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 9, marginHorizontal: 14 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, marginHorizontal: 14, marginBottom: 14 }, profileContacts: { gap: 9, marginHorizontal: 14, marginTop: 12, marginBottom: 14 }, profileContactRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, profileContactText: { flex: 1, color: c.ink, fontSize: 10, lineHeight: 15 }, profileContactEmpty: { color: c.muted, fontSize: 9, lineHeight: 14 }, body: { color: c.ink, fontSize: 11, lineHeight: 18 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, job: { paddingTop: 12, marginTop: 11, borderTopWidth: 1, borderColor: c.line }, jobHead: { flexDirection: 'row', alignItems: 'center', gap: 8 }, jobIcon: { width: 31, height: 31, borderRadius: 9, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' }, jobTitle: { color: c.ink, fontWeight: '800', fontSize: 10 }, salary: { color: c.purple, fontSize: 9, fontWeight: '700', marginTop: 7, marginLeft: 39 }, verificationRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }, notice: { flexDirection: 'row', gap: 8, backgroundColor: '#F5F8FF' }, noticeText: { flex: 1, color: c.muted, fontSize: 9, lineHeight: 14 }, personName: { color: c.ink, fontSize: 10, fontWeight: '800' }, error: { color: c.rose, fontSize: 11 }, saveNotice: { borderRadius: 11, padding: 11, gap: 3, marginVertical: 8 }, saveNoticeSuccess: { backgroundColor: '#ECF8F1' }, saveNoticeError: { backgroundColor: '#FFF1F2' }, saveNoticeTitle: { color: c.ink, fontSize: 11, fontWeight: '900' }, saveNoticeText: { color: c.muted, fontSize: 10, lineHeight: 15 }, modalBackdrop: { flex: 1, backgroundColor: 'rgba(20,18,30,0.45)', justifyContent: 'center', padding: 18 }, modalCard: { maxHeight: '90%', borderRadius: 18, padding: 16, backgroundColor: '#FFF' }, confirmCard: { borderRadius: 18, padding: 16, backgroundColor: '#FFF' }, modalTitle: { color: c.ink, fontSize: 16, fontWeight: '900', marginBottom: 10 }, modalScroll: { flexGrow: 0 }, photoPreviewOverlay: { flex: 1, backgroundColor: 'rgba(12,25,45,0.78)', alignItems: 'center', justifyContent: 'center', padding: 18 }, photoPreviewBackdrop: { ...StyleSheet.absoluteFill }, photoPreviewFrame: { width: '100%', maxWidth: 520, maxHeight: '80%', minHeight: 240, alignItems: 'center', justifyContent: 'center' }, photoPreviewCover: { width: '100%', aspectRatio: 3, borderRadius: 12 }, photoPreviewAvatar: { width: 280, height: 280, borderRadius: 18 }, photoPreviewEdit: { position: 'absolute', top: 10, right: 10, width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 4 }, editField: { gap: 5, marginTop: 8 }, editLabel: { color: c.ink, fontSize: 11, fontWeight: '700' }, editInput: { minHeight: 42, borderWidth: 1, borderColor: c.line, borderRadius: 10, paddingHorizontal: 10, color: c.ink, fontSize: 12 }, editInputError: { borderColor: c.rose }, editTextarea: { minHeight: 76, paddingTop: 10 }, modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 }, logoutButton: { minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: '#F3C7D0', backgroundColor: '#FFF8F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }, logoutText: { color: c.rose, fontSize: 12, fontWeight: '800' } });
+const layoutStyles = StyleSheet.create({
+  body: { flex: 1, minHeight: 0 },
+  desktopBody: { flexDirection: 'row', gap: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20, width: '100%', maxWidth: 1800, alignSelf: 'center' },
+  main: { flex: 1, minWidth: 0, minHeight: 0 },
+  desktopScroll: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 0 },
+  mobileScroll: { paddingHorizontal: 0, paddingTop: 0 },
+  mobileCard: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
+  settingsColumn: { width: 400, borderRadius: 20, borderWidth: 1, borderColor: c.line, backgroundColor: c.white, overflow: 'hidden' },
+  verificationHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  fixedMobileHeader: { flexShrink: 0, zIndex: 1, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: c.page },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reminderSlot: { flex: 1, minWidth: 0, flexDirection: 'row' },
+  settingsButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  compactSettingsButton: { width: 32, height: 36 },
+  pressed: { opacity: 0.65 },
+});
+
+const editStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(16,40,75,0.36)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  card: { width: '100%', maxWidth: 600, maxHeight: '90%', borderRadius: 20, borderWidth: 1, borderColor: c.line, backgroundColor: c.white, overflow: 'hidden', boxShadow: '0 20px 70px rgba(16,40,75,0.18)' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20, borderBottomWidth: 1, borderBottomColor: c.line },
+  headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' },
+  heading: { flex: 1, minWidth: 0, gap: 4 },
+  title: { color: c.ink, fontSize: 18, fontWeight: '800', lineHeight: 24 },
+  subtitle: { color: c.muted, fontSize: 12, lineHeight: 18 },
+  close: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7FAFF' },
+  content: { padding: 20, gap: 16 },
+  field: { minWidth: 0, gap: 7 },
+  halfField: { flex: 1, minWidth: 0 },
+  label: { color: c.ink, fontSize: 12, fontWeight: '700' },
+  input: { minHeight: 44, borderWidth: 1, borderColor: c.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FAFCFF', color: c.ink, fontSize: 13, outlineWidth: 0 },
+  focused: { borderColor: c.blue, backgroundColor: c.white, boxShadow: '0 0 0 3px rgba(23,105,224,0.1)' },
+  textarea: { minHeight: 76 },
+  contactFields: { flexDirection: 'row', gap: 14 },
+  stackedFields: { flexDirection: 'column', gap: 16 },
+  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: c.line, backgroundColor: '#F7FAFF' },
+  footerButton: { minHeight: 42, paddingHorizontal: 18 },
+  footerLabel: { fontSize: 13 },
+});
+
+const s = StyleSheet.create({ editIconButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#EAF3FF', alignItems: 'center', justifyContent: 'center' }, sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, companyName: { color: c.ink, fontSize: 17, fontWeight: '900' }, websiteChip: { maxWidth: '100%', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, borderRadius: 16, backgroundColor: '#EEF5FF' }, websiteChipText: { maxWidth: 260, color: c.blue, fontSize: 10, fontWeight: '700' }, websiteEditRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }, websiteEditInput: { flex: 1 }, websiteRemove: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' }, addWebsite: { minHeight: 34, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }, addWebsiteText: { color: c.blue, fontSize: 10, fontWeight: '700' }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, marginHorizontal: 14, marginBottom: 14 }, body: { color: c.ink, fontSize: 11, lineHeight: 18 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, job: { paddingTop: 12, marginTop: 11, borderTopWidth: 1, borderColor: c.line }, jobHead: { flexDirection: 'row', alignItems: 'center', gap: 8 }, jobIcon: { width: 31, height: 31, borderRadius: 9, backgroundColor: c.purpleSoft, alignItems: 'center', justifyContent: 'center' }, jobTitle: { color: c.ink, fontWeight: '800', fontSize: 10 }, salary: { color: c.purple, fontSize: 9, fontWeight: '700', marginTop: 7, marginLeft: 39 }, verificationRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }, notice: { flexDirection: 'row', gap: 8, backgroundColor: '#F5F8FF' }, noticeText: { flex: 1, color: c.muted, fontSize: 9, lineHeight: 14 }, personName: { color: c.ink, fontSize: 10, fontWeight: '800' }, error: { color: c.rose, fontSize: 11 }, saveNotice: { borderRadius: 11, padding: 11, gap: 3, marginVertical: 8 }, saveNoticeSuccess: { backgroundColor: '#ECF8F1' }, saveNoticeError: { backgroundColor: '#FFF1F2' }, saveNoticeTitle: { color: c.ink, fontSize: 11, fontWeight: '900' }, saveNoticeText: { color: c.muted, fontSize: 10, lineHeight: 15 }, modalBackdrop: { flex: 1, backgroundColor: 'rgba(20,18,30,0.45)', justifyContent: 'center', padding: 18 }, modalCard: { maxHeight: '90%', borderRadius: 18, padding: 16, backgroundColor: '#FFF' }, confirmCard: { borderRadius: 18, padding: 16, backgroundColor: '#FFF' }, modalTitle: { color: c.ink, fontSize: 16, fontWeight: '900', marginBottom: 10 }, modalScroll: { flexGrow: 0 }, photoPreviewOverlay: { flex: 1, backgroundColor: 'rgba(12,25,45,0.78)', alignItems: 'center', justifyContent: 'center', padding: 18 }, photoPreviewBackdrop: { ...StyleSheet.absoluteFill }, photoPreviewFrame: { width: '100%', maxWidth: 520, maxHeight: '80%', minHeight: 240, alignItems: 'center', justifyContent: 'center' }, photoPreviewCover: { width: '100%', aspectRatio: 3, borderRadius: 12 }, photoPreviewAvatar: { width: 280, height: 280, borderRadius: 18 }, photoPreviewEdit: { position: 'absolute', top: 10, right: 10, width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 4 }, editField: { gap: 5, marginTop: 8 }, editLabel: { color: c.ink, fontSize: 11, fontWeight: '700' }, editInput: { minHeight: 42, borderWidth: 1, borderColor: c.line, borderRadius: 10, paddingHorizontal: 10, color: c.ink, fontSize: 12 }, editInputError: { borderColor: c.rose }, editTextarea: { minHeight: 76, paddingTop: 10 }, modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 }, logoutButton: { minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: '#F3C7D0', backgroundColor: '#FFF8F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }, logoutText: { color: c.rose, fontSize: 12, fontWeight: '800' } });

@@ -1,19 +1,43 @@
-import { Redirect, Slot } from 'expo-router';
+import { desktopHeaderStyles } from '@/components/ui/desktop-header.styles';
+import { accountHome } from '@/utils/role-navigation';
+import { Redirect, Slot, router, type Href } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CompanyTabBar } from '@/components/company/company-ui';
 import { Loading } from '@/components/ui/Loading';
 import { useAuthStore } from '@/store/auth.store';
 import { ACCOUNT_ROLE } from '@/constants/roles';
-import { StyleSheet, Text, View } from 'react-native';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { CompanyHeaderActions } from '@/components/company/CompanyHeaderActions';
 import { colors } from '@/constants/colors';
 
 export default function CompanyLayout() {
   const { isLoading, isAuthenticated, account } = useAuthStore();
+  const { width } = useWindowDimensions();
+  const desktop = width >= 1024;
   if (isLoading) return <Loading />;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
-  if (isAuthenticated && account?.role !== ACCOUNT_ROLE.PARTNER) return <Redirect href="/(tabs)" />;
-  return <SafeAreaView edges={['top']} style={{ flex: 1 }}><View style={styles.header}><Text style={styles.brand}>UniNet <Text style={styles.caption}>Đối tác</Text></Text><NotificationBell /></View><Slot /><CompanyTabBar /></SafeAreaView>;
+  if (isAuthenticated && account?.role !== ACCOUNT_ROLE.PARTNER) return <Redirect href={accountHome(account?.role) as Href} />;
+  return <SafeAreaView edges={['top']} style={styles.root}>
+    {desktop && <View testID="company-header" style={styles.header}><View style={[styles.headerInner, width < 1200 && styles.compactHeader]}>
+      <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => router.navigate('/(company)')} style={({ pressed }) => [styles.brand, pressed && styles.pressed]}>
+        <Image source={require('@/assets/images/uninet-mark.png')} resizeMode="contain" accessibilityLabel="Logo UniNet" style={styles.logo} />
+        <Text style={styles.brandName}>UniNet</Text>
+      </Pressable>
+      <CompanyTabBar placement="header" />
+      <CompanyHeaderActions />
+    </View></View>}
+    <Slot />
+    {!desktop && <CompanyTabBar />}
+  </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({ header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, minHeight: 60, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }, brand: { fontSize: 21, fontWeight: '800', color: colors.navy }, caption: { fontSize: 13, fontWeight: '500', color: colors.textSecondary } });
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  header: desktopHeaderStyles.frame,
+  headerInner: { width: '100%', maxWidth: 1600, alignSelf: 'center', minHeight: 68, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 },
+  compactHeader: { paddingHorizontal: 16, gap: 16 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flexShrink: 0 },
+  logo: { width: 30, height: 34 },
+  brandName: { color: colors.navy, fontSize: 23, fontWeight: '800', letterSpacing: -0.8 },
+  pressed: { opacity: 0.7 },
+});

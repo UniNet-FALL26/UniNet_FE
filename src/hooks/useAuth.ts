@@ -16,7 +16,7 @@ export function useAuth() {
   return {
     loading, error, clearError: () => setError(null),
     login: (request: LoginRequest) => run(() => authService.login(request), authStore.setAuth),
-    register: (request: RegisterStudentRequest) => run(() => authService.registerStudent(request), authStore.setAuth),
+    register: (request: RegisterStudentRequest) => run(() => authService.registerStudent(request)),
     registerPartner: (request: RegisterPartnerRequest) => run(() => authService.registerPartner(request), authStore.setAuth),
     logout: () => run(() => authService.logout()),
     logoutAll: () => run(() => authService.logoutAll()),

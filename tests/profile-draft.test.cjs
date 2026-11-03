@@ -46,14 +46,13 @@ test('content and identity participate in dirty comparisons; successful reread b
   assert.equal(isProfileDraftDirty(same, baseline), false);
 });
 
-test('automatic display requires contents and explicit disable overrides contents', () => {
-  const { shouldShowPortfolio } = load('utils/student-profile.ts');
-  const data = original(); assert.equal(shouldShowPortfolio(data), false);
-  data.portfolio.appearance.profile.showPortfolio = true; assert.equal(shouldShowPortfolio(data), true);
-  delete data.portfolio.appearance.profile.showPortfolio; assert.equal(shouldShowPortfolio(data), true);
-  data.portfolio.headline = null; data.portfolio.projects = []; data.portfolio.activities = []; data.portfolio.languages = [];
-  assert.equal(shouldShowPortfolio(data), false);
-  data.portfolio.appearance.profile.showPortfolio = true; assert.equal(shouldShowPortfolio(data), false);
+test('missing appearance defaults to the first profile template without changing saved content', () => {
+  const { createProfileDraft } = load('utils/profile-draft.ts');
+  const data = original(); delete data.portfolio.appearance.profile.template; delete data.portfolio.appearance.profile.theme;
+  const before = JSON.stringify(data), draft = createProfileDraft(data);
+  assert.equal(draft.portfolio.appearance.profile.template, 'developer-modern');
+  assert.equal(draft.portfolio.appearance.profile.theme, 'blue');
+  assert.equal(JSON.stringify(data), before);
 });
 
 test('missing route appearance keeps saved selection; legacy orange maps to amber', () => {

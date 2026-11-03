@@ -100,6 +100,7 @@ export function ProjectRecommendationScreen() {
           <Text>{draft.projectField}</Text>
           <Text>{draft.description}</Text>
           <Text>Số thành viên: {draft.memberTarget}</Text>
+          <Text>Số thành viên tối thiểu: {draft.minimumQuantity}</Text>
           <Text>Hạn tuyển: {new Date(draft.recruitmentDeadline).toLocaleString("vi-VN")}</Text>
           <Text>Dự kiến hoàn thành: {new Date(draft.expectedOutput).toLocaleDateString("vi-VN")}</Text>
           <Text>{draft.visibility === 0 ? "Riêng tư" : "Công khai"}</Text>

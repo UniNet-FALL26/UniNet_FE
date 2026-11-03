@@ -1,0 +1,7 @@
+# Student profile popup inputs — 2026-11-02
+
+- Shared ProfileFieldForm and ProfileEntryForm now use scoped ProfileTextInput: white background, soft border, blue focus border, no browser auto outline. Applies to all existing student portfolio templates/themes without changing global Input or other account flows.
+- Non-numeric text fields wrap and grow/shrink with value and available width. Web measures scrollHeight on initial value, edits and layout changes; native uses onContentSizeChange. Search/numeric inputs stay single-line. Long values scroll in the bounded modal content while action buttons remain reachable.
+- Field popup gained a scrollable body and fixed footer. Hủy/Xác nhận are compact, right-aligned, 38px high with 13px labels in field, entry and photo popups. Existing confirm/cancel, validation, draft/final save and photo processing remain intact.
+- Verified npx tsc --noEmit and tests/profile-popup-inputs-browser-check.cjs on developer-modern, developer-showcase and developer-landscape at 1440/390px: existing long values, growth/shrink, white/focus styling, compact reachable actions, cancel, confirm and final persistence. Existing skill picker browser regression also passes. Screenshots: ignored dist/profile-popup-inputs.
+- Visual changes were tested in web browser viewports; native resizing is implemented using native events, not verified on physical devices. No backend changes, real profile writes or commit.

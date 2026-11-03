@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/constants/colors';
@@ -11,7 +11,7 @@ export function NotificationBell() {
   const { unreadCount, synchronize } = useNotificationUpdates();
   const openInbox = () => {
     synchronize();
-    router.navigate(account?.role === ACCOUNT_ROLE.PARTNER ? '/(company)/company-notifications' : '/(tabs)/notifications');
+    router.navigate((account?.role === ACCOUNT_ROLE.ASSESSOR ? '/(assessor)/assessor-notifications' : account?.role === ACCOUNT_ROLE.PARTNER ? '/(company)/company-notifications' : '/(tabs)/notifications') as Href);
   };
   return <Pressable accessibilityRole="button" accessibilityLabel="Thông báo" accessibilityHint={unreadCount ? `${unreadCount} thông báo chưa đọc` : 'Không có thông báo chưa đọc'} onPress={openInbox} style={({ pressed }) => [s.bell, pressed && s.pressed]}>
     <SymbolView name={{ ios: 'bell', android: 'notifications_none', web: 'notifications_none' }} size={24} tintColor={colors.textSecondary} />

@@ -8,6 +8,8 @@ import { backgroundRemovalService, type BackgroundRemovalPreview } from '@/servi
 import { pickProfileImage, uploadProfileImage } from '@/utils/profile-image-picker';
 import { splitProfileImageUrl, withProfileImageCrop } from '@/utils/profile-image-crop';
 import { PortraitProcessingPreview } from './PortraitProcessingPreview';
+import { ToastHost } from '@/components/ui/ToastHost';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 
 type CropTarget = 'avatarUrl' | 'coverUrl';
 type Props = {
@@ -170,7 +172,7 @@ export function ProfilePhotoForm({ initialAsset, onConfirm, onClose, portrait = 
   const close = () => { if (!upload.current) onClose(); };
   const processing = !!asset && !editingOriginal && (portrait ? !preview : cropFor ? !cropReady || url === null : url === null) && !error;
 
-  return <Modal visible transparent animationType="fade" onRequestClose={close}><View style={s.overlay}><View style={s.dialog} accessibilityViewIsModal>
+  return <Modal visible transparent animationType="fade" onRequestClose={close}><View style={s.overlay}><ToastHost modal /><View style={s.dialog} accessibilityViewIsModal>
     <ScrollView style={s.dialogScroll} contentContainerStyle={s.dialogContent} showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
       <Text role="heading" aria-level={2} style={s.title}>{cropFor ? cropFor === 'coverUrl' ? 'Căn khung ảnh bìa' : 'Căn khung ảnh đại diện' : portrait ? 'Ảnh chân dung' : 'Chọn ảnh hồ sơ'}</Text>
       {asset && cropFor ? <>
@@ -189,14 +191,14 @@ export function ProfilePhotoForm({ initialAsset, onConfirm, onClose, portrait = 
       {!!asset && portrait && <Text style={s.hint}>Chọn ảnh rõ người, ít vật thể che phía trước. Ảnh bị che khuất nhiều có thể không cắt và xóa nền đầy đủ; vui lòng chọn ảnh khác khi nhận cảnh báo.</Text>}
       {processing && !portrait && <Text accessibilityLiveRegion="polite" style={s.hint}>Đang tải ảnh lên…</Text>}
       {portrait && preview && !uploading && <Text style={s.hint}>{confirmationHint}</Text>}
-      {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+      {!!error && <ActionFeedback type="error" message={error} />}
       <View style={s.photoActions}>
         {!!error && asset && !editingOriginal && <Button title={portrait ? 'Thử tách nền lại' : 'Thử tải lại'} variant="outline" style={s.smallButton} onPress={() => setAttempt(value => value + 1)} />}
         <Button title="Chọn ảnh khác" variant="outline" style={s.smallButton} disabled={uploading} onPress={() => { void choose(); }} loading={choosing} />
       </View>
       {asset && <Pressable accessibilityRole="button" disabled={uploading || choosing} onPress={() => { setUrl(''); setPreview(null); setAsset(null); setCropReady(true); }} style={s.removeAction}><Text style={s.removeText}>Bỏ ảnh</Text></Pressable>}
     </ScrollView>
-    <View style={s.actions}><Button title="Hủy" variant="outline" disabled={uploading} onPress={close} style={{ ...s.footerButton, flex: 1 }} /><Button title="Xác nhận" loading={uploading} disabled={choosing || processing || (!!asset && portrait ? !preview : url === null)} onPress={() => { void confirm(); }} style={{ ...s.footerButton, flex: 1 }} /></View>
+    <View style={[s.actions, { justifyContent: 'flex-end' }]}><Button title="Hủy" variant="outline" disabled={uploading} onPress={close} style={{ ...s.footerButton, minWidth: 80, paddingHorizontal: 16, borderRadius: 8 }} textStyle={{ fontSize: 13, fontWeight: '600' }} /><Button title="Xác nhận" loading={uploading} disabled={choosing || processing || (!!asset && portrait ? !preview : url === null)} onPress={() => { void confirm(); }} style={{ ...s.footerButton, minWidth: 80, paddingHorizontal: 16, borderRadius: 8 }} textStyle={{ fontSize: 13, fontWeight: '600' }} /></View>
   </View></View></Modal>;
 }
 

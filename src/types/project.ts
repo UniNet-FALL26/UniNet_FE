@@ -48,6 +48,7 @@ export type ProjectListItem = {
   projectField: string;
   description: string;
   memberTarget: number;
+  minimumQuantity: number;
   currentMemberCount: number;
   recruitmentDeadline: string;
   visibility: ProjectVisibility;
@@ -171,6 +172,7 @@ export type Project = {
   description: string;
   technologies: string[];
   memberTarget: number;
+  minimumQuantity: number;
   currentMemberCount: number;
   creator: {
     id: string;
@@ -190,6 +192,7 @@ export type CreateProjectRequest = {
   projectField: string;
   description: string;
   memberTarget: number;
+  minimumQuantity: number;
   recruitmentDeadline: string;
   expectedOutput: string;
   visibility: ProjectVisibility;

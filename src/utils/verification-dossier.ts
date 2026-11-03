@@ -11,9 +11,19 @@ export function canCancelVerification(detail: VerificationDetail, now = Date.now
 export function dossierSteps(detail: VerificationDetail) {
   const v = detail.verification;
   const final = v.status === 1 || v.status === 2;
+  const paid = detail.payments.some(p => p.status === 1);
+  const review = detail.payments.some(p => p.requiresManualReview);
+  const bookingConfirmed = v.bookingStatus === 2;
+  const paymentProgress = paid
+    ? review ? 'Đã thanh toán · Cần hỗ trợ đối soát và xử lý lịch hẹn'
+      : bookingConfirmed ? 'Đã thanh toán và xác nhận lịch'
+      : 'Đã thanh toán · Chờ xác nhận lịch'
+    : review ? 'Giao dịch cần đối soát · Vui lòng liên hệ hỗ trợ'
+      : bookingConfirmed ? 'Đã xác nhận lịch · Chờ thanh toán'
+      : 'Chưa hoàn tất';
   return [
     { title: 'Tạo hồ sơ', done: true },
-    { title: 'Xác nhận lịch và thanh toán', done: v.bookingStatus === 2 && detail.payments.some(p => p.status === 1) },
+    { title: 'Xác nhận lịch và thanh toán', done: bookingConfirmed && paid && !review, statusText: paymentProgress },
     { title: 'Phân công chuyên viên', done: detail.assignments.some(a => [0, 1, 2].includes(a.status)) },
     { title: 'Buổi xác minh', done: !!detail.meetingEndAt },
     { title: 'Kết luận cấp 2', done: final },

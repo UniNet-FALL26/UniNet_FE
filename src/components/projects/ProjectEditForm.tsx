@@ -1,3 +1,5 @@
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
+import { ToastHost } from '@/components/ui/ToastHost';
 import { createElement, useRef, useState } from "react";
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -50,7 +52,7 @@ export function ProjectEditForm({ project, onClose, onSaved }: Props) {
   };
   return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!saving) onClose(); }}>
     <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={styles.dialog} accessibilityViewIsModal>
+      <ToastHost modal /><View style={styles.dialog} accessibilityViewIsModal>
         <Text style={styles.title}>Chỉnh sửa dự án</Text>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.fields}>
           <Input label="Tên dự án" value={values.title} onChangeText={(value) => update("title", value)} editable={!saving} />
@@ -58,7 +60,7 @@ export function ProjectEditForm({ project, onClose, onSaved }: Props) {
           <Input label="Mô tả dự án" value={values.description} onChangeText={(value) => update("description", value)} multiline editable={!saving} />
           <DateField label="Hạn tuyển thành viên" value={values.recruitmentDeadline} disabled={saving} onChange={(value) => update("recruitmentDeadline", value)} />
           <DateField label="Ngày dự kiến hoàn thành" value={values.expectedOutput} disabled={saving} onChange={(value) => update("expectedOutput", value)} />
-          {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          {error ? <ActionFeedback type="error" message={error} /> : null}
         </ScrollView>
         <View style={styles.actions}><Button title="Hủy" variant="outline" disabled={saving} onPress={onClose} style={{ flex: 1 }} /><Button title="Lưu thay đổi" loading={saving} onPress={save} style={{ flex: 1 }} /></View>
       </View>

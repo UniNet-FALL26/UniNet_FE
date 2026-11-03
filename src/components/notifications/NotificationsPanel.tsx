@@ -2,25 +2,22 @@ import { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { notificationTheme as theme, notificationVisuals } from '@/constants/notification-presentation';
-import { useNotificationCategoryCounts, useNotificationsInbox } from '@/hooks/useNotificationsInbox';
+import { useNotificationsInbox } from '@/hooks/useNotificationsInbox';
 import { groupNotifications } from '@/utils/notifications';
 import { NotificationRow } from './NotificationRow';
-import { NotificationCategoryFilter } from './NotificationCategoryFilter';
 import { useNotificationUpdates } from './NotificationsProvider';
 
-export function NotificationsPanel() {
-  const [unreadOnly, setUnreadOnly] = useState(false), [category, setCategory] = useState('');
-  const inbox = useNotificationsInbox({ unreadOnly, category });
-  const counts = useNotificationCategoryCounts();
+export function NotificationsPanel({ description = 'Những cập nhật dành cho bạn trên UniNet.' }: { description?: string } = {}) {
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const inbox = useNotificationsInbox({ unreadOnly });
   const { unreadCount } = useNotificationUpdates();
   const { width } = useWindowDimensions();
   const narrow = width < 640;
   const groups = groupNotifications(inbox.items);
   return <View style={[s.panel, narrow && s.mobilePanel]} testID="notifications-page">
     <View style={[s.heading, narrow && s.mobileHeading]}>
-      <View style={s.headingCopy}><Text accessibilityRole="header" aria-level={1} style={s.title}>Thông báo</Text><Text style={s.subtitle}>Những cập nhật dành cho bạn trên UniNet.</Text></View>
+      <View style={s.headingCopy}><Text accessibilityRole="header" aria-level={1} style={s.title}>Thông báo</Text><Text style={s.subtitle}>{description}</Text></View>
       <View style={[s.headerActions, narrow && s.mobileActions]}>
-        <NotificationCategoryFilter value={category} counts={counts} onChange={setCategory} />
         <Pressable accessibilityRole="checkbox" accessibilityLabel="Chỉ hiện chưa đọc" accessibilityState={{ checked: unreadOnly }} onPress={() => setUnreadOnly(value => !value)} style={s.unreadFilter}>
           <SymbolView name={unreadOnly ? { ios: 'checkmark.square.fill', android: 'check_box', web: 'check_box' } : { ios: 'square', android: 'check_box_outline_blank', web: 'check_box_outline_blank' }} size={16} tintColor={unreadOnly ? theme.blue : theme.secondary} />
           <Text style={s.filterLabel}>{narrow ? 'Chưa đọc' : 'Chỉ hiện chưa đọc'}</Text>{!narrow && unreadCount > 0 && <Text style={s.unreadCount}>{unreadCount}</Text>}

@@ -22,7 +22,9 @@ export function paymentQrPayload(transaction: VerificationTransaction | null, de
   return typeof payload === 'string' && payload.trim().length > 0 && payload.length <= 4096 ? payload : null;
 }
 export function paymentPresentation(detail: VerificationDetail, transaction: VerificationTransaction | null, now: number) {
-  if (transaction?.requiresReview || transaction?.reconciliationRequired || detail.payments.some(p => p.requiresManualReview)) return { title: 'Thanh toán cần đối soát', message: 'Hệ thống đang kiểm tra giao dịch. Không thanh toán thêm; hãy kiểm tra lại trạng thái hoặc liên hệ hỗ trợ.' };
+  if (transaction?.requiresReview || transaction?.reconciliationRequired || detail.payments.some(p => p.requiresManualReview)) return { title: 'Thanh toán cần đối soát', message: transaction?.status === 1 || detail.payments.some(p => p.status === 1)
+    ? 'Đã ghi nhận thanh toán nhưng lịch hẹn cần được hỗ trợ xử lý. Vui lòng liên hệ hỗ trợ, không thanh toán thêm.'
+    : 'Giao dịch cần được hỗ trợ đối soát và xử lý lịch hẹn. Vui lòng liên hệ hỗ trợ, không thanh toán thêm.' };
   const paid = transaction?.status === 1 || detail.payments.some(p => p.status === 1);
   if (paid) return detail.verification.bookingStatus === 2
     ? { title: 'Thanh toán thành công', message: 'Hệ thống đã xác nhận thanh toán và lịch hẹn. Hồ sơ đang chờ bước xác minh tiếp theo.' }

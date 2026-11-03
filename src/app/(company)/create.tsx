@@ -1,9 +1,11 @@
-import { createElement, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { ActivityIndicator, findNodeHandle, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActionButton, companyColors as c, Card, CompanyIcon, CompanyPage, PageScroll, type CompanyIconName } from '@/components/company/company-ui';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
+import { jobApplicationIcons as jobIcons } from '@/constants/job-applicant-icons';
+import { companyService, type CompanyJobBenefit, type CompanyJobEmploymentType, type PartnerVerificationStatus, type SkillCatalogItem } from '@/services/company.service';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageScroll, Tag } from '@/components/company/company-ui';
-import { companyService, type CompanyJobBenefit, type SkillCatalogItem, type PartnerVerificationStatus } from '@/services/company.service';
+import { createElement, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { ActivityIndicator, findNodeHandle, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 function datePart(value: string | null): string {
   if (!value) return '';
@@ -71,12 +73,6 @@ function formatVnd(value: string): string {
 function toSalaryNumber(value: string): number | null {
   const digits = value.replace(/\D/g, '');
   return digits ? Number(digits) : null;
-}
-
-function formatMillions(value: number): string {
-  const whole = Math.floor(value / 1_000_000);
-  const remainder = String(value % 1_000_000).padStart(6, '0').replace(/0+$/, '');
-  return `${new Intl.NumberFormat('vi-VN').format(whole)}${remainder ? `,${remainder}` : ''}`;
 }
 
 const benefitIcons = [
@@ -148,7 +144,7 @@ function DateTimeField({ label, value, mode, onChange, placeholder, onBlur, minD
   return <View style={s.field}><Text style={s.label}>{label}</Text><Pressable disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled }} onPress={() => setOpen(true)} style={[s.dateButton, disabled && s.dateButtonDisabled]}><Text style={value ? s.dateText : s.datePlaceholder}>{value ? formatDateLabel(value) : placeholder}</Text><CompanyIcon name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} color={c.muted} /></Pressable>{open && <DateTimePicker value={initial} mode="date" display="default" minimumDate={minDate ? new Date(`${minDate}T00:00:00`) : undefined} is24Hour onChange={onPickerChange} />}</View>;
 }
 
-const PillSelect = ({ values, value, onChange }: { values: string[]; value: string; onChange: (value: string) => void }) => <View style={s.pills}>{values.map((item) => <Pressable key={item} onPress={() => onChange(item)} style={[s.pill, value === item && s.pillActive]}><Text style={[s.pillText, value === item && s.pillTextActive]}>{item}</Text></Pressable>)}</View>;
+const PillSelect = ({ values, value, onChange, icons }: { values: string[]; value: string; onChange: (value: string) => void; icons?: Record<string, CompanyIconName> }) => <View style={s.pills}>{values.map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: value === item }} onPress={() => onChange(item)} style={[s.pill, value === item && s.pillActive]}>{!!icons?.[item] && <CompanyIcon name={icons[item]!} size={15} color={value === item ? '#FFF' : c.muted} />}<Text style={[s.pillText, value === item && s.pillTextActive]}>{item}</Text></Pressable>)}</View>;
 
 const RequirementSwitch = ({ value, onChange }: { value: 0 | 1; onChange: (value: 0 | 1) => void }) => <View style={s.requirementSwitch} accessibilityRole="radiogroup">
   <Pressable accessibilityRole="radio" accessibilityState={{ checked: value === 0 }} onPress={() => onChange(0)} style={[s.requirementOption, value === 0 && s.requirementOptionRequired]}><Text style={[s.requirementOptionText, value === 0 && s.requirementOptionTextActive]}>Bắt buộc</Text></Pressable>
@@ -159,7 +155,13 @@ function Field({ label, value, onChangeText, placeholder, multiline = false, err
   return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} onBlur={onBlur} placeholder={placeholder} placeholderTextColor={c.muted} multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} style={[s.input, multiline && s.textarea, !!error && s.inputError]} />{!!error && <Text style={s.fieldError}>{error}</Text>}</View>;
 }
 
+function JobSectionTitle({ title, subtitle, icon }: { title: string; subtitle: string; icon: 'job' | 'salary' | 'description' | 'requirements' | 'skills' | 'benefitsSection' }) {
+  return <View style={s.jobSectionTitle}><View style={s.jobSectionIcon}><CompanyIcon name={jobIcons[icon]} size={17} color={c.blue} /></View><View style={s.sectionHeadingCopy}><Text style={s.sectionTitle}>{title}</Text><Text style={s.sectionSub}>{subtitle}</Text></View></View>;
+}
+
 export default function CompanyCreateJob() {
+  const { width } = useWindowDimensions();
+  const wide = Platform.OS === 'web' && width >= 900;
   const { jobId, publishError, draftSaved } = useLocalSearchParams<{ jobId?: string; publishError?: string; draftSaved?: string }>();
   const editing = typeof jobId === 'string' && !!jobId;
   const [title, setTitle] = useState('');
@@ -167,28 +169,29 @@ export default function CompanyCreateJob() {
   const [startTime, setStartTime] = useState('');
   const [deadline, setDeadline] = useState('');
   const [workMode, setWorkMode] = useState('');
+  const [employmentType, setEmploymentType] = useState<CompanyJobEmploymentType | null>(null);
+  const [jobField, setJobField] = useState('');
   const [location, setLocation] = useState('');
   const [salary, setSalary] = useState('');
   const [salaryMax, setSalaryMax] = useState('');
   const [description, setDescription] = useState('');
-  const [skills, setSkills] = useState<{ key: string; skillId?: string; name: string; requirementType: 0 | 1 }[]>([]);
+  const [skills, setSkills] = useState<{ key: string; skillId?: string; name: string; iconUrl?: string | null; requirementType: 0 | 1 }[]>([]);
   const [benefits, setBenefits] = useState<CompanyJobBenefit[]>([]);
   const [benefitTitle, setBenefitTitle] = useState('');
   const [benefitDescription, setBenefitDescription] = useState('');
   const [benefitError, setBenefitError] = useState('');
   const [benefitIcon, setBenefitIcon] = useState<BenefitIconKey>('education');
   const [activeBenefitIconPicker, setActiveBenefitIconPicker] = useState<string | null>(null);
-  const [qualifications, setQualifications] = useState<string[]>([]);
-  const [preferredQualifications, setPreferredQualifications] = useState<string[]>([]);
-  const [requirementDraft, setRequirementDraft] = useState('');
-  const [requirementType, setRequirementType] = useState<0 | 1>(0);
+  const [requirementsText, setRequirementsText] = useState('');
+
+
+
   const [skillQuery, setSkillQuery] = useState('');
   const [skillType, setSkillType] = useState<0 | 1>(0);
   const [hoveredSkillDelete, setHoveredSkillDelete] = useState<string | null>(null);
   const [mobileSkillDelete, setMobileSkillDelete] = useState<string | null>(null);
   const [projectAreas, setProjectAreas] = useState<string[]>([]);
   const [skillCatalog, setSkillCatalog] = useState<SkillCatalogItem[]>([]);
-  const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [verification, setVerification] = useState<PartnerVerificationStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -205,6 +208,7 @@ export default function CompanyCreateJob() {
   const scrollRef = useRef<ScrollView>(null);
   const errorTargets = useRef<Record<string, View | null>>({});
   const [jobStatus, setJobStatus] = useState<0 | 1 | 2 | 3 | null>(null);
+  const [originalStartAt, setOriginalStartAt] = useState<string | null>(null);
   const [lockCheckNow, setLockCheckNow] = useState(() => Date.now());
   useEffect(() => () => {
     if (publishSuccessTimer.current) clearTimeout(publishSuccessTimer.current);
@@ -224,7 +228,7 @@ export default function CompanyCreateJob() {
     return skillCatalog.filter(item => item.name.toLocaleLowerCase().includes(query) && !skills.some(skill => skill.skillId === item.id)).slice(0, 3);
   }, [skillCatalog, skillQuery, skills]);
 
-  const formSnapshot = () => JSON.stringify({ title, startDate, startTime, deadline, workMode, location, salary, salaryMax, description, skills, benefits, qualifications, preferredQualifications, projectAreas });
+  const formSnapshot = () => JSON.stringify({ title, startDate, startTime, deadline, workMode, employmentType, jobField, location, salary, salaryMax, description, skills, benefits, requirementsText, projectAreas });
   const formIsDirty = savedSnapshot.current !== null && savedSnapshot.current !== formSnapshot();
   useEffect(() => {
     if (!loading && savedSnapshot.current === null) savedSnapshot.current = formSnapshot();
@@ -239,12 +243,15 @@ export default function CompanyCreateJob() {
     if (!description.trim()) errors.description = 'Vui lòng nhập nội dung mô tả.';
     else if (description.length > 20000) errors.description = 'Mô tả không được dài quá 20.000 ký tự.';
     if (!workMode) errors.workMode = 'Vui lòng chọn hình thức làm việc.';
+    if (employmentType === null) errors.employmentType = 'Vui lòng chọn loại công việc.';
+    if (!jobField.trim()) errors.jobField = 'Vui lòng nhập lĩnh vực công việc.';
+    else if (jobField.trim().length > 150) errors.jobField = 'Lĩnh vực công việc không được dài quá 150 ký tự.';
     const parsedDeadline = dateValue(deadline, '', true);
     if (!parsedDeadline) errors.deadline = 'Vui lòng chọn hạn ứng tuyển hợp lệ.';
     const parsedStartAt = startDate ? dateValue(startDate, startTime) : null;
     if (startDate && !parsedStartAt) errors.startAt = 'Chọn đủ ngày và giờ bắt đầu nhận hồ sơ.';
     if (parsedStartAt && !startTimeLocked && (startDate < minimumStartDate || Number(startTime.split(':')[1]) % 15 !== 0 || (startDate === minimumStartDate && startTime < minimumStartTime))) errors.startAt = 'Vui lòng chọn ngày giờ bắt đầu cách hiện tại ít nhất 5 phút.';
-    if (startDate && deadline && deadline <= startDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
+    if (!startedPublishedJob && startDate && deadline && deadline <= startDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
     if (deadline && deadline < minimumDeadlineDate) errors.deadline = 'Hạn ứng tuyển phải sau ngày bắt đầu nhận hồ sơ.';
     const parseSalary = (value: string) => {
       if (!value.trim()) return null;
@@ -259,16 +266,8 @@ export default function CompanyCreateJob() {
     if (minimum != null && minimum > maxSalary) errors.salary = 'Lương tối thiểu vượt giới hạn hỗ trợ.';
     if (maximum != null && maximum > maxSalary) errors.salaryMax = 'Lương tối đa vượt giới hạn hỗ trợ.';
     if (minimum != null && maximum != null && minimum > maximum) errors.salary = 'Lương tối thiểu phải nhỏ hơn hoặc bằng lương tối đa.';
-    const requirementGroups = [
-      { label: 'Yêu cầu bắt buộc', values: qualifications },
-      { label: 'Yêu cầu ưu tiên', values: preferredQualifications },
-    ];
-    for (const group of requirementGroups) {
-      if (group.values.length > 50 || group.values.some(value => value.length > 2000)) {
-        errors.requirements = `${group.label}: tối đa 50 mục, mỗi mục không quá 2.000 ký tự.`;
-        break;
-      }
-    }
+    const requirementLines = requirementsText.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    if (requirementLines.length > 50 || requirementLines.some(value => value.length > 2000)) errors.requirements = 'Tối đa 50 dòng yêu cầu, mỗi dòng không quá 2.000 ký tự.';
     if (projectAreas.length > 50 || projectAreas.some(value => value.length > 255)) errors.projectAreas = 'Nhóm lĩnh vực dự án tối đa 50 mục, mỗi mục không quá 255 ký tự.';
     if (skills.length > 100) errors.skills = 'Mỗi bài tuyển dụng có tối đa 100 kỹ năng.';
     if (benefits.length > 30) errors.benefits = 'Mỗi bài tuyển dụng có tối đa 30 quyền lợi.';
@@ -299,7 +298,8 @@ export default function CompanyCreateJob() {
   const minimumStartTime = startDate === minimumStartDate ? startBoundary.time : '00:00';
   const currentStartAt = startDate ? dateValue(startDate, startTime) : null;
   const startTimeLocked = editing && jobStatus !== null && jobStatus !== 0 && (!currentStartAt || new Date(currentStartAt).getTime() <= lockCheckNow + 5 * 60 * 1000);
-  const minimumDeadlineDate = startDate && addDays(startDate, 1) > addDays(today, 1) ? addDays(startDate, 1) : addDays(today, 1);
+  const startedPublishedJob = editing && jobStatus === 1 && !!originalStartAt && new Date(originalStartAt).getTime() <= Date.now();
+  const minimumDeadlineDate = startedPublishedJob ? today : startDate && addDays(startDate, 1) > addDays(today, 1) ? addDays(startDate, 1) : addDays(today, 1);
 
   const addCatalogSkill = (item: SkillCatalogItem, type: 0 | 1) => {
     if (!skills.some(skill => skill.skillId === item.id) && skills.length >= 100) {
@@ -308,8 +308,8 @@ export default function CompanyCreateJob() {
     }
     const key = item.id;
     setSkills(current => current.some(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase())
-      ? current.map(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase() ? { ...skill, key, skillId: item.id, name: item.name, requirementType: type } : skill)
-      : [...current, { key, skillId: item.id, name: item.name, requirementType: type }]);
+      ? current.map(skill => skill.name.toLocaleLowerCase() === item.name.toLocaleLowerCase() ? { ...skill, key, skillId: item.id, name: item.name, iconUrl: item.iconUrl, requirementType: type } : skill)
+      : [...current, { key, skillId: item.id, name: item.name, iconUrl: item.iconUrl, requirementType: type }]);
     setSkillQuery('');
   };
 
@@ -332,7 +332,7 @@ export default function CompanyCreateJob() {
   };
 
   const scrollToFirstError = (errors: Record<string, string>) => {
-    const firstError = ['title', 'startAt', 'deadline', 'workMode', 'location', 'salary', 'salaryMax', 'description'].find(key => errors[key]);
+    const firstError = ['title', 'startAt', 'deadline', 'workMode', 'location', 'salary', 'salaryMax', 'description', 'requirements'].find(key => errors[key]);
     const target = firstError ? errorTargets.current[firstError] : null;
     if (!target) return;
     if (Platform.OS === 'web') {
@@ -347,28 +347,6 @@ export default function CompanyCreateJob() {
       (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true }),
       () => scrollRef.current?.scrollTo({ y: 0, animated: true }),
     );
-  };
-
-  const addRequirement = () => {
-    const value = requirementDraft.trim();
-    if (!value) {
-      setFormNotice({ type: 'error', title: 'Chưa có nội dung yêu cầu', message: 'Nhập nội dung rồi chọn “Thêm”.' });
-      return;
-    }
-    if (value.length > 2000) {
-      setFormNotice({ type: 'error', title: 'Yêu cầu quá dài', message: 'Mỗi mục yêu cầu không được dài quá 2.000 ký tự.' });
-      return;
-    }
-    const setter = requirementType === 0 ? setQualifications : setPreferredQualifications;
-    const current = requirementType === 0 ? qualifications : preferredQualifications;
-    if (current.length >= 50) {
-      setFormNotice({ type: 'error', title: 'Đã đủ số yêu cầu', message: 'Mỗi nhóm yêu cầu có tối đa 50 mục.' });
-      return;
-    }
-    setter(current => [...current, value]);
-    skillCatalog.filter(item => value.toLocaleLowerCase().includes(item.name.toLocaleLowerCase()))
-      .forEach(item => addCatalogSkill(item, requirementType));
-    setRequirementDraft('');
   };
 
   const addBenefit = () => {
@@ -403,13 +381,15 @@ export default function CompanyCreateJob() {
           companyService.getVerificationStatus(controller.signal),
         ]);
         setSkillCatalog(catalog);
-        setCompanyName(profile.companyName);
         setCompanyAddress(profile.address ?? '');
         setVerification(verificationStatus);
         if (job) {
           setJobStatus(job.status);
+          setOriginalStartAt(job.startAt);
           setTitle(job.title);
           setWorkMode(['Tại văn phòng', 'Kết hợp', 'Từ xa'][job.workType] ?? 'Tại văn phòng');
+          setEmploymentType(job.employmentType);
+          setJobField(job.jobField ?? '');
           setLocation(job.location ?? '');
           setStartDate(datePart(job.startAt));
           setStartTime(timePart(job.startAt));
@@ -417,13 +397,13 @@ export default function CompanyCreateJob() {
           setSalary(job.minSalaryVnd == null ? '' : formatVnd(String(job.minSalaryVnd)));
           setSalaryMax(job.maxSalaryVnd == null ? '' : formatVnd(String(job.maxSalaryVnd)));
           setDescription(job.description ?? '');
-          setQualifications(job.requiredQualifications);
-          setPreferredQualifications(job.preferredQualifications);
+          setRequirementsText([...job.requiredQualifications, ...job.preferredQualifications].filter(item => item.trim()).join('\n'));
           setProjectAreas(job.projectAreas);
-          setSkills(job.skills.map(skill => ({ key: skill.skillId ?? `pending:${skill.name.toLocaleLowerCase()}`, ...(skill.skillId ? { skillId: skill.skillId } : {}), name: skill.name, requirementType: skill.requirementType })));
+          setSkills(job.skills.map(skill => ({ key: skill.skillId ?? `pending:${skill.name.toLocaleLowerCase()}`, ...(skill.skillId ? { skillId: skill.skillId } : {}), name: skill.name, iconUrl: skill.iconUrl, requirementType: skill.requirementType })));
           setBenefits(job.benefits.map((benefit, index) => ({ ...benefit, icon: benefit.icon ?? benefitIcons[index % benefitIcons.length]!.key })));
         } else {
           setJobStatus(null);
+          setOriginalStartAt(null);
           setLocation(profile.address ?? '');
         }
       } catch (cause) {
@@ -454,6 +434,8 @@ export default function CompanyCreateJob() {
     const errors = validateFields();
     const parsedDeadline = dateValue(deadline, '', true);
     const parsedStartAt = startDate ? dateValue(startDate, startTime) : null;
+    const startAtUnchanged = startDate === datePart(originalStartAt) && startTime === timePart(originalStartAt);
+    const startAtToSave = startTimeLocked && startAtUnchanged ? originalStartAt : parsedStartAt;
     const minimum = salary.trim() ? Number(salary.replace(/\D/g, '')) : null;
     const maximum = salaryMax.trim() ? Number(salaryMax.replace(/\D/g, '')) : null;
     setFieldErrors(errors);
@@ -467,15 +449,17 @@ export default function CompanyCreateJob() {
     const input = {
       title: title.trim(),
       workType: ['Tại văn phòng', 'Kết hợp', 'Từ xa'].indexOf(workMode) as 0 | 1 | 2,
+      employmentType: employmentType as CompanyJobEmploymentType,
+      jobField: jobField.trim(),
       minSalaryVnd: minimum,
       maxSalaryVnd: maximum,
       location: location.trim(),
       description: description.trim(),
-      startAt: parsedStartAt,
+      startAt: startAtToSave,
       deadline: parsedDeadline ?? '',
       status,
-      requiredQualifications: qualifications,
-      preferredQualifications,
+      requiredQualifications: requirementsText.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+      preferredQualifications: [],
       projectAreas,
       skills: skills.map(({ skillId, name, requirementType }) => skillId ? ({ skillId, requirementType }) : ({ name, requirementType })),
       benefits,
@@ -532,48 +516,33 @@ export default function CompanyCreateJob() {
     }
   };
 
-  return <CompanyPage><PageScroll scrollRef={scrollRef}>
-    <View style={s.nav}><Pressable onPress={() => formIsDirty ? setShowLeavePrompt(true) : router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={{ flex: 1 }}><Text style={s.navTitle}>{editing ? 'Chỉnh sửa bài tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.navSub}>{companyName || 'Tổ chức của bạn'}</Text></View><View style={s.avatar}><Text style={s.avatarText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View></View>
+  return <CompanyPage><PageScroll scrollRef={scrollRef}><View style={s.formPage}>
+    <View style={s.pageHeader}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại quản lý bài đăng" onPress={() => formIsDirty ? setShowLeavePrompt(true) : router.back()} style={s.back}><CompanyIcon name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} /></Pressable><View style={s.pageHeaderCopy}><Text style={s.breadcrumb}>Quản lý bài đăng tuyển dụng</Text><Text style={s.pageHeading}>{editing ? 'Chỉnh sửa bài đăng tuyển dụng' : 'Tạo bài đăng tuyển dụng'}</Text><Text style={s.pageSubtitle}>Đăng tin tuyển dụng để tiếp cận các ứng viên phù hợp trên UniNet.</Text></View></View>
     <Modal transparent visible={showLeavePrompt} animationType="fade" onRequestClose={() => setShowLeavePrompt(false)}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>Bài này chưa được lưu</Text><Text style={s.noticeMessage}>{jobStatus === 1 ? 'Bạn có muốn lưu các thay đổi cho bài đã đăng không?' : 'Bạn có muốn lưu nháp lại không?'}</Text><View style={s.leaveActions}><ActionButton title="Ở lại" variant="outline" onPress={() => setShowLeavePrompt(false)} /><ActionButton title="Bỏ qua" variant="soft" onPress={() => router.back()} /><ActionButton title={jobStatus === 1 ? 'Lưu thay đổi' : 'Lưu nháp'} onPress={() => { setShowLeavePrompt(false); void saveJob(jobStatus === 1 ? 1 : 0, true); }} /></View></View></View></Modal>
-    <Modal transparent visible={showPublishSuccess} animationType="fade" onRequestClose={() => router.replace('/(company)/jobs')}><View style={s.leaveOverlay}><View style={s.leaveDialog}><Text style={s.noticeTitle}>{editing ? 'Cập nhật bài đăng thành công' : 'Đăng bài thành công'}</Text><Text style={s.noticeMessage}>{editing ? 'Bài tuyển dụng đã được cập nhật.' : 'Bài tuyển dụng đã được đăng công khai.'} Đang chuyển về trang quản lý bài đăng…</Text></View></View></Modal>
-    {!!formNotice && <View accessibilityRole="alert" style={[s.notice, formNotice.type === 'success' ? s.noticeSuccess : s.noticeError]}><Text style={s.noticeTitle}>{formNotice.title}</Text><Text style={s.noticeMessage}>{formNotice.message}</Text></View>}
+    {showPublishSuccess && <ActionFeedback type="success" message={editing ? 'Đã cập nhật bài tuyển dụng.' : 'Đã đăng bài tuyển dụng.'} />}
+    {!!formNotice && <ActionFeedback type={formNotice.type} message={formNotice.message} />}
     {!!loadError && <Card><Text style={s.error}>{loadError}</Text><ActionButton title="Quay lại" onPress={() => router.back()} variant="outline" /></Card>}
     {loading ? <Card><ActivityIndicator color={c.purple} /><Text style={s.helper}>Đang tải dữ liệu bài tuyển dụng…</Text></Card> : null}
-    <Card style={s.jobPreview}>
-      <View style={s.previewTop}><View style={s.logo}><Text style={s.logoText}>{companyName.trim().charAt(0).toUpperCase() || 'Đ'}</Text></View><View style={{ flex: 1 }}><Text style={s.company}>{companyName || 'Tổ chức của bạn'}</Text><Text style={s.helper}>{location || 'Địa điểm làm việc'}</Text></View></View>
-      <Text style={s.previewTitle}>{title || 'Bản xem trước bài tuyển dụng'}</Text>
-      {!!workMode && <Tag tone="purple">{workMode}</Tag>}
-      <View style={s.pills}>{(() => {
-        const minimum = toSalaryNumber(salary);
-        const maximum = toSalaryNumber(salaryMax);
-        const wallet = { ios: 'wallet.pass.fill', android: 'account_balance_wallet', web: 'account_balance_wallet' } as const;
-        if (minimum != null && maximum != null) return <Tag tone="green" icon={wallet}>{formatMillions(minimum)}-{formatMillions(maximum)} triệu VND/tháng</Tag>;
-        if (minimum != null) return <Tag tone="green" icon={wallet}>Từ {formatMillions(minimum)} triệu VND/tháng</Tag>;
-        if (maximum != null) return <Tag tone="green" icon={wallet}>Tới {formatMillions(maximum)} triệu VND/tháng</Tag>;
-        return null;
-      })()}{!!deadline && <Tag tone="amber">🗓 Hạn nộp: {formatDateLabel(deadline)}</Tag>}</View>
-      <View style={s.pills}>{skills.map(skill => <Tag key={skill.key} tone="gray">{skill.name}</Tag>)}</View>
-    </Card>
-    <Card style={s.dateTimeCard}>
-      <Text style={s.sectionTitle}>Thông tin công việc</Text><Text style={s.sectionSub}>Dấu * là thông tin bắt buộc.</Text>
+
+    <Card style={[s.formCard, s.dateTimeCard]}>
+      <JobSectionTitle title="Thông tin công việc" subtitle="Thông tin cơ bản về vị trí tuyển dụng." icon="job" />
       <View ref={node => { errorTargets.current.title = node; }}><Field label="Tiêu đề bài đăng *" value={title} onChangeText={setTitle} onBlur={() => validateOnBlur('title')} placeholder="Ví dụ: Thực tập sinh Backend" error={fieldErrors.title} /></View>
-      <View ref={node => { errorTargets.current.startAt = node; }} style={s.startAtLayer}><View style={s.dateRow}><View style={{ flex: 1 }}><DateTimeField label="Bắt đầu nhận hồ sơ · tùy chọn" value={startDate} mode="date" minDate={minimumStartDate} disabled={startTimeLocked} onChange={value => { setStartDate(value); const minTime = value === minimumStartDate ? startBoundary.time : '00:00'; setStartTime(current => current && Number(current.split(':')[1]) % 15 === 0 && current >= minTime ? current : value === minimumStartDate ? firstQuarterAtOrAfter(minTime) : '09:00'); }} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn ngày" /></View>{!!startDate && <View style={{ flex: 0.7 }}><DateTimeField label="Giờ bắt đầu *" value={startTime} mode="time" minTime={minimumStartTime} disabled={startTimeLocked} onChange={setStartTime} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn giờ" /></View>}</View>{startTimeLocked && <Text style={s.lockNotice}>Thời điểm bắt đầu còn không quá 5 phút hoặc đã đến, nên không thể chỉnh sửa.</Text>}{!!fieldErrors.startAt && <Text style={s.fieldError}>{fieldErrors.startAt}</Text>}</View>
-      <View ref={node => { errorTargets.current.deadline = node; }}><DateTimeField label="Hạn ứng tuyển *" value={deadline} mode="date" minDate={minimumDeadlineDate} onChange={setDeadline} onBlur={() => validateOnBlur('deadline')} placeholder="Chọn ngày (dd/mm/yyyy)" />{!!fieldErrors.deadline && <Text style={s.fieldError}>{fieldErrors.deadline}</Text>}</View>
-      <View ref={node => { errorTargets.current.workMode = node; }}><Text style={s.label}>Hình thức làm việc *</Text><PillSelect values={['Tại văn phòng', 'Kết hợp', 'Từ xa']} value={workMode} onChange={setWorkMode} />{!!fieldErrors.workMode && <Text style={s.fieldError}>{fieldErrors.workMode}</Text>}</View>
-      <View ref={node => { errorTargets.current.location = node; }}><Field label="Địa điểm *" value={location} onChangeText={setLocation} onBlur={() => validateOnBlur('location')} placeholder="Nhập địa chỉ làm việc" error={fieldErrors.location} /></View>
-      {!!companyAddress && <Text style={s.helper}>Địa chỉ hồ sơ: {companyAddress}. Bạn có thể sửa cho chi nhánh tuyển dụng.</Text>}
-      <View style={s.salaryRow}><View ref={node => { errorTargets.current.salary = node; }} style={{ flex: 1 }}><Field label="Lương tối thiểu · VND/tháng" value={salary} onChangeText={value => setSalary(formatVnd(value))} onBlur={() => validateOnBlur('salary')} placeholder="Ví dụ: 4.000.000" error={fieldErrors.salary} /></View><View ref={node => { errorTargets.current.salaryMax = node; }} style={{ flex: 1 }}><Field label="Lương tối đa · VND/tháng" value={salaryMax} onChangeText={value => setSalaryMax(formatVnd(value))} onBlur={() => validateOnBlur('salaryMax')} placeholder="Ví dụ: 6.000.000" error={fieldErrors.salaryMax} /></View></View>
-      <Text style={s.helper}>Chỉ nhập số nguyên dương; dấu phân cách được định dạng tự động. Có thể để trống cả hai mức nếu thỏa thuận.</Text>
-    </Card>
-    <Card><Text style={s.sectionTitle}>Mô tả công việc</Text><View ref={node => { errorTargets.current.description = node; }}><Field label="Nội dung *" value={description} onChangeText={setDescription} onBlur={() => validateOnBlur('description')} multiline placeholder="Mô tả trách nhiệm, môi trường làm việc và quyền lợi..." error={fieldErrors.description} /></View><Text style={s.helper}>Mô tả rõ vai trò, hướng dẫn và sản phẩm giúp ứng viên hiểu cơ hội.</Text>
-    </Card>
-    <Card><Text style={s.sectionTitle}>Yêu cầu</Text><Text style={s.helper}>Thêm mô tả yêu cầu. Nếu nội dung có tên kỹ năng trong danh mục UniNet, kỹ năng sẽ tự được gắn vào đúng nhóm.</Text>
-      <RequirementSwitch value={requirementType} onChange={setRequirementType} />
-      {(requirementType === 0 ? qualifications : preferredQualifications).map((item, index) => <View style={s.editableRow} key={`${requirementType}-${index}`}><TextInput style={[s.input, s.rowInput]} value={item} onChangeText={value => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.map((entry, i) => i === index ? value : entry))} /><Pressable accessibilityLabel="Xóa yêu cầu" onPress={() => (requirementType === 0 ? setQualifications : setPreferredQualifications)(current => current.filter((_, i) => i !== index))}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} color={c.rose} /></Pressable></View>)}
-      <View style={s.addRow}><TextInput style={[s.input, s.rowInput, s.textarea]} value={requirementDraft} onChangeText={setRequirementDraft} multiline placeholder="Ví dụ: Có kinh nghiệm JavaScript và Node.js" placeholderTextColor={c.muted} /><Pressable onPress={addRequirement}><Text style={s.purpleText}>+ Thêm</Text></Pressable></View>
-      {!!fieldErrors.requirements && <Text accessibilityRole="alert" style={s.fieldError}>{fieldErrors.requirements}</Text>}
-    </Card>
-    <Card><Text style={s.sectionTitle}>Kỹ năng cần có</Text><Text style={s.helper}>Chọn nhóm trước khi thêm. Kỹ năng mới sẽ được gửi để admin phân loại sau khi bài được đăng công khai.</Text>
+      <View style={[s.fieldGrid, wide && s.fieldGridWide]}>
+        <View ref={node => { errorTargets.current.workMode = node; }} style={[s.formField, s.gridField, wide && s.gridFieldWide]}><Text style={s.label}>Hình thức làm việc *</Text><PillSelect values={['Tại văn phòng', 'Kết hợp', 'Từ xa']} value={workMode} onChange={setWorkMode} icons={{ 'Tại văn phòng': { ios: 'building.2.fill', android: 'business', web: 'business' }, 'Kết hợp': { ios: 'laptopcomputer', android: 'laptop', web: 'laptop' }, 'Từ xa': { ios: 'house.fill', android: 'home', web: 'home' } }} />{!!fieldErrors.workMode && <Text style={s.fieldError}>{fieldErrors.workMode}</Text>}</View>
+        <View ref={node => { errorTargets.current.employmentType = node; }} style={[s.formField, s.gridField, wide && s.gridFieldWide]}><Text style={s.label}>Loại công việc *</Text><PillSelect values={['Toàn thời gian', 'Bán thời gian']} value={employmentType === 0 ? 'Toàn thời gian' : employmentType === 1 ? 'Bán thời gian' : ''} onChange={value => setEmploymentType(value === 'Toàn thời gian' ? 0 : 1)} />{!!fieldErrors.employmentType && <Text style={s.fieldError}>{fieldErrors.employmentType}</Text>}</View>
+      </View>
+      <View style={[s.fieldGrid, wide && s.fieldGridWide]}>
+        <View ref={node => { errorTargets.current.jobField = node; }} style={[s.gridField, wide && s.gridFieldWide]}><Field label="Lĩnh vực công việc *" value={jobField} onChangeText={setJobField} onBlur={() => validateOnBlur('jobField')} placeholder="Ví dụ: Công nghệ thông tin" error={fieldErrors.jobField} /></View>
+        <View ref={node => { errorTargets.current.location = node; }} style={[s.gridField, wide && s.gridFieldWide]}><Field label="Địa điểm *" value={location} onChangeText={setLocation} onBlur={() => validateOnBlur('location')} placeholder="Nhập địa chỉ làm việc" error={fieldErrors.location} />{!!companyAddress && <Text style={s.helper}>Địa chỉ hồ sơ: {companyAddress}. Có thể sửa cho chi nhánh tuyển dụng.</Text>}</View>
+      </View>
+      <View style={[s.fieldGrid, wide && s.fieldGridWide]}>
+        <View ref={node => { errorTargets.current.startAt = node; }} style={[s.startAtLayer, s.gridField, wide && s.gridFieldWide]}><View style={[s.dateRow, wide && s.dateRowWide]}><View style={s.startDateField}><DateTimeField label="Bắt đầu nhận hồ sơ · tùy chọn" value={startDate} mode="date" minDate={minimumStartDate} disabled={startTimeLocked} onChange={value => { setStartDate(value); const minTime = value === minimumStartDate ? startBoundary.time : '00:00'; setStartTime(current => current && Number(current.split(':')[1]) % 15 === 0 && current >= minTime ? current : value === minimumStartDate ? firstQuarterAtOrAfter(minTime) : '09:00'); }} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn ngày" /></View>{!!startDate && <View style={s.startTimeField}><DateTimeField label="Giờ bắt đầu *" value={startTime} mode="time" minTime={minimumStartTime} disabled={startTimeLocked} onChange={setStartTime} onBlur={() => validateOnBlur('startAt')} placeholder="Chọn giờ" /></View>}</View>{startTimeLocked && <Text style={s.lockNotice}>Thời điểm bắt đầu còn không quá 5 phút hoặc đã đến, nên không thể chỉnh sửa.</Text>}{!!fieldErrors.startAt && <Text style={s.fieldError}>{fieldErrors.startAt}</Text>}</View>
+        <View ref={node => { errorTargets.current.deadline = node; }} style={[s.gridField, wide && s.gridFieldWide]}><DateTimeField label="Hạn ứng tuyển *" value={deadline} mode="date" minDate={minimumDeadlineDate} onChange={setDeadline} onBlur={() => validateOnBlur('deadline')} placeholder="Chọn ngày" />{!!fieldErrors.deadline && <Text style={s.fieldError}>{fieldErrors.deadline}</Text>}</View>
+      </View></Card>
+    <Card style={s.formCard}><JobSectionTitle title="Mức lương" subtitle="Khoảng lương cho vị trí này." icon="salary" /><View style={[s.fieldGrid, wide && s.fieldGridWide]}><View ref={node => { errorTargets.current.salary = node; }} style={[s.gridField, wide && s.gridFieldWide]}><Field label="Lương tối thiểu · VND/tháng" value={salary} onChangeText={value => setSalary(formatVnd(value))} onBlur={() => validateOnBlur('salary')} placeholder="Ví dụ: 4.000.000" error={fieldErrors.salary} /></View><View ref={node => { errorTargets.current.salaryMax = node; }} style={[s.gridField, wide && s.gridFieldWide]}><Field label="Lương tối đa · VND/tháng" value={salaryMax} onChangeText={value => setSalaryMax(formatVnd(value))} onBlur={() => validateOnBlur('salaryMax')} placeholder="Ví dụ: 6.000.000" error={fieldErrors.salaryMax} /></View></View><View style={s.helperNote}><CompanyIcon name={{ ios: 'info.circle', android: 'info', web: 'info' }} size={13} color={c.muted} /><Text style={s.helperNoteText}>Chỉ nhập số nguyên dương; dấu phân cách được định dạng tự động. Có thể để trống cả hai mức nếu thỏa thuận.</Text></View></Card>
+    <Card style={s.formCard}><JobSectionTitle title="Mô tả công việc" subtitle="Giới thiệu chi tiết về vị trí và phạm vi công việc." icon="description" /><View ref={node => { errorTargets.current.description = node; }}><Field label="Nội dung *" value={description} onChangeText={setDescription} onBlur={() => validateOnBlur('description')} multiline placeholder="Mô tả trách nhiệm, môi trường làm việc và quyền lợi..." error={fieldErrors.description} /></View><Text style={s.characterCount}>{description.length.toLocaleString('vi-VN')} / 20.000 ký tự</Text></Card>
+    <Card style={s.formCard}><JobSectionTitle title="Yêu cầu" subtitle="Các điều kiện và tiêu chí ứng viên cần đáp ứng." icon="requirements" /><View ref={node => { errorTargets.current.requirements = node; }}><Field label="Nội dung" value={requirementsText} onChangeText={setRequirementsText} onBlur={() => validateOnBlur('requirements')} multiline placeholder="Mô tả kinh nghiệm, kiến thức hoặc điều kiện cần thiết..." error={fieldErrors.requirements} /></View><Text style={s.characterCount}>{requirementsText.split(/\r?\n/).filter(line => line.trim()).length} dòng · tối đa 50 dòng, 2.000 ký tự mỗi dòng</Text></Card>
+    <Card style={s.formCard}><JobSectionTitle title="Kỹ năng cần có" subtitle="Chọn các kỹ năng phù hợp với vị trí tuyển dụng." icon="skills" />
       <RequirementSwitch value={skillType} onChange={setSkillType} />
       <TextInput style={s.input} value={skillQuery} onChangeText={setSkillQuery} placeholder="Tìm kỹ năng trong danh mục..." placeholderTextColor={c.muted} />
       {!!skillQuery.trim() && (suggestedSkills.length ? <View style={s.suggestions}>{suggestedSkills.map(item => <Pressable key={item.id} onPress={() => addCatalogSkill(item, skillType)} style={s.suggestion}><Text style={s.suggestionText}>{item.name}</Text><Text style={s.purpleText}>+ Thêm</Text></Pressable>)}</View> : <View style={s.noSkill}><Text style={s.helper}>Chưa có kỹ năng này trong danh mục.</Text><Pressable onPress={addCustomSkill}><Text style={s.purpleText}>+ Thêm “{skillQuery.trim()}” vào bài tuyển dụng</Text></Pressable></View>)}
@@ -581,14 +550,14 @@ export default function CompanyCreateJob() {
         const canRemove = hoveredSkillDelete === skill.key || mobileSkillDelete === skill.key;
         return <View key={skill.key} onPointerEnter={Platform.OS === 'web' ? () => setHoveredSkillDelete(skill.key) : undefined} onPointerLeave={Platform.OS === 'web' ? () => setHoveredSkillDelete(current => current === skill.key ? null : current) : undefined} style={[s.skillChip, skill.requirementType === 0 ? s.skillRequired : s.skillPreferred]}>
           <Pressable accessibilityRole="button" accessibilityLabel={`${skill.name}, ${skill.requirementType === 0 ? 'bắt buộc' : 'ưu tiên'}${canRemove ? ', nút xóa đang hiện' : ', chạm để hiện nút xóa'}`} onPress={() => setMobileSkillDelete(current => current === skill.key ? null : skill.key)} style={s.skillChipBody}>
-            <Text numberOfLines={1} style={[s.skillChipText, skill.requirementType === 0 ? s.skillRequiredText : s.skillPreferredText]}>{skill.name}</Text>
+            {!!skill.iconUrl && <Image source={{ uri: skill.iconUrl }} style={{ width: 15, height: 15, borderRadius: 4 }} resizeMode="contain" />}<Text numberOfLines={1} style={[s.skillChipText, skill.requirementType === 0 ? s.skillRequiredText : s.skillPreferredText]}>{skill.name}</Text>
           </Pressable>
           {canRemove && <Pressable accessibilityRole="button" accessibilityLabel={`Xóa ${skill.name}`} onPress={() => { setSkills(current => current.filter(item => item.key !== skill.key)); setHoveredSkillDelete(null); setMobileSkillDelete(null); }} style={s.skillRemove}><Text style={s.skillRemoveText}>×</Text></Pressable>}
         </View>;
       })}</ScrollView>}
       {!!fieldErrors.skills && <Text accessibilityRole="alert" style={s.fieldError}>{fieldErrors.skills}</Text>}
     </Card>
-    <Card><Text style={s.sectionTitle}>Quyền lợi</Text><Text style={s.helper}>Chọn một icon có sẵn làm biểu tượng cho từng quyền lợi.</Text>{benefits.map((item, index) => {
+    <Card style={s.formCard}><JobSectionTitle title="Quyền lợi" subtitle="Các quyền lợi và chế độ dành cho ứng viên." icon="benefitsSection" />{benefits.map((item, index) => {
       const icon = getBenefitIcon(item.icon);
       const pickerKey = `benefit-${index}`;
       return <View key={pickerKey} style={s.benefitEdit}><View style={s.benefitRow}><Pressable accessibilityRole="button" accessibilityLabel={`Chọn icon: ${icon.label}`} onPress={() => setActiveBenefitIconPicker(current => current === pickerKey ? null : pickerKey)} style={s.benefitIconTile}><CompanyIcon name={{ ios: icon.ios, android: icon.android, web: icon.web }} size={23} color={c.blue} /></Pressable><View style={s.benefitFields}><Text style={s.label}>Tiêu đề</Text><TextInput style={s.benefitInput} value={item.title} onChangeText={value => setBenefits(current => current.map((entry, i) => i === index ? { ...entry, title: value } : entry))} placeholder={`Ví dụ: ${icon.example}`} placeholderTextColor={c.muted} /><Text style={s.label}>Mô tả</Text><TextInput style={[s.benefitInput, s.benefitDescription]} value={item.description} onChangeText={value => setBenefits(current => current.map((entry, i) => i === index ? { ...entry, description: value } : entry))} multiline placeholder="Mô tả quyền lợi" placeholderTextColor={c.muted} /></View><Pressable accessibilityLabel="Xóa quyền lợi" onPress={() => setBenefits(current => current.filter((_, i) => i !== index))} style={s.benefitDelete}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={18} color={c.muted} /></Pressable></View>
@@ -601,15 +570,19 @@ export default function CompanyCreateJob() {
       {!!benefitError && <Text accessibilityRole="alert" style={s.fieldError}>{benefitError}</Text>}
       <ActionButton title="Thêm quyền lợi" onPress={addBenefit} variant="soft" icon={{ ios: 'plus', android: 'add', web: 'add' }} />
     </Card>
-    <View style={s.submitRow}>{!(editing && jobStatus === 1) && <ActionButton title={saving ? 'Đang lưu…' : 'Lưu bản nháp'} onPress={() => { if (!saving && !loading) void saveJob(0); }} variant="outline" icon={{ ios: 'tray.and.arrow.down', android: 'save', web: 'save' }} />}<ActionButton title={saving ? 'Đang lưu…' : editing && jobStatus === 1 ? 'Lưu thay đổi' : 'Đăng bài tuyển dụng'} onPress={() => { if (!saving && !loading) void saveJob(1); }} icon={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} /></View>
-  </PageScroll></CompanyPage>;
+    <View style={[s.submitRow, wide && s.submitRowWide]}>{!(editing && jobStatus === 1) && <ActionButton title={saving ? 'Đang lưu…' : 'Lưu bản nháp'} onPress={() => { if (!saving && !loading) void saveJob(0); }} variant="outline" icon={{ ios: 'tray.and.arrow.down', android: 'save', web: 'save' }} />}<ActionButton title={saving ? 'Đang lưu…' : editing && jobStatus === 1 ? 'Lưu thay đổi' : 'Đăng bài tuyển dụng'} onPress={() => { if (!saving && !loading) void saveJob(1); }} icon={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} /></View>
+  </View></PageScroll></CompanyPage>;
 }
 
 const s = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 },
-  jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontWeight: '900', fontSize: 10 }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
-  sectionTitle: { color: c.ink, fontSize: 14, fontWeight: '900', marginBottom: 4 }, sectionSub: { color: c.muted, fontSize: 9, marginBottom: 5 }, field: { marginTop: 8, gap: 5 }, label: { color: c.ink, fontSize: 10, fontWeight: '700' }, input: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, color: c.ink, fontSize: 10 }, textarea: { minHeight: 72, paddingTop: 10, lineHeight: 16 }, salaryRow: { flexDirection: 'row', gap: 8 }, dateRow: { flexDirection: 'row', gap: 8 }, dateButton: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, dateButtonDisabled: { backgroundColor: '#F4F6FA', opacity: 0.72 }, dateText: { color: c.ink, fontSize: 11 }, datePlaceholder: { color: c.muted, fontSize: 11 }, dateTimeCard: { position: 'relative', zIndex: 1000, elevation: 100 }, startAtLayer: { position: 'relative', zIndex: 1000, elevation: 100 }, lockNotice: { color: c.muted, fontSize: 9, lineHeight: 13, marginTop: 5 },
-  editableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, rowInput: { flex: 1 }, addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, purpleText: { color: c.purple, fontSize: 10, fontWeight: '800' }, suggestions: { borderWidth: 1, borderColor: c.line, borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden' }, suggestion: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, suggestionText: { color: c.ink, fontSize: 11, fontWeight: '600' }, noSkill: { gap: 6, marginTop: 7 }, skillList: { gap: 8, marginTop: 12, alignItems: 'center' }, skillChip: { minHeight: 32, maxWidth: 260, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, borderWidth: 1 }, skillRequired: { borderColor: '#BFDBFE', backgroundColor: '#EAF3FF' }, skillPreferred: { borderColor: '#BBF7D0', backgroundColor: '#E8F7F0' }, skillChipBody: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }, skillChipText: { maxWidth: 220, fontSize: 10, fontWeight: '700' }, skillRequiredText: { color: c.purple }, skillPreferredText: { color: c.green }, skillRemove: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2' }, skillRemoveText: { color: c.rose, fontSize: 15, fontWeight: '700', lineHeight: 17 },
-  requirementSwitch: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, padding: 3, borderRadius: 20, backgroundColor: '#F1F5F9' }, requirementOption: { minHeight: 30, paddingHorizontal: 12, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, requirementOptionRequired: { backgroundColor: c.purple }, requirementOptionPreferred: { backgroundColor: c.green }, requirementOptionText: { color: c.muted, fontSize: 9, fontWeight: '800' }, requirementOptionTextActive: { color: '#FFF' },
-  benefitEdit: { paddingVertical: 12, borderBottomWidth: 1, borderColor: c.line }, benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, benefitIconTile: { width: 44, height: 44, marginTop: 21, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF3FF' }, benefitFields: { flex: 1, gap: 6 }, benefitInput: { minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 9, color: c.ink, fontSize: 12 }, benefitDescription: { minHeight: 72, textAlignVertical: 'top' }, benefitDelete: { marginTop: 20, padding: 4 }, benefitIconOptions: { flexDirection: 'row', gap: 8, marginTop: 10, marginLeft: 54, paddingVertical: 2 }, benefitIconOption: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, benefitIconOptionActive: { backgroundColor: '#EAF3FF', borderColor: c.blue }, newBenefit: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 12 }, newBenefitIconColumn: { width: 44 }, submitRow: { flexDirection: 'row', gap: 8 }, error: { color: c.rose, fontSize: 11 }, inputError: { borderColor: c.rose }, fieldError: { color: c.rose, fontSize: 9, lineHeight: 13 }, notice: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 3 }, noticeSuccess: { backgroundColor: '#ECFDF5', borderColor: '#86EFAC' }, noticeError: { backgroundColor: '#FFF1F2', borderColor: '#FDA4AF' }, noticeTitle: { color: c.ink, fontSize: 11, fontWeight: '800' }, noticeMessage: { color: c.ink, fontSize: 10, lineHeight: 15 }, leaveOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20 }, leaveDialog: { width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, backgroundColor: '#FFF', gap: 10 }, leaveActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginTop: 6 }, timeField: { position: 'relative', zIndex: 1000 }, timeModalRoot: { flex: 1 }, timeModalBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent' }, timeDropdown: { position: 'absolute', width: 152, height: 216, flexDirection: 'row', backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 4, zIndex: 2000, elevation: 100, shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }, timeWheel: { flex: 1 }, timeWheelItem: { height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, timeWheelItemSelected: { backgroundColor: '#0878F9' }, timeWheelItemDisabled: { backgroundColor: '#EEF1F5' }, timeWheelText: { color: c.ink, fontSize: 13, fontWeight: '500' }, timeWheelTextSelected: { color: '#FFF', fontWeight: '800' }, timeWheelTextDisabled: { color: '#C4CBD4' }, pill: { borderWidth: 1, borderColor: c.line, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#FFF' }, pillActive: { backgroundColor: c.purple, borderColor: c.purple }, pillText: { color: c.muted, fontSize: 9, fontWeight: '700' }, pillTextActive: { color: '#FFF' },
+  formPage: { width: '100%', maxWidth: 1040, alignSelf: 'center', gap: 12, paddingHorizontal: 4, paddingBottom: 18 },
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 3 }, pageHeaderCopy: { flex: 1, minWidth: 0, gap: 3 }, breadcrumb: { color: c.muted, fontSize: 11, fontWeight: '600' }, pageHeading: { color: c.ink, fontSize: 25, lineHeight: 31, fontWeight: '900' }, pageSubtitle: { color: c.muted, fontSize: 12, lineHeight: 18 },
+  formCard: { gap: 12, padding: 20, borderRadius: 18 }, formField: { gap: 7, marginTop: 3 }, fieldGrid: { flexDirection: 'column', gap: 10 }, fieldGridWide: { flexDirection: 'row', alignItems: 'flex-start', gap: 18 }, gridField: { width: '100%', minWidth: 0 }, gridFieldWide: { flex: 1, width: 'auto', minWidth: 0 },
+  helperNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: 1 }, helperNoteText: { flex: 1, color: c.muted, fontSize: 10, lineHeight: 15 }, characterCount: { alignSelf: 'flex-end', color: c.muted, fontSize: 9, marginTop: -5 }, submitRowWide: { justifyContent: 'space-between', paddingHorizontal: 2, paddingBottom: 10 },
+  nav: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line }, navTitle: { color: c.ink, fontSize: 13, fontWeight: '900' }, navSub: { color: c.muted, fontSize: 9, marginTop: 2 }, avatar: { width: 28, height: 28, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.purpleSoft, overflow: 'hidden' }, avatarImage: { width: '100%', height: '100%' }, avatarText: { color: c.purple, fontWeight: '900', fontSize: 10 },
+  jobPreview: { gap: 8 }, previewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.purple, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, logoText: { color: '#FFF', fontWeight: '900', fontSize: 10 }, company: { color: c.ink, fontWeight: '800', fontSize: 10 }, helper: { color: c.muted, fontSize: 9, lineHeight: 14 }, previewTitle: { color: c.ink, fontSize: 16, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  jobSectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 0 }, jobSectionIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#EAF3FF', alignItems: 'center', justifyContent: 'center' }, sectionHeadingCopy: { flex: 1, minWidth: 0, gap: 2 }, sectionTitle: { color: c.ink, fontSize: 17, fontWeight: '900', marginBottom: 0 }, sectionSub: { color: c.muted, fontSize: 11, lineHeight: 16 }, field: { marginTop: 5, gap: 7 }, label: { color: c.ink, fontSize: 12, fontWeight: '700' }, input: { minHeight: 44, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 12, color: c.ink, fontSize: 12 }, textarea: { minHeight: 118, paddingTop: 12, lineHeight: 19 }, salaryRow: { flexDirection: 'row', gap: 8 }, dateRow: { flexDirection: 'column', gap: 6 }, dateRowWide: { flexDirection: 'row' }, startDateField: { flex: 1, minWidth: 0 }, startTimeField: { flex: 0.85, minWidth: 0 }, dateButton: { minHeight: 44, borderRadius: 11, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, dateButtonDisabled: { backgroundColor: '#F4F6FA', opacity: 0.72 }, dateText: { color: c.ink, fontSize: 12 }, datePlaceholder: { color: c.muted, fontSize: 12 }, dateTimeCard: { position: 'relative', zIndex: 1000, elevation: 100 }, startAtLayer: { position: 'relative', zIndex: 1000, elevation: 100 }, lockNotice: { color: c.muted, fontSize: 9, lineHeight: 13, marginTop: 5 },
+  editableRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, rowInput: { flex: 1 }, addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }, purpleText: { color: c.purple, fontSize: 10, fontWeight: '800' }, suggestions: { borderWidth: 1, borderColor: c.line, borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden' }, suggestion: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: c.line }, suggestionText: { color: c.ink, fontSize: 11, fontWeight: '600' }, noSkill: { gap: 6, marginTop: 7 }, skillList: { gap: 8, marginTop: 12, alignItems: 'center' }, skillChip: { minHeight: 32, maxWidth: 260, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, borderWidth: 1 }, skillRequired: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' }, skillPreferred: { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' }, skillChipBody: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }, skillChipText: { maxWidth: 220, fontSize: 10, fontWeight: '700' }, skillRequiredText: { color: c.green }, skillPreferredText: { color: c.blue }, skillRemove: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2' }, skillRemoveText: { color: c.rose, fontSize: 15, fontWeight: '700', lineHeight: 17 },
+  requirementSwitch: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, padding: 3, borderRadius: 20, backgroundColor: '#F1F5F9' }, requirementOption: { minHeight: 30, paddingHorizontal: 12, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, requirementOptionRequired: { backgroundColor: c.purple }, requirementOptionPreferred: { backgroundColor: c.purple }, requirementOptionText: { color: c.muted, fontSize: 9, fontWeight: '800' }, requirementOptionTextActive: { color: '#FFF' },
+  benefitEdit: { paddingVertical: 12, borderBottomWidth: 1, borderColor: c.line }, benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, benefitIconTile: { width: 44, height: 44, marginTop: 21, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF3FF' }, benefitFields: { flex: 1, gap: 6 }, benefitInput: { minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: c.line, backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 9, color: c.ink, fontSize: 12 }, benefitDescription: { minHeight: 72, textAlignVertical: 'top' }, benefitDelete: { marginTop: 20, padding: 4 }, benefitIconOptions: { flexDirection: 'row', gap: 8, marginTop: 10, marginLeft: 54, paddingVertical: 2 }, benefitIconOption: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, benefitIconOptionActive: { backgroundColor: '#EAF3FF', borderColor: c.blue }, newBenefit: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 12 }, newBenefitIconColumn: { width: 44 }, submitRow: { flexDirection: 'row', gap: 8 }, error: { color: c.rose, fontSize: 11 }, inputError: { borderColor: c.rose }, fieldError: { color: c.rose, fontSize: 9, lineHeight: 13 }, notice: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 3 }, noticeSuccess: { backgroundColor: '#ECFDF5', borderColor: '#86EFAC' }, noticeError: { backgroundColor: '#FFF1F2', borderColor: '#FDA4AF' }, noticeTitle: { color: c.ink, fontSize: 11, fontWeight: '800' }, noticeMessage: { color: c.ink, fontSize: 10, lineHeight: 15 }, leaveOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20 }, leaveDialog: { width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, backgroundColor: '#FFF', gap: 10 }, leaveActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginTop: 6 }, timeField: { position: 'relative', zIndex: 1000 }, timeModalRoot: { flex: 1 }, timeModalBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent' }, timeDropdown: { position: 'absolute', width: 152, height: 216, flexDirection: 'row', backgroundColor: '#FFF', borderWidth: 1, borderColor: c.line, borderRadius: 4, zIndex: 2000, elevation: 100, shadowColor: '#0F172A', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }, timeWheel: { flex: 1 }, timeWheelItem: { height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }, timeWheelItemSelected: { backgroundColor: '#0878F9' }, timeWheelItemDisabled: { backgroundColor: '#EEF1F5' }, timeWheelText: { color: c.ink, fontSize: 13, fontWeight: '500' }, timeWheelTextSelected: { color: '#FFF', fontWeight: '800' }, timeWheelTextDisabled: { color: '#C4CBD4' }, pill: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: c.line, borderRadius: 10, paddingHorizontal: 15, backgroundColor: '#FFF' }, pillActive: { backgroundColor: c.purple, borderColor: c.purple }, pillText: { color: c.muted, fontSize: 11, fontWeight: '700' }, pillTextActive: { color: '#FFF' },
 });

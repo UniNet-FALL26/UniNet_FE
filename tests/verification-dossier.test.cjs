@@ -29,6 +29,17 @@ test('payment success and a cancelled assignment never fabricate completed verif
   assert.equal(steps[2].done, false);
   assert.equal(steps[4].done, false);
 });
+
+test('paid progress distinguishes pending booking, manual review and confirmed booking', () => {
+  const step = (bookingStatus, status = 1, requiresManualReview = false) => helper.dossierSteps(detail({ verification: { status: 0, bookingStatus }, payments: [{ status, requiresManualReview }] }))[1];
+  assert.equal(step(3).done, false);
+  assert.equal(step(3).statusText, 'Đã thanh toán · Chờ xác nhận lịch');
+  assert.match(step(3, 1, true).statusText, /Đã thanh toán · Cần hỗ trợ/);
+  assert.equal(step(2, 1, true).done, false);
+  assert.equal(step(2).done, true);
+  assert.equal(step(2).statusText, 'Đã thanh toán và xác nhận lịch');
+  assert.doesNotMatch(step(3, 0, true).statusText, /Đã thanh toán/);
+});
 test('result and cancellation use actual backend routes, body and abort signal', async () => {
   const calls = [];
   const api = load('src/services/project-verification.service.ts', {

@@ -1,4 +1,5 @@
 import { apiRequest } from '@/services/api';
+import type { AuthAccount } from '@/types/auth';
 import { skillService } from '@/services/skill.service';
 import { Platform } from 'react-native';
 import { File as NativeFile } from 'expo-file-system';
@@ -8,19 +9,20 @@ export type { SkillCatalogItem } from '@/services/skill.service';
 
 export type CompanyJobStatus = 0 | 1 | 2 | 3;
 export type CompanyJobWorkType = 0 | 1 | 2;
+export type CompanyJobEmploymentType = 0 | 1;
 export type CompanyJobApplicationStatus = 0 | 1 | 2 | 3 | 4;
 export type JobSkillRequirementType = 0 | 1;
 export type PartnerType = 0 | 1 | 2 | 3 | 4;
 export type VerificationStatus = 0 | 1 | 2 | 3;
 export type VerificationDocumentType = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type CompanyJobSkill = { skillId: string | null; name: string; category: number | null; requirementType: JobSkillRequirementType };
+export type CompanyJobSkill = { skillId: string | null; name: string; category: number | null; requirementType: JobSkillRequirementType; iconUrl: string | null };
 export type CompanyJobBenefit = { title: string; description: string; icon?: string };
 export type CompanyJob = {
-  id: string; title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
+  id: string; title: string; workType: CompanyJobWorkType; employmentType: CompanyJobEmploymentType; jobField: string; minSalaryVnd: number | null; maxSalaryVnd: number | null;
   location: string | null; description: string | null; status: CompanyJobStatus; startAt: string | null; deadline: string | null;
   responsibilities: string[]; requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
-  skills: CompanyJobSkill[]; benefits: CompanyJobBenefit[]; applicantCount: number; createdAt: string; updatedAt: string;
+  skills: CompanyJobSkill[]; benefits: CompanyJobBenefit[]; applicantCount: number; viewCount: number; createdAt: string; updatedAt: string;
 };
 export type CompanyApplicant = {
   id: string; jobId: string; studentUserId: string; fullName: string; nickname: string;
@@ -30,18 +32,18 @@ export type CompanyApplicant = {
   applicationRound: number;
 };
 export type CompanyJobInput = {
-  title: string; workType: CompanyJobWorkType; minSalaryVnd: number | null; maxSalaryVnd: number | null;
+  title: string; workType: CompanyJobWorkType; employmentType: CompanyJobEmploymentType; jobField: string; minSalaryVnd: number | null; maxSalaryVnd: number | null;
   location: string; description: string; startAt: string | null; deadline: string; status: Exclude<CompanyJobStatus, 3>;
   requiredQualifications: string[]; preferredQualifications: string[]; projectAreas: string[];
   skills: { skillId?: string; name?: string; requirementType: JobSkillRequirementType }[]; benefits: CompanyJobBenefit[];
 };
 export type CompanyProfile = {
   id: string; companyName: string; partnerType: PartnerType; description: string | null; industry: string | null;
-  website: string | null; phone: string | null; address: string | null; contactEmail: string | null;
+  website: string | null; websites: string[]; phone: string | null; address: string | null; contactEmail: string | null;
   avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; updatedAt: string; openJobs: CompanyJob[];
 };
 export type CompanyProfileInput = Pick<CompanyProfile,
-  'companyName' | 'partnerType' | 'description' | 'industry' | 'website' | 'phone' | 'address' | 'contactEmail' | 'avatarUrl' | 'coverUrl'>;
+  'companyName' | 'partnerType' | 'description' | 'industry' | 'website' | 'websites' | 'phone' | 'address' | 'contactEmail' | 'avatarUrl' | 'coverUrl'>;
 export type CompanyDashboard = {
   companyName: string; totalJobs: number; publishedJobs: number; draftJobs: number; closedJobs: number;
   expiringJobs: number; totalApplications: number; pendingApplications: number; viewedApplications: number;
@@ -51,7 +53,11 @@ export type CompanyJobsPage = {
   page: number; pageSize: number; totalItems: number; totalPages: number; totalJobs: number;
   publishedJobs: number; draftJobs: number; closingSoonJobs: number; jobs: CompanyJob[];
 };
-export type PartnerVerificationStatus = { id: string | null; status: VerificationStatus | null; rejectReason: string | null; submittedAt: string | null };
+export type PartnerVerificationStatus = {
+  id: string | null; status: VerificationStatus | null; rejectReason: string | null; submittedAt: string | null;
+  reviewedAt?: string | null; organizationName?: string | null;
+  taxCode?: string | null; representativeName?: string | null;
+};
 export type PartnerVerificationDocument = { type: VerificationDocumentType; fileName: string; url: string };
 export type PartnerVerificationUploadDocument = { type: VerificationDocumentType; fileName: string; url?: string | null; document?: VerificationDocument | null };
 export type PartnerVerificationInput = { taxCode?: string | null; representativeName?: string | null; documents: PartnerVerificationUploadDocument[] };
@@ -59,7 +65,7 @@ export type PartnerVerificationInput = { taxCode?: string | null; representative
 type PartnerProfileResponse = {
   id: string; fullName: string; organizationName: string | null; avatarUrl: string | null; coverUrl: string | null;
   bio: string | null; partnerType: PartnerType | null; industry: string | null; website: string | null;
-  contactEmail: string | null; phone: string | null; address: string | null; isVerified: boolean;
+  contactEmail: string | null; phone: string | null; address: string | null; isVerified: boolean; websites?: string[];
 };
 type AccountProfileResponse = { profile: PartnerProfileResponse | null };
 type PartnerDashboardResponse = Omit<CompanyDashboard, 'companyName'> & { organizationName: string };
@@ -71,24 +77,30 @@ async function getProfile(signal?: AbortSignal): Promise<CompanyProfile> {
   ]);
   const profile = account.profile;
   if (!profile) throw new Error('Không tìm thấy hồ sơ đối tác.');
+  const websites = profile.websites?.length ? profile.websites : profile.website ? [profile.website] : [];
   return {
     id: profile.id, companyName: profile.organizationName || profile.fullName, partnerType: profile.partnerType ?? 4,
-    description: profile.bio, industry: profile.industry, website: profile.website, phone: profile.phone,
+    description: profile.bio, industry: profile.industry, website: websites[0] ?? null, websites, phone: profile.phone,
     address: profile.address, contactEmail: profile.contactEmail, avatarUrl: profile.avatarUrl, coverUrl: profile.coverUrl,
     isVerified: profile.isVerified, updatedAt: '', openJobs: dashboard.openJobs,
   };
 }
 
-export const companyService = {
-  getProfile,
-  updateProfile: async (input: CompanyProfileInput, signal?: AbortSignal) => {
-    await apiRequest('/profile/partner', {
+async function savePartnerProfile(input: CompanyProfileInput, signal?: AbortSignal): Promise<AuthAccount> {
+    return apiRequest<AuthAccount>('/profile/partner', {
       method: 'PUT', body: JSON.stringify({
         organizationName: input.companyName, partnerType: input.partnerType, avatarUrl: input.avatarUrl,
-        coverUrl: input.coverUrl, bio: input.description, industry: input.industry, website: input.website,
+        coverUrl: input.coverUrl, bio: input.description, industry: input.industry, website: input.websites[0] ?? input.website, websites: input.websites,
         contactEmail: input.contactEmail, phone: input.phone, address: input.address,
       }), signal,
     });
+}
+
+export const companyService = {
+  getProfile,
+  saveProfile: savePartnerProfile,
+  updateProfile: async (input: CompanyProfileInput, signal?: AbortSignal) => {
+    await savePartnerProfile(input, signal);
     return getProfile(signal);
   },
   getDashboard: async (signal?: AbortSignal): Promise<CompanyDashboard> => {
@@ -135,9 +147,10 @@ export const companyService = {
   },
 };
 
-export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đã đăng', 2: 'Đã đóng', 3: 'Hết hạn' };
+export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đang tuyển', 2: 'Đã đóng', 3: 'Hết hạn' };
 export const companyJobApplicationStatusLabel: Record<CompanyJobApplicationStatus, string> = { 0: 'Chờ xem', 1: 'Đã xem', 2: 'Phỏng vấn', 3: 'Đã nhận', 4: 'Từ chối' };
 export const companyJobWorkTypeLabel: Record<CompanyJobWorkType, string> = { 0: 'Tại văn phòng', 1: 'Kết hợp', 2: 'Từ xa' };
+export const companyJobEmploymentTypeLabel: Record<CompanyJobEmploymentType, string> = { 0: 'Toàn thời gian', 1: 'Bán thời gian' };
 export function formatCompanyDate(value: string | null): string {
   if (!value) return 'Chưa đặt'; const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'Chưa đặt' : new Intl.DateTimeFormat('vi-VN', { timeZone: 'UTC' }).format(date);
@@ -148,5 +161,5 @@ export function formatCompanySalary(min: number | null, max: number | null): str
     : new Intl.NumberFormat('vi-VN').format(value);
   if (min == null && max == null) return 'Thỏa thuận';
   if (min != null && max != null) return `${format(min)}–${format(max)} VND/tháng`;
-  return `${format(min ?? max!)} VND/tháng`;
+  return min != null ? `Từ ${format(min)} VND/tháng` : `Tới ${format(max!)} VND/tháng`;
 }
