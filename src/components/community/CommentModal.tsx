@@ -1,19 +1,18 @@
 import { colors } from "@/constants/colors";
-import { reportApiFailure } from '@/services/api';
-import { ToastHost } from '@/components/ui/ToastHost';
 import {
   communityService,
   type CommentResponse,
+  type PostResponse,
 } from "@/services/community.service";
+import { useAuthStore } from "@/store/auth.store";
 import { SymbolView } from "expo-symbols";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Dimensions,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -21,21 +20,32 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { CommentItem } from "./CommentItem";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const HEIGHT_CLOSED = 0;
-const HEIGHT_MID = SCREEN_HEIGHT * 0.55;
-const HEIGHT_FULL = SCREEN_HEIGHT * 0.92;
-
 interface CommentModalProps {
-  postId: string | null;
+  post: PostResponse | null;
   onClose: () => void;
+  onToggleReaction: (postId: string) => void;
+  onToggleBookmark: (postId: string) => void;
+  onRequestEdit: (post: PostResponse) => void;
+  onRequestDelete: (postId: string) => void;
+  onCommentCountChange: (postId: string, delta: number) => void; // Thêm dòng này
 }
+export function CommentModal({
+  post,
+  onClose,
+  onToggleReaction,
+  onToggleBookmark,
+  onRequestEdit,
+  onRequestDelete,
+  onCommentCountChange,
+}: CommentModalProps) {
+  const { account } = useAuthStore();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
 
-export function CommentModal({ postId, onClose }: CommentModalProps) {
   const [comments, setComments] = useState<CommentResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,69 +63,28 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
   } | null>(null);
 
   const [optionsCommentId, setOptionsCommentId] = useState<string | null>(null);
+  const [optionsPostOpen, setOptionsPostOpen] = useState(false);
   const [deleteConfirmCommentId, setDeleteConfirmCommentId] = useState<
     string | null
   >(null);
 
+  // Dùng cho slider ảnh bên trái
+  const [mediaIndex, setMediaIndex] = useState(0);
+
   const abortController = useRef<AbortController | null>(null);
   const textInputRef = useRef<TextInput>(null);
-  const sheetHeight = useRef(new Animated.Value(HEIGHT_CLOSED)).current;
-  const currentHeight = useRef(HEIGHT_CLOSED);
-  const backdropOpacity = sheetHeight.interpolate({
-    inputRange: [HEIGHT_CLOSED, HEIGHT_MID],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
 
-  const animateToHeight = useCallback(
-    (toValue: number, onComplete?: () => void) => {
-      Animated.spring(sheetHeight, {
-        toValue,
-        useNativeDriver: false,
-        friction: 9,
-        tension: 65,
-      }).start(() => {
-        currentHeight.current = toValue;
-        if (onComplete) onComplete();
-      });
-    },
-    [sheetHeight],
-  );
-
-  const handleDismiss = useCallback(() => {
-    animateToHeight(HEIGHT_CLOSED, () => {
-      onClose();
-    });
-  }, [animateToHeight, onClose]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dy) > 10,
-      onPanResponderGrant: () => {
-        sheetHeight.stopAnimation();
-      },
-      onPanResponderMove: (e, gestureState) => {
-        const newHeight = Math.max(0, currentHeight.current - gestureState.dy);
-        sheetHeight.setValue(newHeight);
-      },
-      onPanResponderRelease: (e, gestureState) => {
-        const finalHeight = currentHeight.current - gestureState.dy;
-        if (gestureState.vy > 1.5 || finalHeight < HEIGHT_MID - 100) {
-          handleDismiss();
-        } else if (finalHeight < (HEIGHT_MID + HEIGHT_FULL) / 2) {
-          animateToHeight(HEIGHT_MID);
-        } else {
-          animateToHeight(HEIGHT_FULL);
-        }
-      },
-    }),
-  ).current;
+  const isPostOwner =
+    account?.id === post?.authorUserId ||
+    (account as any)?.profile?.id === post?.authorUserId;
+  const isFavorited = (post as any)?.isFavorited;
+  const isSaved = (post as any)?.isSaved;
 
   useEffect(() => {
-    if (!postId) {
+    if (!post?.id) {
       setComments([]);
-      animateToHeight(HEIGHT_CLOSED);
+      setMediaIndex(0);
+      setOptionsPostOpen(false);
       return;
     }
 
@@ -126,11 +95,10 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
     const fetchCommentsData = async () => {
       setLoading(true);
       setError("");
-
       try {
-        if (!postId.startsWith("temp-")) {
+        if (!post.id.startsWith("temp-")) {
           const commentsData = await communityService.getComments(
-            postId,
+            post.id,
             controller.signal,
           );
           setComments(Array.isArray(commentsData) ? commentsData : []);
@@ -148,11 +116,10 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
     };
 
     fetchCommentsData();
-    requestAnimationFrame(() => animateToHeight(HEIGHT_MID));
-
     return () => controller.abort();
-  }, [postId, animateToHeight]);
+  }, [post?.id]);
 
+  // Giữ nguyên logic xử lý Comment & Reply cũ
   const appendReplyFlattened = (
     list: CommentResponse[],
     targetId: string,
@@ -180,7 +147,7 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
 
   const handleSubmitComment = async () => {
     const text = inputText.trim();
-    if (!text || sending || !postId) return;
+    if (!text || sending || !post?.id) return;
     setSending(true);
 
     try {
@@ -188,7 +155,6 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
         await communityService.updateComment(editingComment.id, {
           content: text,
         });
-        // GIẢI PHÁP: Giữ lại toàn bộ data cũ của comment (...c) (name, avatar), chỉ ghi đè content vừa nhập
         setComments((prev) =>
           prev.map((c) =>
             c.id === editingComment.id ? { ...c, content: text } : c,
@@ -208,9 +174,12 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
             replies: [],
           }),
         );
+        onCommentCountChange(post.id, 1); // <--- THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ
         setReplyingTo(null);
+
+        // Tìm đoạn code gửi Comment gốc:
       } else {
-        const res = await communityService.createComment(postId, {
+        const res = await communityService.createComment(post.id, {
           content: text,
         });
         const rawComment = (res as any)?.data ?? res;
@@ -218,10 +187,11 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
           { ...rawComment, content: text, replies: [] },
           ...prev,
         ]);
+        onCommentCountChange(post.id, 1); // <--- THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ
       }
       setInputText("");
-    } catch (error) {
-      reportApiFailure(error, "Không thể gửi bình luận.");
+    } catch {
+      Alert.alert("Lỗi", "Không thể gửi bình luận.");
     } finally {
       setSending(false);
     }
@@ -230,6 +200,7 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
   const handleEditComment = (comment: CommentResponse) => {
     setEditingComment({ id: comment.id, content: comment.content });
     setInputText(comment.content);
+    textInputRef.current?.focus();
   };
 
   const handleReplyComment = (
@@ -239,76 +210,278 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
   ) => {
     setEditingComment(null);
     setReplyingTo({ commentId, authorName, authorUserId });
+    textInputRef.current?.focus();
   };
 
-  const handleDeleteComment = (commentId: string) => {
-    setDeleteConfirmCommentId(commentId);
-  };
+  if (!post) return null;
+
+  const displayName = (post as any).authorNickname || post.authorName;
+  const hasMedia = post.mediaUrls && post.mediaUrls.length > 0;
 
   return (
     <>
       <Modal
-        visible={!!postId}
+        visible={!!post}
         transparent
-        animationType="none"
-        onRequestClose={handleDismiss}
+        animationType="fade"
+        onRequestClose={onClose}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          {!!postId && <ToastHost modal />}
-          <Animated.View
-            style={[styles.backdrop, { opacity: backdropOpacity }]}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={handleDismiss}
+        <View style={styles.modalContainer}>
+          {/* Đưa nút X ra ngoài cùng của màn hình */}
+          <Pressable style={styles.globalCloseBtn} onPress={onClose}>
+            <SymbolView
+              name={{ ios: "xmark", android: "close", web: "close" }}
+              size={24}
+              tintColor="#FFF"
             />
-          </Animated.View>
+          </Pressable>
 
-          <Animated.View
-            style={[styles.sheetContainer, { height: sheetHeight }]}
+          <KeyboardAvoidingView
+            style={[
+              styles.contentWrapper,
+              { flexDirection: isDesktop ? "row" : "column" },
+            ]}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
-            <View {...panResponder.panHandlers} style={styles.dragHeaderArea}>
-              <View style={styles.dragIndicator} />
-              <View style={styles.header}>
-                <Text style={styles.headerTitle}>Bình luận</Text>
-                {Platform.OS === "web" && (
-                  <Pressable onPress={handleDismiss} style={styles.closeBtn}>
+            {/* CỘT TRÁI: Media Viewer */}
+            <View
+              style={[
+                styles.leftMediaSection,
+                !hasMedia && { display: "none" },
+                !isDesktop && styles.mobileMediaSection,
+              ]}
+            >
+              {hasMedia && (
+                <View style={styles.imageViewer}>
+                  {post.mediaUrls.length > 1 && (
+                    <Pressable
+                      style={[styles.navArrow, { left: 20 }]}
+                      onPress={() =>
+                        setMediaIndex((prev) =>
+                          prev > 0 ? prev - 1 : post.mediaUrls.length - 1,
+                        )
+                      }
+                    >
+                      <SymbolView
+                        name={{
+                          ios: "chevron.left",
+                          android: "chevron_left",
+                          web: "chevron_left",
+                        }}
+                        size={32}
+                        tintColor="#FFF"
+                      />
+                    </Pressable>
+                  )}
+
+                  <Image
+                    source={{ uri: post.mediaUrls[mediaIndex] }}
+                    style={styles.mainImage}
+                    resizeMode="contain"
+                  />
+
+                  {post.mediaUrls.length > 1 && (
+                    <Pressable
+                      style={[styles.navArrow, { right: 20 }]}
+                      onPress={() =>
+                        setMediaIndex((prev) =>
+                          prev < post.mediaUrls.length - 1 ? prev + 1 : 0,
+                        )
+                      }
+                    >
+                      <SymbolView
+                        name={{
+                          ios: "chevron.right",
+                          android: "chevron_right",
+                          web: "chevron_right",
+                        }}
+                        size={32}
+                        tintColor="#FFF"
+                      />
+                    </Pressable>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* CỘT PHẢI: Thông tin bài viết, Menu Post, Comment */}
+            <View
+              style={[
+                styles.rightDetailSection,
+                (!hasMedia || !isDesktop) && { flex: 1 },
+              ]}
+            >
+              {/* Header của bài viết (bên phải) */}
+              <View
+                style={[
+                  styles.rightHeader,
+                  optionsPostOpen && { zIndex: 9999 },
+                ]}
+              >
+                <View style={styles.authorInfoRow}>
+                  <View style={styles.avatarPlaceholder}>
+                    {post.authorAvatar ? (
+                      <Image
+                        source={{ uri: post.authorAvatar }}
+                        style={styles.avatarImage}
+                      />
+                    ) : (
+                      <Text style={styles.avatarText}>
+                        {displayName?.charAt(0)?.toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View>
+                    <Text style={styles.authorNameText}>{displayName}</Text>
+                    <Text style={styles.dateText}>
+                      {new Date(post.createdAt).toLocaleDateString("vi-VN")}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Dấu 3 chấm chức năng của Post */}
+                <View style={{ position: "relative", zIndex: 9999 }}>
+                  <Pressable
+                    onPress={() => setOptionsPostOpen(!optionsPostOpen)}
+                    style={{ padding: 8 }}
+                  >
                     <SymbolView
-                      name={{ web: "close" }}
-                      size={20}
+                      name={{
+                        ios: "ellipsis",
+                        android: "more_horiz",
+                        web: "more_horiz",
+                      }}
+                      size={24}
                       tintColor={colors.textSecondary}
                     />
                   </Pressable>
-                )}
-              </View>
-            </View>
 
-            {loading ? (
-              <ActivityIndicator
-                style={{ marginTop: 40 }}
-                size="large"
-                color={colors.primary}
-              />
-            ) : error ? (
-              <Text style={styles.errorText}>{error}</Text>
-            ) : (
+                  {optionsPostOpen && (
+                    <>
+                      <Pressable
+                        style={styles.dropdownBackdrop}
+                        onPress={() => setOptionsPostOpen(false)}
+                      />
+                      <View style={styles.postDropdownMenu}>
+                        <Pressable
+                          onPress={() => {
+                            setOptionsPostOpen(false);
+                            onToggleBookmark(post.id);
+                          }}
+                          style={styles.dropdownItem}
+                        >
+                          <Text style={styles.optionText}>
+                            {isSaved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
+                          </Text>
+                        </Pressable>
+
+                        {isPostOwner && (
+                          <>
+                            <Pressable
+                              onPress={() => {
+                                setOptionsPostOpen(false);
+                                onRequestEdit(post);
+                              }}
+                              style={styles.dropdownItem}
+                            >
+                              <Text style={styles.optionText}>
+                                Sửa bài viết
+                              </Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => {
+                                setOptionsPostOpen(false);
+                                onRequestDelete(post.id);
+                              }}
+                              style={styles.dropdownItem}
+                            >
+                              <Text
+                                style={[
+                                  styles.optionText,
+                                  { color: colors.error },
+                                ]}
+                              >
+                                Xóa bài viết
+                              </Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+
               <ScrollView
-                style={styles.scrollFlex}
-                contentContainerStyle={{ paddingBottom: 24 }}
-                onScroll={() => setOptionsCommentId(null)}
-                scrollEventThrottle={16}
+                style={styles.scrollArea}
+                contentContainerStyle={{ padding: 16, paddingBottom: 150 }} // Thêm paddingBottom 150 để không bị khuất menu chức năng
                 keyboardShouldPersistTaps="handled"
+                onScroll={() => {
+                  if (optionsPostOpen) setOptionsPostOpen(false);
+                  if (optionsCommentId) setOptionsCommentId(null);
+                }}
               >
-                <View style={styles.commentsSection}>
-                  {comments.length === 0 ? (
-                    <Text style={styles.emptyText}>
-                      Chưa có bình luận nào. Hãy là người đầu tiên!
+                {/* Description */}
+                {post.description ? (
+                  <Text style={styles.postDescriptionText}>
+                    {post.description}
+                  </Text>
+                ) : null}
+
+                {/* React & Comment Count Bar */}
+                <View style={styles.statsBar}>
+                  <Pressable
+                    style={styles.statBtn}
+                    onPress={() => onToggleReaction(post.id)}
+                  >
+                    <SymbolView
+                      name={{
+                        ios: isFavorited ? "heart.fill" : "heart",
+                        android: isFavorited ? "favorite" : "favorite_border",
+                        web: isFavorited ? "favorite" : "favorite_border",
+                      }}
+                      size={20}
+                      tintColor={isFavorited ? "#EF4444" : colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.statText,
+                        isFavorited && { color: "#EF4444", fontWeight: "600" },
+                      ]}
+                    >
+                      {post.favoriteCount}
                     </Text>
-                  ) : (
-                    comments.map((comment, index) => {
+                  </Pressable>
+                  <View style={styles.statBtn}>
+                    <SymbolView
+                      name={{
+                        ios: "bubble.right.fill",
+                        android: "comment",
+                        web: "comment",
+                      }}
+                      size={20}
+                      tintColor={colors.textSecondary}
+                    />
+                    <Text style={styles.statText}>{post.commentCount}</Text>
+                  </View>
+                </View>
+
+                {/* Comment List */}
+                {loading ? (
+                  <ActivityIndicator
+                    style={{ marginTop: 40 }}
+                    size="large"
+                    color={colors.primary}
+                  />
+                ) : error ? (
+                  <Text style={styles.errorText}>{error}</Text>
+                ) : comments.length === 0 ? (
+                  <Text style={styles.emptyText}>
+                    Chưa có bình luận nào. Hãy là người đầu tiên!
+                  </Text>
+                ) : (
+                  <View style={{ gap: 16, marginTop: 16 }}>
+                    {comments.map((comment, index) => {
                       const isTreeOpen =
                         optionsCommentId === comment.id ||
                         comment.replies?.some((r) => r.id === optionsCommentId);
@@ -326,79 +499,82 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
                             optionsCommentId={optionsCommentId}
                             setOptionsCommentId={setOptionsCommentId}
                             onEdit={handleEditComment}
-                            onDelete={handleDeleteComment}
+                            onDelete={(id) => setDeleteConfirmCommentId(id)}
                             onReply={handleReplyComment}
                           />
                         </View>
                       );
-                    })
-                  )}
-                </View>
+                    })}
+                  </View>
+                )}
               </ScrollView>
-            )}
 
-            {(replyingTo || editingComment) && (
-              <View style={styles.bannerBar}>
-                <Text style={styles.bannerText}>
-                  {editingComment
-                    ? "Đang sửa bình luận"
-                    : `Đang phản hồi ${replyingTo?.authorName}`}
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    setReplyingTo(null);
-                    setEditingComment(null);
-                    setInputText("");
-                  }}
-                >
-                  <SymbolView
-                    name={{
-                      ios: "xmark.circle.fill",
-                      android: "cancel",
-                      web: "cancel",
+              {/* Input section (Giữ nguyên logic cũ) */}
+              {(replyingTo || editingComment) && (
+                <View style={styles.bannerBar}>
+                  <Text style={styles.bannerText}>
+                    {editingComment
+                      ? "Đang sửa bình luận"
+                      : `Đang phản hồi ${replyingTo?.authorName}`}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setReplyingTo(null);
+                      setEditingComment(null);
+                      setInputText("");
                     }}
-                    size={18}
-                    tintColor={colors.textSecondary}
-                  />
+                  >
+                    <SymbolView
+                      name={{
+                        ios: "xmark.circle.fill",
+                        android: "cancel",
+                        web: "cancel",
+                      }}
+                      size={18}
+                      tintColor={colors.textSecondary}
+                    />
+                  </Pressable>
+                </View>
+              )}
+              <View style={styles.inputBar}>
+                <TextInput
+                  ref={textInputRef}
+                  style={styles.input}
+                  placeholder="Viết bình luận..."
+                  value={inputText}
+                  onChangeText={setInputText}
+                  multiline
+                  editable={!sending}
+                />
+                <Pressable
+                  onPress={handleSubmitComment}
+                  disabled={sending || !inputText.trim()}
+                  style={[
+                    styles.sendBtn,
+                    (!inputText.trim() || sending) && styles.sendBtnDisabled,
+                  ]}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <SymbolView
+                      name={{
+                        ios: "paperplane.fill",
+                        android: "send",
+                        web: "send",
+                      }}
+                      size={16}
+                      tintColor="#FFF"
+                    />
+                  )}
                 </Pressable>
               </View>
-            )}
-            <View style={styles.inputBar}>
-              <TextInput
-                ref={textInputRef}
-                style={styles.input}
-                placeholder="Viết bình luận..."
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-                editable={!sending}
-              />
-              <Pressable
-                onPress={handleSubmitComment}
-                disabled={sending || !inputText.trim()}
-                style={[
-                  styles.sendBtn,
-                  (!inputText.trim() || sending) && styles.sendBtnDisabled,
-                ]}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <SymbolView
-                    name={{
-                      ios: "paperplane.fill",
-                      android: "send",
-                      web: "send",
-                    }}
-                    size={16}
-                    tintColor="#FFF"
-                  />
-                )}
-              </Pressable>
             </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
+
+      {/* Modal xác nhận xóa Comment */}
       <Modal
         visible={!!deleteConfirmCommentId}
         transparent
@@ -428,13 +604,16 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
               <Pressable
                 style={[styles.popupBtn, { backgroundColor: colors.error }]}
                 onPress={async () => {
-                  if (deleteConfirmCommentId) {
+                  if (deleteConfirmCommentId && post?.id) {
                     await communityService.deleteComment(
                       deleteConfirmCommentId,
                     );
                     setComments((prev) =>
                       removeCommentFromTree(prev, deleteConfirmCommentId),
                     );
+
+                    onCommentCountChange(post.id, -1); // <--- THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ
+
                     setDeleteConfirmCommentId(null);
                   }
                 }}
@@ -454,43 +633,137 @@ export function CommentModal({ postId, onClose }: CommentModalProps) {
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.5)" },
-  sheetContainer: {
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)", // Nền tối ngoài cùng
+  },
+  contentWrapper: {
+    flex: 1,
     width: "100%",
-    maxWidth: 800,
+    maxWidth: 1200,
     alignSelf: "center",
-    backgroundColor: "#FFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  },
+  leftMediaSection: {
+    flex: 1.5,
+    backgroundColor: "#000",
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mobileMediaSection: {
+    flex: 1, // Trên mobile chia đôi hoặc lấy 1 phần
+    minHeight: 300,
+  },
+  globalCloseBtn: {
     position: "absolute",
-    bottom: 0,
+    top: Platform.OS === "ios" ? 50 : 20,
+    left: 20,
+    zIndex: 9999, // Đảm bảo luôn nằm trên cùng mọi thành phần
+    padding: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 24,
+  },
+  imageViewer: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mainImage: {
+    width: "100%",
+    height: "100%",
+  },
+  navArrow: {
+    position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -20 }],
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  rightDetailSection: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: Platform.OS !== "web" ? 16 : 0,
+    borderTopRightRadius: Platform.OS !== "web" ? 16 : 0,
     overflow: "hidden",
   },
-  dragHeaderArea: {
-    paddingTop: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  rightHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#FFF",
   },
-  dragIndicator: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "#D1D5DB",
-    alignSelf: "center",
-    marginBottom: 6,
-  },
-  header: {
+  authorInfoRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingBottom: 12,
-    position: "relative",
+    gap: 10,
   },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: colors.textPrimary },
-  closeBtn: { position: "absolute", right: 16, bottom: 8, padding: 4 },
-  scrollFlex: { flex: 1 },
-  commentsSection: { padding: 16, gap: 16 },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  avatarText: { color: colors.primary, fontWeight: "700", fontSize: 16 },
+  avatarImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  authorNameText: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  dateText: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+
+  dropdownBackdrop: {
+    position: "absolute",
+    top: -1000,
+    bottom: -1000,
+    left: -1000,
+    right: -1000,
+    backgroundColor: "transparent",
+    zIndex: 999,
+  },
+  postDropdownMenu: {
+    position: "absolute",
+    top: 40,
+    right: 0,
+    minWidth: 160,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8 },
+  optionText: { fontSize: 14, fontWeight: "500", color: colors.textPrimary },
+
+  scrollArea: { flex: 1 },
+  postDescriptionText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#1F2937",
+    marginBottom: 16,
+  },
+  statsBar: {
+    flexDirection: "row",
+    gap: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  statBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
+  statText: { fontSize: 14, color: colors.textSecondary, fontWeight: "500" },
+
   bannerBar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -503,7 +776,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     padding: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#FFF",
     paddingBottom: Platform.OS === "ios" ? 24 : 12,
@@ -533,6 +806,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   errorText: { textAlign: "center", color: colors.error, marginTop: 20 },
+
   popupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

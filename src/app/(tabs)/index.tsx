@@ -46,7 +46,7 @@ const ExpandableDescription = ({ text }: { text: string }) => {
 
 export default function CommunityScreen() {
   const { isAuthenticated, account } = useAuthStore();
-  const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  const [detailPostId, setDetailPostId] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<PostResponse[]>([]);
   const [adPost, setAdPost] = useState<any | null>(null);
@@ -66,6 +66,14 @@ export default function CommunityScreen() {
     null,
   );
 
+  const detailPost = useMemo(() => {
+    if (!detailPostId) return null;
+    // Tìm post từ danh sách posts đang hiển thị, hoặc từ adPost để luôn có data mới nhất
+    return (
+      posts.find((p) => p.id === detailPostId) ||
+      (adPost?.id === detailPostId ? adPost : null)
+    );
+  }, [detailPostId, posts, adPost]);
   const fetchAdPost = async () => {
     try {
       const data = await communityService.getAdFeed();
@@ -373,7 +381,7 @@ export default function CommunityScreen() {
         <View style={[styles.cardHeader, isOpenMenu && { zIndex: 9999 }]}>
           <Pressable
             style={styles.authorInfo}
-            onPress={() => setCommentPostId(item.id)}
+            onPress={() => setDetailPostId(item.id)}
           >
             <View style={[styles.avatarPlaceholder, { overflow: "hidden" }]}>
               {item.authorAvatar ? (
@@ -511,7 +519,7 @@ export default function CommunityScreen() {
           </View>
         </View>
 
-        <Pressable onPress={() => setCommentPostId(item.id)}>
+        <Pressable onPress={() => setDetailPostId(item.id)}>
           <ExpandableDescription text={item.description || ""} />
         </Pressable>
 
@@ -542,7 +550,7 @@ export default function CommunityScreen() {
           </Pressable>
           <Pressable
             style={styles.actionBtn}
-            onPress={() => setCommentPostId(item.id)}
+            onPress={() => setDetailPostId(item.id)}
           >
             <SymbolView
               name={{
@@ -596,8 +604,28 @@ export default function CommunityScreen() {
       )}
 
       <CommentModal
-        postId={commentPostId}
-        onClose={() => setCommentPostId(null)}
+        post={detailPost as any}
+        onClose={() => setDetailPostId(null)}
+        onToggleReaction={handleToggleReaction}
+        onToggleBookmark={handleToggleBookmark}
+        onRequestEdit={(post) => {
+          setDetailPostId(null);
+          setEditingPost(post);
+        }}
+        onRequestDelete={(postId) => {
+          setDetailPostId(null);
+          setDeleteConfirmPostId(postId);
+        }}
+        onCommentCountChange={(postId, delta) => {
+          // Đồng bộ đếm số bình luận ra ngoài feed
+          setPosts((prev) =>
+            prev.map((p) =>
+              p.id === postId
+                ? { ...p, commentCount: Math.max(0, p.commentCount + delta) }
+                : p,
+            ),
+          );
+        }}
       />
 
       <Modal visible={!!deleteConfirmPostId} transparent animationType="fade">

@@ -5,6 +5,7 @@ import { tokenStorage, type AuthSession } from "@/utils/storage";
 import { apiErrorMessage, apiFeedbackPolicy, apiSuccessMessage, readableApiMessage } from '@/utils/api-feedback';
 import { toast } from '@/store/toast.store';
 export type ApiRequestOptions = RequestInit & { feedback?: false | { success?: string | false; error?: boolean } };
+
 export class ApiError extends Error {
   constructor(
     message: string,
