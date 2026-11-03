@@ -2,7 +2,7 @@
 
 - Partner footer Cộng đồng now routes to `/(company)/company-community`, reusing `(tabs)/index.tsx` exactly as the student community route does. Importing the screen does not mount the student layout or redirect partner accounts.
 - Navigation order is now Cộng đồng, Nhắn tin, Tuyển dụng, Thông báo, Hồ sơ. Advertising moved to Partner Settings; Overview remains reachable through the brand link. At widths >=1024px, the header shows community/messages/recruitment plus the existing bell/profile actions; smaller widths use the five-tab footer with Student-matching dimensions. `CompanyTabBar` accepts `placement="header"` for horizontal icon/text styling. Resize preserves the route. Tab selection is exposed through `aria-selected` on web and `accessibilityState` on native. See `partner-navigation.md` for the latest regression checks.
-- `/(company)/applicants` remains available from job and dashboard applicant actions; no applicant logic changed.
+- Applicant actions from jobs and dashboard now open `/(company)/job-detail`; the standalone applicants route was removed during applicant consolidation.
 - Regression: `node tests/partner-community-browser-check.cjs` against Expo web at `http://localhost:8081`. Uses isolated partner login/API fixtures; verifies feed, comments, selected tab, reload, recruitment navigation, tab order, exclusive header/footer visibility, navigation positioning, and screenshots at 320/390/768/1023/1024/1440px. Failed before both the feed and responsive navigation changes; passed afterward.
 - TypeScript verification: `npx tsc --noEmit`. No backend changes or new dependencies.
 

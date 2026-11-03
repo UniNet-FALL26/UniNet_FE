@@ -11,7 +11,11 @@ test('notification targets accept local business screens only', () => {
   assert.equal(output.safeNotificationTarget(ownAssessment), ownAssessment);
   assert.equal(output.safeNotificationTarget('/assessor/projects'), null);
   assert.equal(output.safeNotificationTarget('/assessor-assessments/not-a-guid'), null);
-  for (const path of ['/settings?account=1', '/(company)/profile', '/(company)/verification', '/(company)/applicants?jobId=abc', '/group/00000000-0000-4000-8000-000000000001', '/workspace/00000000-0000-4000-8000-000000000001']) assert.equal(output.safeNotificationTarget(path), path);
+  for (const path of ['/settings?account=1', '/(company)/profile', '/(company)/verification', '/(company)/job-detail?jobId=abc', '/group/00000000-0000-4000-8000-000000000001', '/workspace/00000000-0000-4000-8000-000000000001']) assert.equal(output.safeNotificationTarget(path), path);
+  assert.equal(output.safeNotificationTarget('/(company)/applicants?jobId=abc'), '/(company)/job-detail?jobId=abc');
+  assert.equal(output.safeNotificationTarget('/applicants?jobId=abc&applicationId=one'), '/(company)/job-detail?jobId=abc&applicationId=one');
+  assert.equal(output.safeNotificationTarget('/applicants'), '/(company)/jobs');
+  assert.equal(output.safeNotificationTarget('/applicants?jobId=abc&redirect=evil'), null);
   for (const path of ['https://evil.test', '//evil.test', '/\\evil.test', 'javascript:alert(1)', '/settings?redirect=https://evil.test', '/settings#https://evil.test', '/%2f%2fevil.test', '/settings%0a', '/login', '/unknown']) assert.equal(output.safeNotificationTarget(path), null, path);
 });
 
