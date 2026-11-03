@@ -1,3 +1,4 @@
+import { desktopHeaderStyles } from '@/components/ui/desktop-header.styles';
 import { accountHome } from '@/utils/role-navigation';
 import { Redirect, Slot, router, type Href } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,7 +33,7 @@ export default function CompanyLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { marginHorizontal: 16, marginTop: 14, marginBottom: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#E0EDFD', borderRadius: 18, zIndex: 2, boxShadow: '0 5px 22px rgba(39, 110, 190, 0.07)', experimental_backgroundImage: 'linear-gradient(115deg, #F0F7FF 0%, #FFFFFF 22%, #FFFFFF 80%, #F0F7FF 100%)' },
+  header: desktopHeaderStyles.frame,
   headerInner: { width: '100%', maxWidth: 1600, alignSelf: 'center', minHeight: 68, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 },
   compactHeader: { paddingHorizontal: 16, gap: 16 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flexShrink: 0 },

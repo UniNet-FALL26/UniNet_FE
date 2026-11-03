@@ -1,3 +1,4 @@
+import { desktopHeaderStyles } from '@/components/ui/desktop-header.styles';
 import { Slot, router, usePathname, type Href } from 'expo-router';
 import { useState } from 'react';
 import { SymbolView } from 'expo-symbols';
@@ -45,7 +46,7 @@ export function AssessorShell() {
 }
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background }, content: { flex: 1, minHeight: 0 },
-  header: { marginHorizontal: 16, marginTop: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E0EDFD', borderRadius: 18, backgroundColor: colors.surface, zIndex: 2, boxShadow: '0 5px 22px rgba(39,110,190,0.07)', experimental_backgroundImage: 'linear-gradient(115deg, #F0F7FF 0%, #FFFFFF 22%, #FFFFFF 80%, #F0F7FF 100%)' },
+  header: desktopHeaderStyles.frame,
   headerInner: { minHeight: 68, maxWidth: 1600, width: '100%', alignSelf: 'center', paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 }, compactHeader: { paddingHorizontal: 16, gap: 16 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flexShrink: 0 }, logo: { width: 30, height: 34 }, brandName: { fontSize: 23, fontWeight: '800', color: colors.navy, letterSpacing: -0.8 },
   nav: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' }, mainNav: { flex: 1, paddingLeft: 24, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 }, headerTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, minHeight: 44, borderRadius: 11 }, compactLink: { paddingHorizontal: 6, gap: 4 }, compactLabel: { fontSize: 11 },

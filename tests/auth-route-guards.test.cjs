@@ -24,6 +24,7 @@ function renderLayout(group, state) {
     if (name === '@/constants/colors') return { colors: {} };
     if (name === '@/components/company/company-ui') return { CompanyTabBar: 'CompanyTabBar' };
     if (name === '@/components/ui/Loading') return { Loading: 'Loading' };
+    if (name === '@/components/ui/desktop-header.styles') return { desktopHeaderStyles: { frame: {} } };
     if (name === '@/components/app-tabs') return { __esModule: true, default: 'AppTabs' };
     throw new Error(`Unexpected dependency: ${name}`);
   } });
