@@ -1,6 +1,6 @@
 # Recruitment and application icons
 
-Use `src/constants/job-application-icons.ts` as the shared icon map for partner job management and student opportunity/application screens. Keep the meaning consistent wherever the same information appears:
+Use `src/constants/job-applicant-icons.ts` as the shared icon map for partner job management and student opportunity/application screens. Keep the meaning consistent wherever the same information appears:
 
 - Job and work mode: briefcase and building.
 - Employment type: clock.

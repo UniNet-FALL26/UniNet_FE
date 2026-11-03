@@ -147,7 +147,7 @@ export const companyService = {
   },
 };
 
-export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đã đăng', 2: 'Đã đóng', 3: 'Hết hạn' };
+export const companyJobStatusLabel: Record<CompanyJobStatus, string> = { 0: 'Bản nháp', 1: 'Đang tuyển', 2: 'Đã đóng', 3: 'Hết hạn' };
 export const companyJobApplicationStatusLabel: Record<CompanyJobApplicationStatus, string> = { 0: 'Chờ xem', 1: 'Đã xem', 2: 'Phỏng vấn', 3: 'Đã nhận', 4: 'Từ chối' };
 export const companyJobWorkTypeLabel: Record<CompanyJobWorkType, string> = { 0: 'Tại văn phòng', 1: 'Kết hợp', 2: 'Từ xa' };
 export const companyJobEmploymentTypeLabel: Record<CompanyJobEmploymentType, string> = { 0: 'Toàn thời gian', 1: 'Bán thời gian' };
@@ -161,5 +161,5 @@ export function formatCompanySalary(min: number | null, max: number | null): str
     : new Intl.NumberFormat('vi-VN').format(value);
   if (min == null && max == null) return 'Thỏa thuận';
   if (min != null && max != null) return `${format(min)}–${format(max)} VND/tháng`;
-  return `${format(min ?? max!)} VND/tháng`;
+  return min != null ? `Từ ${format(min)} VND/tháng` : `Tới ${format(max!)} VND/tháng`;
 }

@@ -1,13 +1,13 @@
+import { ActionButton, Card, CompanyIcon, CompanyPage, PageTitle, Tag, companyColors as c, type CompanyIconName } from '@/components/company/company-ui';
+import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
+import { jobApplicationIcons as jobIcons } from '@/constants/job-applicant-icons';
+import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
+import { companyJobApplicationStatusLabel, companyJobEmploymentTypeLabel, companyJobStatusLabel, companyJobWorkTypeLabel, companyService, formatCompanyDate, formatCompanySalary, type CompanyApplicant, type CompanyJob, type CompanyJobApplicationStatus } from '@/services/company.service';
+import type { PortfolioResponse } from '@/types/portfolio';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ActionButton, Card, CompanyIcon, CompanyPage, companyColors as c, PageTitle, Tag, type CompanyIconName } from '@/components/company/company-ui';
-import { companyService, companyJobApplicationStatusLabel, companyJobEmploymentTypeLabel, companyJobStatusLabel, companyJobWorkTypeLabel, formatCompanyDate, formatCompanySalary, type CompanyApplicant, type CompanyJob, type CompanyJobApplicationStatus } from '@/services/company.service';
-import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
-import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
-import type { PortfolioResponse } from '@/types/portfolio';
-import { jobApplicationIcons as jobIcons } from '@/constants/job-application-icons';
 
 const statusTone = { 0: 'purple', 1: 'amber', 2: 'purple', 3: 'green', 4: 'rose' } as const;
 const applicantStatuses: CompanyJobApplicationStatus[] = [0, 1, 2, 3, 4];

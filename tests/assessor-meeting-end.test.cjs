@@ -18,6 +18,7 @@ function render(start, end, status = 0) {
     'react/jsx-runtime': { jsx: element, jsxs: element },
     'expo-router': { useLocalSearchParams: () => ({ id: 'assignment' }), useFocusEffect: () => {} },
     'react-native': { useWindowDimensions: () => ({ width: 1000 }) },
+    '@/components/assessor/AssignmentDetailContent': { detailTabs: () => [{ key: 'schedule' }, { key: 'info' }] },
     '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'user' } }) },
     '@/components/assessor/assessor-ui': { assessorStyles: {}, assessorDate: () => '' },
     '@/services/assessor.service': { assessorService: { meetingAction: async (...args) => { calls.push(args); } } },
