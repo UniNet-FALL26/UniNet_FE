@@ -9,7 +9,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 function load(file, imports = {}) {
   const exports = {};
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  vm.runInNewContext(source, { exports, AbortController, setTimeout, clearTimeout, require: name => name in imports ? imports[name] : name === '@/utils/verification-date' ? load('src/utils/verification-date.ts') : require(name) });
+  vm.runInNewContext(source, { exports, AbortController, setTimeout, clearTimeout, require: name => name in imports ? imports[name] : name === '@/components/projects/ProjectOverview' ? load('src/components/projects/ProjectOverview.tsx', { 'react-native': require('react-native-web'), 'expo-symbols': { SymbolView: () => null }, '@/types/project': load('src/types/project.ts'), '@/constants/colors': { colors: { primary: '#1769E0', navy: '#10284B' } } }) : name === '@/utils/verification-date' ? load('src/utils/verification-date.ts') : require(name) });
   return exports;
 }
 const helpers = load('src/utils/project-verification.ts');
@@ -113,7 +113,7 @@ function renderScreen({ creator = true, level1Only = false, tab, reviewData = re
     '@/hooks/useProjectVerification': { useProjectVerification: () => ({ level1: { ...block(reviewData), error }, level2: block(null), cycle: block({ status: 2 }), refresh() {}, retry() {} }) },
     '@/components/ui/Button': { Button: props => React.createElement('button', { disabled: props.disabled }, props.title) },
   });
-  const project = { id: 'project', title: 'Dự án hoàn thành', projectField: 'Giáo dục', description: 'Mô tả', isCreator: creator, isMember: !creator, skills: [], creator: { id: 'owner', fullName: 'Chủ dự án' }, members: [] };
+  const project = { status: 2, visibility: 1, currentMemberCount: 0, memberTarget: 3, roleRequirements: [], id: 'project', title: 'Dự án hoàn thành', projectField: 'Giáo dục', description: 'Mô tả', isCreator: creator, isMember: !creator, skills: [], creator: { id: 'owner', fullName: 'Chủ dự án' }, members: [] };
   return renderToStaticMarkup(React.createElement(screen.CompletedDetailView, { project, level1Only, initialTab: tab }));
 }
 test('S01 separates completion from verification and retains overview when verification fails', () => {

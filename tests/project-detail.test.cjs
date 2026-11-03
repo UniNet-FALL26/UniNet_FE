@@ -33,6 +33,17 @@ function harness(project, operations = {}) {
     if (name === '@/components/ui/Button') return { Button: props => { buttons.push(props); return React.createElement('button', { disabled: props.disabled || props.loading }, props.title); } };
     if (name === '@/components/ui/Input') return { Input: () => React.createElement('input') };
     if (name === '@/components/ui/Loading') return { Loading: () => React.createElement('span', null, 'Loading') };
+    if (name === '@/components/projects/ProjectOverview') {
+      const overview = {};
+      vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/components/projects/ProjectOverview.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, { exports: overview, require: dependency => {
+        if (dependency === 'react-native') return native;
+        if (dependency === 'expo-symbols') return { SymbolView: () => null };
+        if (dependency === '@/types/project') return types;
+        if (dependency === '@/constants/colors') return { colors: { navy: '#000', primary: '#123', textSecondary: '#555' } };
+        return require(dependency);
+      } });
+      return overview;
+    }
     if (name === '@/components/projects/ProjectEditForm') return { ProjectEditForm: () => React.createElement('div', null, 'Edit form') };
     if (name === '@/components/projects/CompletedDetailView') return { CompletedDetailView: () => React.createElement('div', null, 'Completed detail screen') };
     if (name === '@/components/projects/RecommendedMemberCard') return { RecommendedMemberCard: () => React.createElement('div', null, 'Recommendation') };
