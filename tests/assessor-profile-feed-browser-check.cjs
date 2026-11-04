@@ -33,7 +33,7 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email); await page.getByRole('textbox', { name: 'Mật khẩu', exact: true }).fill('fixture-password');
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(/assessor-community/);
     await page.goto(origin + '/assessor-profile'); await page.getByTestId('assessor-posts-empty').waitFor();
-    assert.equal(await page.getByTestId('assessor-profile-hero').getByRole('tab').count(), 5); assert.equal(await page.getByRole('tab', { name: 'Bài viết', exact: true }).getAttribute('aria-selected'), 'true');
+    assert.equal(await page.getByTestId('assessor-profile-hero').getByRole('tab').count(), 0);
     fs.mkdirSync('dist/assessor-profile-feed', { recursive: true });
     for (const width of [1920, 1440, 1200, 1024, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 1100 }); await page.getByTestId('assessor-profile-content').scrollIntoViewIfNeeded();
@@ -47,10 +47,7 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
     await first.getByRole('button', { name: 'Thích bài viết', exact: true }).click(); await first.getByText('9 lượt thích', { exact: true }).waitFor(); assert.equal(likes, 1);
     await first.getByRole('button', { name: 'Lưu bài viết', exact: true }).click(); await first.getByText('Đã lưu', { exact: true }).waitFor(); assert.equal(saves, 1);
     await page.getByRole('button', { name: 'Xem thêm bài viết', exact: true }).click(); await page.getByTestId('assessor-post-next').waitFor(); assert.equal(await page.getByTestId('assessor-post-0').count(), 1); assert.ok(pages.includes(2));
-    for (const [label, section] of [['Giới thiệu', 'bio'], ['Công việc & chuyên môn', 'work'], ['Học vấn', 'education'], ['Liên kết', 'links']]) {
-      await page.getByRole('tab', { name: label, exact: true }).click(); await page.getByTestId('assessor-card-' + section).waitFor(); assert.equal(await page.getByTestId('assessor-profile-posts').count(), 0);
-    }
-    await page.getByRole('tab', { name: 'Bài viết', exact: true }).click(); await first.waitFor(); await page.setViewportSize({ width: 1920, height: 1100 }); await page.getByTestId('assessor-profile-hero').scrollIntoViewIfNeeded(); await page.screenshot({ path: 'dist/assessor-profile-feed/posts-desktop.png' });
+    await first.waitFor(); await page.setViewportSize({ width: 1920, height: 1100 }); await page.getByTestId('assessor-profile-hero').scrollIntoViewIfNeeded(); await page.screenshot({ path: 'dist/assessor-profile-feed/posts-desktop.png' });
     const openCard = async (section, title, fields) => {
       await page.getByTestId('assessor-summary-' + section).getByRole('button', { name: 'Chỉnh sửa ' + title, exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Chỉnh sửa ' + title, exact: true }); await dialog.waitFor();
@@ -58,7 +55,10 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
       return dialog;
     };
     const save = async dialog => { await dialog.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click(); await dialog.waitFor({ state: 'hidden' }); };
-    let dialog = await openCard('bio', 'Giới thiệu', ['Giới thiệu bản thân', 'Chức danh nghề nghiệp', 'Công ty đang làm việc', 'Trường đại học đã theo học', 'Địa chỉ']);
+    const intro = page.getByTestId('assessor-summary-bio');
+    await intro.getByText('Đang làm việc tại', { exact: true }).waitFor();
+    assert.equal(await intro.getByText('Đơn vị / trường', { exact: true }).count(), 0);
+    let dialog = await openCard('bio', 'Giới thiệu', ['Giới thiệu bản thân', 'Chức danh nghề nghiệp', 'Công ty đang làm việc', 'Địa chỉ']);
     await dialog.getByRole('textbox', { name: 'Chức danh nghề nghiệp', exact: true }).fill('Senior Assessor');
     await dialog.getByRole('textbox', { name: 'Địa chỉ', exact: true }).fill('Hà Nội');
     profile.phone = '0988888888'; await save(dialog);
@@ -68,13 +68,15 @@ const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://localhost:8081';
     await dialog.getByRole('textbox').fill('Cloud, Backend'); await save(dialog); assert.deepEqual(profile.assessorJson.expertise, ['Cloud', 'Backend']); assert.equal(profile.assessorJson.jobTitle, 'Senior Assessor');
     dialog = await openCard('contact', 'Liên hệ', ['Email liên hệ', 'Điện thoại']); await dialog.getByRole('textbox', { name: 'Điện thoại', exact: true }).fill('0912345678'); await save(dialog); assert.equal(profile.address, 'Hà Nội');
     dialog = await openCard('links', 'Liên kết', ['LinkedIn', 'GitHub', 'Website / Portfolio']); await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
-    dialog = await openCard('bio', 'Giới thiệu', ['Giới thiệu bản thân', 'Chức danh nghề nghiệp', 'Công ty đang làm việc', 'Trường đại học đã theo học', 'Địa chỉ']);
+    dialog = await openCard('bio', 'Giới thiệu', ['Giới thiệu bản thân', 'Chức danh nghề nghiệp', 'Công ty đang làm việc', 'Địa chỉ']);
     await dialog.getByRole('button', { name: 'Xóa thông tin Giới thiệu', exact: true }).click(); await dialog.getByRole('button', { name: 'Xác nhận xóa', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
-    assert.equal(profile.bio, null); assert.equal(profile.address, null); assert.equal(profile.assessorJson.jobTitle, null); assert.equal(profile.assessorJson.companyName, null); assert.equal(profile.assessorJson.university, null);
+    assert.equal(profile.bio, null); assert.equal(profile.address, null); assert.equal(profile.assessorJson.jobTitle, null); assert.equal(profile.assessorJson.companyName, null); assert.equal(profile.assessorJson.university, 'Đại học FPT');
+    assert.equal(await intro.getByText('Đang làm việc tại', { exact: true }).count(), 0);
+    assert.equal(await intro.getByText('Đại học FPT', { exact: true }).count(), 0, 'An attended university is not shown as a current workplace');
     assert.equal(profile.phone, '0912345678'); assert.equal(profile.assessorJson.education, 'Thạc sĩ'); assert.deepEqual(profile.assessorJson.expertise, ['Cloud', 'Backend']);
     for (const width of [1920, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
-      dialog = await openCard('bio', 'Giới thiệu', ['Giới thiệu bản thân', 'Chức danh nghề nghiệp', 'Công ty đang làm việc', 'Trường đại học đã theo học', 'Địa chỉ']);
+      dialog = await openCard('bio', 'Giới thiệu', ['Giới thiệu bản thân', 'Chức danh nghề nghiệp', 'Công ty đang làm việc', 'Địa chỉ']);
       await page.waitForFunction(() => { const dialog = document.querySelector('[role="dialog"]'); if (!dialog) return false; for (let el=dialog; el; el=el.parentElement) if (Number(getComputedStyle(el).opacity)<1) return false; return true; });
       const bounds = await dialog.boundingBox(); assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width); assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 901);
       await dialog.screenshot({ path: `dist/assessor-profile-feed/intro-editor-${width}.png` });

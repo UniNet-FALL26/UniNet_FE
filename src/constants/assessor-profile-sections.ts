@@ -13,7 +13,6 @@ export function assessorCardSection(section: AssessorProfileSection, summary = f
   if (section === 'bio') return { ...config, fields: [
     ...assessorProfileSections.bio.fields,
     ...assessorProfileSections.work.fields.filter(([key]) => key === 'jobTitle' || key === 'companyName'),
-    assessorProfileSections.education.fields[1],
     assessorProfileSections.contact.fields[2],
   ] };
   if (section === 'work') return { ...config, title: 'Kỹ năng chuyên môn', fields: [assessorProfileSections.work.fields[3]] };
