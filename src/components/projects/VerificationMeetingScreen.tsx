@@ -111,7 +111,7 @@ export function VerificationMeetingScreen() {
           )}
           {state.result && (
             <Button
-              title="Xem báo cáo cấp 2"
+              title="Xem báo cáo thẩm định"
               onPress={() =>
                 router.push({
                   pathname: "/group/verification-result/[id]",
