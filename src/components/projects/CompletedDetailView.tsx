@@ -75,7 +75,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
   const cta = level1Only
     ? { title: 'Xem minh chứng cần cập nhật', action: showEvidence }
     : !level2.loading && !level2.error && (level2.data || eligible)
-    ? { title: level2.data ? level2.data.verification.status === 0 ? 'Tiếp tục hồ sơ cấp 2' : 'Xem hồ sơ và kết quả cấp 2' : 'Chọn gói xác minh cấp 2', action: openLevel2 }
+    ? { title: level2.data ? level2.data.verification.status === 0 ? 'Tiếp tục hồ sơ thẩm định' : 'Xem hồ sơ và kết quả thẩm định' : 'Chọn gói thẩm định', action: openLevel2 }
     : { title: 'Xem kết quả cấp 1', action: openLevel1 };
   return <SafeAreaView style={s.safe}>
     <View style={s.header}>
@@ -104,7 +104,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
           <View style={s.divider} />
           <View style={s.step}><View style={s.stepNumber}><Text style={s.stepNumberText}>02</Text></View><View style={s.stepBody}>
           <Text style={s.label}>Xác minh chuyên viên</Text>
-          <Text style={s.small}>{level2.error ? 'Chưa tải được trạng thái cấp 2' : level2.loading && !level2.data ? 'Đang tải cấp 2…' : level2Label(level2.data, !!eligible)}</Text>
+          <Text style={s.small}>{level2.error ? 'Chưa tải được trạng thái thẩm định' : level2.loading && !level2.data ? 'Đang tải thẩm định…' : level2Label(level2.data, !!eligible)}</Text>
           {level2.error && <Text accessibilityRole="alert" style={s.warning}>{level2.error}</Text>}
           </View></View>
           {(level1.loading || level2.loading) && <Text style={s.small}>Đang làm mới trạng thái…</Text>}
@@ -141,11 +141,11 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
       {!level1Only && tab === 'Xác minh' && <Card title="Chi tiết xác minh">
         <Text style={s.body}>{project.isCreator ? nextMessage : privateMessage}</Text>
         {project.isCreator && <>
-          <Text style={s.label}>Cấp 2 · Xác minh chuyên viên</Text>
+          <Text style={s.label}>Thẩm định · Chuyên viên đánh giá</Text>
           <Text style={s.body}>{level2.error || (level2.loading && !level2.data ? 'Đang tải…' : level2Label(level2.data, !!eligible))}</Text>
           {level2.data?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(level2.data.verification.scheduledStartAt)} — {date(level2.data.verification.scheduledEndAt)} (giờ Việt Nam, UTC+7)</Text>}
-          {!level2.loading && !level2.error && (eligible || level2.data) && <Button title={level2.data ? 'Xem hồ sơ cấp 2' : 'Chọn gói cấp 2'} onPress={openLevel2} />}
-          <Text style={s.small}>Theo dõi lịch hẹn, thanh toán và kết luận chuyên viên trong hồ sơ cấp 2.</Text>
+          {!level2.loading && !level2.error && (eligible || level2.data) && <Button title={level2.data ? 'Xem hồ sơ thẩm định' : 'Chọn gói thẩm định'} onPress={openLevel2} />}
+          <Text style={s.small}>Theo dõi lịch hẹn, thanh toán và kết luận chuyên viên trong hồ sơ thẩm định.</Text>
         </>}
       </Card>}
     </ScrollView>

@@ -26,6 +26,6 @@ export function dossierSteps(detail: VerificationDetail) {
     { title: 'Xác nhận lịch và thanh toán', done: bookingConfirmed && paid && !review, statusText: paymentProgress },
     { title: 'Phân công chuyên viên', done: detail.assignments.some(a => [0, 1, 2].includes(a.status)) },
     { title: 'Buổi xác minh', done: !!detail.meetingEndAt },
-    { title: 'Kết luận cấp 2', done: final },
+    { title: 'Kết luận thẩm định', done: final },
   ];
 }

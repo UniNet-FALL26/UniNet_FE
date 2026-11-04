@@ -19,7 +19,7 @@ export const projectVerificationService = {
   },
   async result(verificationId: string, signal?: AbortSignal) {
     const value = await apiRequest<VerificationFinalResult>(`${base()}/verifications/${id(verificationId)}/result`, { signal });
-    if (!value || ![0, 1, 2, 3].includes(value.status) || !Array.isArray(value.reports)) throw new Error('Phản hồi kết quả cấp 2 không hợp lệ.');
+    if (!value || ![0, 1, 2, 3].includes(value.status) || !Array.isArray(value.reports)) throw new Error('Phản hồi kết quả thẩm định không hợp lệ.');
     return value;
   },
   packages(page = 1, signal?: AbortSignal) {
@@ -42,7 +42,7 @@ export const projectVerificationService = {
   },
   async list(projectId: string, pendingOnly = false, signal?: AbortSignal) {
     const result = await apiRequest<VerificationPage>(`${base()}/${id(projectId)}/verifications?page=1&pageSize=1${pendingOnly ? '&status=0' : ''}`, { signal });
-    if (!result || !Array.isArray(result.verifications) || !Number.isInteger(result.totalPages)) throw new Error('Phản hồi hồ sơ cấp 2 không hợp lệ.');
+    if (!result || !Array.isArray(result.verifications) || !Number.isInteger(result.totalPages)) throw new Error('Phản hồi hồ sơ thẩm định không hợp lệ.');
     return result;
   },
   async detail(verificationId: string, signal?: AbortSignal) {

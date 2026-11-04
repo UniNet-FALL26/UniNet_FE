@@ -302,7 +302,7 @@ test('screen renders countdown, join/rejoin, waiting report and results without 
   const ended = renderMeeting({ meeting: { ...metadata(), meetingEndAt: '2026-11-01T02:30:00Z' } });
   assert.match(ended, /Đang chờ chuyên gia nộp báo cáo/); assert.doesNotMatch(ended, /Chuẩn bị và tham gia|Tham gia lại/);
   const result = renderMeeting({ detail: { ...detail(), finalResult: { reports: [] } } });
-  assert.match(result, /Xem báo cáo cấp 2/); assert.doesNotMatch(result, /Chuẩn bị và tham gia|Tham gia lại/);
+  assert.match(result, /Xem báo cáo thẩm định/); assert.doesNotMatch(result, /Chuẩn bị và tham gia|Tham gia lại/);
   const recoverable = renderMeeting({ error: 'Popup đã bị chặn' });
   assert.doesNotMatch(recoverable, /disabled=""/);
   assert.match(recoverable, /Đóng tab Jitsi hoặc rời phòng không kết thúc/);
