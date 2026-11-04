@@ -5,6 +5,9 @@ import { ProfileFramedImage } from '@/components/profile/ProfileFramedImage';
 import type { CompanyProfile } from '@/services/company.service';
 import { useState } from 'react';
 import { splitProfileImageUrl } from '@/utils/profile-image-crop';
+import { WebsiteBrandIcon, websitePlatformLabel } from './WebsiteBrandIcon';
+import { Linking } from 'react-native';
+import { toast } from '@/store/toast.store';
 
 type Props = {
   profile: CompanyProfile;
@@ -81,10 +84,16 @@ export function CompanyProfileHero({ profile, onViewCover, onEditCover, onViewAv
       {wide && editButton}
     </View>
     {!wide && <View style={s.mobileBottom}>{contactDetails}{!mobile && editButton}</View>}
+    {profile.websites.length > 0 && <View testID="company-profile-socials" style={s.socials}>{profile.websites.map((url, index) => <Pressable key={url + index} accessibilityRole="link" accessibilityLabel={'Mở ' + websitePlatformLabel(url)} onPress={() => {
+      const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      try { const parsed = new URL(href); if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error(); void Linking.openURL(parsed.toString()).catch(() => toast.error('Không mở được liên kết.')); } catch { toast.error('Liên kết không hợp lệ.'); }
+    }} style={({ pressed }) => [s.social, pressed && s.pressed]}><WebsiteBrandIcon url={url} size={19} /><Text style={s.socialName}>{websitePlatformLabel(url)}</Text></Pressable>)}</View>}
   </View>;
 }
 
 const s = StyleSheet.create({
+  socials: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-evenly', gap: 12, paddingHorizontal: 20, paddingBottom: 16 },
+  social: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 }, socialName: { color: c.ink, fontSize: 11, fontWeight: '700' },
   hero: { borderWidth: 1, borderColor: c.line, borderRadius: 16, backgroundColor: c.white, overflow: 'hidden' },
   mobileHero: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
   cover: { height: 240, backgroundColor: '#1769E0', overflow: 'hidden' },

@@ -70,8 +70,8 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
         assert.ok(Math.max(...boxes.map(box => box.y)) - Math.min(...boxes.map(box => box.y)) < 6, 'contact details share one row');
       }
       const about = page.getByTestId('company-about-card');
-      assert.equal(await about.getByRole('link').count(), 4);
-      await about.getByText('Facebook', { exact: true }).waitFor();
+      assert.equal(await hero.getByTestId('company-profile-socials').getByRole('link').count(), 4);
+      await hero.getByText('Facebook', { exact: true }).waitFor();
       if (width === 390 || width === 1440) {
         await about.screenshot({ path: `dist/partner-profile-hero/about-${width}.png` });
       }
@@ -103,9 +103,11 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
     }
     await page.getByText('Hủy', { exact: true }).click();
     await page.getByTestId('company-about-card').getByRole('button', { name: 'Chỉnh sửa phần giới thiệu', exact: true }).click();
-    await editDialog.getByRole('textbox', { name: 'Giới thiệu', exact: true }).waitFor();
-    assert.equal(await editDialog.locator('input').filter({ visible: true }).count(), 4);
-    await editDialog.getByRole('button', { name: 'Hủy', exact: true }).click();
+    const introDialog = page.getByRole('dialog', { name: 'Chỉnh sửa Giới thiệu', exact: true });
+    await introDialog.getByRole('textbox', { name: 'Nội dung giới thiệu', exact: true }).waitFor();
+    assert.equal(await introDialog.getByRole('textbox').count(), 1);
+    await introDialog.getByRole('button', { name: 'Chọn ảnh giới thiệu', exact: true }).waitFor();
+    await introDialog.getByRole('button', { name: 'Hủy', exact: true }).click();
     profile.coverUrl = origin + '/account-cover.png';
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
     await hero.getByRole('img', { name: 'Ảnh bìa đối tác', exact: true }).waitFor();
