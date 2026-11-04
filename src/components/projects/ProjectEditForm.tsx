@@ -30,7 +30,7 @@ function DateField({ label, value, disabled, onChange }: { label: string; value:
   return <View style={{ gap: 6 }}><Text style={styles.hint}>{label}</Text><Button title={valid ? date.toLocaleString("vi-VN") : "Chọn ngày và giờ"} variant="outline" disabled={disabled} onPress={choose} />{open && <DateTimePicker value={date} mode="datetime" disabled={disabled} onChange={(_, selected) => { if (selected) onChange(selected.toISOString()); }} />}</View>;
 }
 export function ProjectEditForm({ project, onClose, onSaved }: Props) {
-  const [values, setValues] = useState<UpdateProjectRequest>({ title: project.title, projectField: project.projectField, description: project.description, recruitmentDeadline: project.recruitmentDeadline, expectedOutput: project.expectedOutput ?? "" });
+  const [values, setValues] = useState<UpdateProjectRequest>({ title: project.title, projectField: project.projectField, description: project.description, recruitmentDeadline: project.recruitmentDeadline ?? "", expectedOutput: project.expectedOutput ?? "" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
