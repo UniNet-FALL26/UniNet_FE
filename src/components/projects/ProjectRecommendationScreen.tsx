@@ -130,7 +130,7 @@ export function ProjectRecommendationScreen() {
       <Text style={styles.subtitle}>
         {project?.title ?? "Dự án"} ·{" "}
         {project
-          ? Math.max(project.memberTarget - project.currentMemberCount, 0)
+          ? Math.max((project.memberTarget ?? 0) - project.currentMemberCount, 0)
           : 0}{" "}
         thành viên còn thiếu
       </Text>

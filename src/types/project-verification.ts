@@ -1,7 +1,8 @@
+export type ProjectEvidenceSnapshot = { content: string; documents: { id: string; uploadedFileId: string; fileUrl: string; publicId: string; resourceType: string; fileName: string; format: string; sizeBytes: number }[] };
 // These are the public evidence API enums, not ProjectModerationStatus.
 export enum EvidenceModerationStatus { Pending, Processing, Passed, Rejected, NeedsEvidence, Error }
 export type EvidenceCheck = {
-  projectTaskId: string; taskReportId: string; taskEvidenceId: string | null;
+  projectTaskId: string | null; taskReportId: string | null; projectEvidenceDocumentId?: string | null; taskEvidenceId: string | null;
   kind: string; url: string | null; status: number; reason: string;
   provider: string; checkedAt: string; errorCode: string | null; transient: boolean;
 };
@@ -9,7 +10,7 @@ export type EvidenceModeration = {
   id: string; projectId: string; version: number; status: EvidenceModerationStatus;
   isCurrent: boolean; createdAt: string; completedAt: string | null;
   summary: string | null; lastErrorCode: string | null;
-  source: { tasks: { projectTaskId: string; reports: { taskReportId: string; version: number; content: string; evidence: { taskEvidenceId: string; fileName: string | null }[] }[] }[] };
+  source: { projectEvidence?: ProjectEvidenceSnapshot | null; tasks: { projectTaskId: string; reports: { taskReportId: string; version: number; content: string; evidence: { taskEvidenceId: string; fileName: string | null; fileUrl?: string }[] }[] }[] };
   policy: { version: string | null };
   attempts: { number: number; transient: boolean; errorCode: string | null; results: EvidenceCheck[] }[];
 };
@@ -21,7 +22,7 @@ export type Verification = {
 };
 export type VerificationPage = { page: number; pageSize: number; totalPages: number; totalItems: number; verifications: Verification[] };
 export type VerificationDetail = {
-  project?: { id: string; title: string; status: number; leaderId: string };
+  project?: { id: string; title: string; status: number; leaderId: string | null };
   finalResult?: VerificationFinalResult | null;
   cancellationReason?: string | null; cancelledAt?: string | null;
   packageId?: string;

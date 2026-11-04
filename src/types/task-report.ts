@@ -10,6 +10,7 @@ export interface TaskEvidence {
 }
 
 export interface ImageUploadResponse {
+  fileId?: string;
   imageUrl: string;
   publicId: string;
   resourceType: string;

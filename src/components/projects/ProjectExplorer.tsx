@@ -6,9 +6,9 @@ import { projectService } from "@/services/project.service";
 import { skillService } from "@/services/skill.service";
 import { API_PROJECT_STATUS_LABEL, ApiProjectStatus, ApiRecruitmentStatus, type ProjectListItem } from "@/types/project";
 import { Image as DecorativeImage } from "expo-image";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
   Modal,
@@ -96,6 +96,7 @@ export function ProjectExplorerScreen() {
     : activeTab === "Dự án chờ duyệt" ? ApiProjectStatus.Pending
     : activeTab === "Dự án bị từ chối" ? ApiProjectStatus.Rejected : undefined;
   const personalTab = activeTab !== "Đang tuyển";
+  useFocusEffect(useCallback(() => { setRetry(value => value + 1); }, []));
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(null); setProjects([]);
@@ -461,7 +462,7 @@ export function ProjectExplorerScreen() {
               const memberCount = project.currentMemberCount;
 
               const progress =
-                project.memberTarget > 0
+                project.memberTarget != null && project.memberTarget > 0
                   ? Math.min(
                       memberCount / project.memberTarget,
                       1,
@@ -526,7 +527,7 @@ export function ProjectExplorerScreen() {
 
                     {/* MEMBER METADATA & PROGRESS */}
 
-                    <View style={styles.progressSection}>
+                    {project.origin !== 1 && project.memberTarget != null && <View style={styles.progressSection}>
                       <View style={styles.progressLabels}>
                         <Text style={styles.progressText}>
                           {memberCount}/{project.memberTarget}{" "}
@@ -534,7 +535,7 @@ export function ProjectExplorerScreen() {
                         </Text>
 
                         <Text style={styles.progressText}>
-                          Hạn: {formatDate(project.recruitmentDeadline)}
+                          Hạn: {project.recruitmentDeadline ? formatDate(project.recruitmentDeadline) : "Không áp dụng"}
                         </Text>
                       </View>
                       <View style={styles.progressTrack}>
@@ -550,9 +551,9 @@ export function ProjectExplorerScreen() {
                       </View>
 
 
-                    </View>
+                    </View>}
 
-                    <Text style={styles.fieldText}>{project.projectField}</Text>
+                    {project.origin === 1 && <Text style={styles.fieldText}>Dự án bên ngoài</Text>}<Text style={styles.fieldText}>{project.projectField}</Text>
                     <Text style={styles.descriptionText} numberOfLines={2} ellipsizeMode="tail">{project.description}</Text>
 
                     {/* TECHNOLOGIES */}

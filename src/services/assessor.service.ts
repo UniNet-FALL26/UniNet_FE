@@ -1,11 +1,17 @@
+import type { DraftData } from '@/types/external-project-draft';
+import type { ProjectLeader } from '@/types/project';
+import type { ProjectEvidenceSnapshot } from '@/types/project-verification';
 import { apiRequest } from '@/services/api';
 export interface AssessorAssignment { id: string; projectVerificationId: string; assignedToUserId: string; status: number; assignedAt: string; assignmentDueAt: string | null; reportDueAt: string | null; scheduledStartAt: string | null; scheduledEndAt: string | null; meetingStartAt: string | null; meetingEndAt: string | null; completedAt: string | null; replacementReason: string | null }
-export interface AssessorProject { imageUrl?: string | null; id: string; title: string; projectField: string; description: string; status: number; leaderId: string }
+export interface AssignmentUser { userId: string; fullName: string | null; avatarUrl: string | null; nickname: string | null }
+export interface AssignmentProjectMember extends AssignmentUser { role: string | null; status: number; joinedAt: string | null }
+export interface AssignmentProjectSkill { skillId: string; skillName: string; category: string | null; iconUrl: string | null; minLevel: number | null }
+export interface AssessorProject { imageUrl?: string | null; id: string; title: string; projectField: string; description: string; status: number; leaderId: string | null; skills?: AssignmentProjectSkill[]; members?: AssignmentProjectMember[]; leader?: ProjectLeader | null; origin?: number; ownerUserId?: string | null; externalDetails?: DraftData | null }
 export interface AssessmentRubric { code: string; version: string; passingScore: number; criteria: { code: string; name: string; weight: number }[]; conditions: { code: string; description: string }[] }
 export interface AssessmentInput { rubricVersion: string; scores: { code: string; score: number | null; reason: string; evidence: string | null }[]; conditions: { code: string; passed: boolean | null; reason: string }[] }
 export interface AssessmentResult extends Omit<AssessmentInput, 'rubricVersion'> { rubric: AssessmentRubric; totalScore: number | null; outcome: number }
 export interface AssessorReport { outcome?: number; assessment?: AssessmentResult | null; id: string; summary: string; findings: string | null; recommendations: string | null; submittedAt: string }
-export interface AssignmentDetail { assignment: AssessorAssignment; project: AssessorProject; evidenceModeration: { status: number; verdict?: string; reason?: string; summary?: string; source?: { tasks: { projectTaskId: string; reports: { taskReportId: string; content: string; evidence: { taskEvidenceId: string; fileUrl: string; fileName: string | null }[] }[] }[] } } | null; report: AssessorReport | null; assessmentRubric: AssessmentRubric | null }
+export interface AssignmentDetail { assignedToUser?: AssignmentUser | null; assignment: AssessorAssignment; project: AssessorProject; evidenceModeration: { status: number; verdict?: string; reason?: string; summary?: string; source?: { projectEvidence?: ProjectEvidenceSnapshot | null; tasks: { projectTaskId: string; reports: { taskReportId: string; content: string; evidence: { taskEvidenceId: string; fileUrl: string; fileName: string | null }[] }[] }[] } } | null; report: AssessorReport | null; assessmentRubric: AssessmentRubric | null }
 export interface AssignmentPage { page: number; pageSize: number; totalItems: number; totalPages: number; assignments: AssessorAssignment[] }
 export interface AssessorMeeting { assignmentId: string; scheduledStartAt: string | null; scheduledEndAt: string | null; meetingStartAt: string | null; meetingEndAt: string | null; joinUrl: string | null }
 export interface AvailabilitySlot { id: string; startAt: string; endAt: string }
