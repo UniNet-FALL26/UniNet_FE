@@ -1,3 +1,4 @@
+import { useDismissDetail } from '@/components/navigation/NavigationDismissContext';
 import { colors as appColors } from "@/constants/colors";
 import { router, usePathname } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -235,6 +236,7 @@ const tabs = [
 ] as const;
 
 export function CompanyTabBar({ placement = 'footer' }: { placement?: 'header' | 'footer' }) {
+  const dismissDetail = useDismissDetail();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -259,7 +261,7 @@ export function CompanyTabBar({ placement = 'footer' }: { placement?: 'header' |
             accessibilityLabel={tab.label}
             accessibilityState={{ selected: isActive }}
             aria-selected={isActive}
-            onPress={() => { if (notification) synchronize(); router.navigate(tab.route as never); }}
+            onPress={() => { dismissDetail?.(); if (notification) synchronize(); router.navigate(tab.route as never); }}
             style={({ pressed }) => [inHeader ? styles.headerTab : styles.tab, compactHeader && styles.compactHeaderTab, inHeader && isActive && styles.headerTabActive, pressed && styles.pressed]}
           >
             {inHeader ? icon : <View style={styles.tabIcon}>{icon}{notification && unreadCount > 0 && <View testID="company-footer-unread-badge" style={styles.tabBadge}><Text style={styles.tabBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}</View>}

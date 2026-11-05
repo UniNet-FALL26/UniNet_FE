@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { openEvidence } from '@/components/assessor/AssignmentDetailContent';
 import { toast } from '@/store/toast.store';
 import { ProjectOverview } from '@/components/projects/ProjectOverview';
@@ -78,10 +79,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
     ? { title: level2.data ? level2.data.verification.status === 0 ? 'Tiếp tục hồ sơ thẩm định' : 'Xem hồ sơ và kết quả thẩm định' : 'Chọn gói thẩm định', action: openLevel2 }
     : { title: 'Xem kết quả cấp 1', action: openLevel1 };
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" style={s.back} onPress={() => level1Only ? router.back() : router.dismissTo('/(tabs)/groups' as never)}><Text style={s.backText}>‹</Text></Pressable>
-      <Text style={s.headerTitle}>{level1Only ? 'Kết quả kiểm tra cấp 1' : 'Dự án đã hoàn thành'}</Text>
-    </View>
+    <DetailNavigation title={level1Only ? 'Kết quả kiểm tra cấp 1' : 'Dự án đã hoàn thành'} onBack={() => level1Only ? router.back() : router.dismissTo('/(tabs)/groups' as never)} />
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}>
 

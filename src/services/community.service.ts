@@ -84,6 +84,7 @@ export interface AdCampaignFeedItem {
 // ==========================================
 
 export const communityService = {
+  getAuthorPosts: (profileId: string, page = 1, pageSize = 10, signal?: AbortSignal): Promise<PostResponse[]> => apiRequest<PostResponse[]>(`/community/posts?authorUserId=${encodeURIComponent(profileId)}&page=${page}&pageSize=${pageSize}`, { signal, feedback: false }),
   getOwnPosts: (page = 1, pageSize = 10, signal?: AbortSignal): Promise<PostResponse[]> => apiRequest<PostResponse[]>(`/community/posts/mine?page=${page}&pageSize=${pageSize}`, { signal, feedback: false }),
   /**
    * Lấy danh sách bài đăng Community Feed (có phân trang)

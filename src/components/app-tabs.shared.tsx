@@ -1,3 +1,6 @@
+import { useDismissDetail } from '@/components/navigation/NavigationDismissContext';
+import { DetailNavigationFrame } from '@/components/navigation/DetailNavigation';
+import type { ReactNode } from 'react';
 import { desktopHeaderStyles } from '@/components/ui/desktop-header.styles';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { router, Slot, usePathname, type Href } from 'expo-router';
@@ -44,7 +47,9 @@ function FooterTab({ item, active, onPress }: { item: TabItem; active: boolean; 
   </Pressable>;
 }
 
-export default function AppTabs() {
+export default function AppTabs({ children }: { children?: ReactNode } = {}) {
+  const dismissDetail = useDismissDetail();
+  const navigate = (href: Href) => { dismissDetail?.(); router.navigate(href); };
   const { account } = useAuthStore();
   const { unreadCount } = useNotificationUpdates();
   const pathname = usePathname();
@@ -89,17 +94,17 @@ export default function AppTabs() {
     desktopShortcuts[1],
     tabs[1],
   ];
-  return <View style={styles.root}>
+  return <View style={[styles.root, !desktop && { paddingTop: insets.top }]}>
     {desktop && <View testID="desktop-app-header" style={[styles.desktopHeader, { paddingTop: insets.top }]}>
       <View style={[styles.headerInner, width < 1200 && styles.compactHeader]}>
-        <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => router.navigate('/(tabs)')} style={({ pressed }) => [styles.brand, pressed && styles.pressed]}>
+        <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => navigate('/(tabs)')} style={({ pressed }) => [styles.brand, pressed && styles.pressed]}>
           <Image source={require('@/assets/images/uninet-mark.png')} resizeMode="contain" style={styles.brandMark} />
           <Text style={styles.brandName}>UniNet</Text>
         </Pressable>
         <View accessibilityRole="tablist" accessibilityLabel="Điều hướng chính" style={styles.desktopNav}>
           {desktopItems.map(item => {
             const active = item.paths.some(path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)));
-            return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => router.navigate(item.href)} style={({ pressed, hovered }) => [styles.desktopLink, width < 1200 && styles.compactLink, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
+            return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => navigate(item.href)} style={({ pressed, hovered }) => [styles.desktopLink, width < 1200 && styles.compactLink, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
               <SymbolView name={active ? item.activeIcon : item.icon} size={width < 1200 ? 17 : 19} tintColor={active ? colors.primary : colors.textSecondary} />
               <Text numberOfLines={1} style={[styles.desktopLabel, width < 1200 && styles.compactLabel, active && styles.activeLabel]}>{item.label}</Text>
             </Pressable>;
@@ -110,7 +115,7 @@ export default function AppTabs() {
           {[tabs[3]].map(item => {
             const active = item.paths.some(path => pathname === path || pathname.startsWith(`${path}/`));
             const profile = item === tabs[3];
-            return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => router.navigate(item.href)} style={({ hovered, pressed }) => [styles.actionButton, profile && styles.profileAction, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
+            return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => navigate(item.href)} style={({ hovered, pressed }) => [styles.actionButton, profile && styles.profileAction, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
               {profile && avatarUrl ? <Image testID="header-profile-avatar" accessibilityLabel="Ảnh đại diện của bạn" source={{ uri: avatarUrl }} onError={() => setFailedAvatar(avatarUrl)} style={styles.headerAvatar} /> : <SymbolView name={active ? item.activeIcon : item.icon} size={24} tintColor={active ? colors.primary : colors.textSecondary} />}
               {profile && <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={colors.textSecondary} />}
             </Pressable>;
@@ -118,14 +123,14 @@ export default function AppTabs() {
         </View>
       </View>
     </View>}
-    <View style={styles.page}><Slot /></View>
+    <View style={styles.page}><DetailNavigationFrame>{children ?? <Slot />}</DetailNavigationFrame></View>
     {!desktop && menuOpen && <View style={[styles.menuLayer, { bottom: 70 + bottomInset }]}>
       <Pressable style={styles.scrim} onPress={() => setMenuOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng menu" />
       <Animated.View accessibilityViewIsModal style={[styles.sheet, { maxHeight: height * 0.68, opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) }] }]}>
         <View style={styles.handle} />
         <Text style={styles.sheetTitle}>Khám phá UniNet</Text>
         <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.shortcutGrid}>
-          {shortcuts.map(item => <Pressable key={item.label} onPress={() => { setMenuOpen(false); router.push(item.href); }} accessibilityRole="button" accessibilityLabel={item.label.replace('\n', ' ')} style={({ pressed }) => [styles.shortcut, { width: `${100 / columns}%` }, pressed && styles.pressed]}>
+          {shortcuts.map(item => <Pressable key={item.label} onPress={() => { setMenuOpen(false); navigate(item.href); }} accessibilityRole="button" accessibilityLabel={item.label.replace('\n', ' ')} style={({ pressed }) => [styles.shortcut, { width: `${100 / columns}%` }, pressed && styles.pressed]}>
             <View style={[styles.shortcutIcon, { backgroundColor: item.background }]}><SymbolView name={item.icon} size={26} tintColor={item.tint} /></View>
             <Text style={styles.shortcutLabel}>{item.label}</Text>
           </Pressable>)}
@@ -133,13 +138,13 @@ export default function AppTabs() {
       </Animated.View>
     </View>}
     {!desktop && <View testID="mobile-app-footer" style={[styles.footer, { paddingBottom: bottomInset }]} accessibilityRole="tablist">
-      <FooterTab item={tabs[0]} active={tabs[0].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[0].href); }} />
-      <FooterTab item={tabs[1]} active={tabs[1].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[1].href); }} />
+      <FooterTab item={tabs[0]} active={tabs[0].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[0].href); }} />
+      <FooterTab item={tabs[1]} active={tabs[1].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[1].href); }} />
       <Pressable onPress={() => setMenuOpen(open => !open)} hitSlop={{ top: 20, left: 6, right: 6 }} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Đóng menu' : 'Mở menu'} accessibilityState={{ expanded: menuOpen }} style={styles.menuSlot}>
         <View style={styles.menuButton}><SymbolView name={menuOpen ? { ios: 'xmark', android: 'close', web: 'close' } : { ios: 'line.3.horizontal', android: 'menu', web: 'menu' }} size={25} tintColor="#FFFFFF" /></View>
       </Pressable>
-      <FooterTab item={{ ...tabs[2], unread: unreadCount }} active={tabs[2].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[2].href); }} />
-      <FooterTab item={tabs[3]} active={tabs[3].paths.includes(pathname)} onPress={() => { setMenuOpen(false); router.navigate(tabs[3].href); }} />
+      <FooterTab item={{ ...tabs[2], unread: unreadCount }} active={tabs[2].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[2].href); }} />
+      <FooterTab item={tabs[3]} active={tabs[3].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[3].href); }} />
     </View>}
   </View>;
 }

@@ -1,7 +1,7 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { colors } from '@/constants/colors';
 import { useAuthStore } from '@/store/auth.store';
 import { ACCOUNT_ROLE } from '@/constants/roles';
@@ -9,7 +9,7 @@ import { ACCOUNT_ROLE } from '@/constants/roles';
 export function ExternalProjectLayout({ step, children, onBack, scrollRef }: { step: 1 | 2; children: ReactNode; onBack?: () => void; scrollRef?: React.RefObject<ScrollView | null> }) {
   const { account, isLoading } = useAuthStore();
   return <SafeAreaView style={externalStyles.safe}><KeyboardAvoidingView style={externalStyles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <View style={externalStyles.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={onBack || (() => router.back())} style={externalStyles.back}><Text style={externalStyles.backText}>‹</Text></Pressable><Text style={externalStyles.heading}>Thêm dự án có sẵn</Text></View>
+    <DetailNavigation title="Thêm dự án có sẵn" onBack={onBack} />
     <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={externalStyles.content}>
       <Text style={externalStyles.progress}>{step === 2 ? '✓' : '1.'} Tải tài liệu  →  2. Xem lại hồ sơ</Text>
       {isLoading ? <Text>Đang kiểm tra phiên đăng nhập…</Text> : account?.role === ACCOUNT_ROLE.STUDENT ? children : <Text style={externalStyles.error}>Vui lòng đăng nhập bằng tài khoản sinh viên để thêm dự án có sẵn.</Text>}

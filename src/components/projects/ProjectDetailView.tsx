@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ProjectOverview } from '@/components/projects/ProjectOverview';
 import { ToastHost } from '@/components/ui/ToastHost';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
@@ -212,6 +213,8 @@ export function ProjectDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <DetailNavigation title="Chi tiết dự án" backLabel="Quay lại danh sách dự án" onBack={() => router.dismissTo('/(tabs)/groups' as never)} actions={<>        <Pressable accessibilityRole="button" accessibilityLabel="Chia sẻ dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => void shareProject()} style={styles.headerIcon}><Text style={styles.headerIconText}>↗</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Tùy chọn dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => setOptionsVisible(true)} style={styles.headerIcon}><Text style={styles.headerIconText}>⋮</Text></Pressable></>} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
@@ -220,10 +223,8 @@ export function ProjectDetailScreen() {
         keyboardDismissMode="on-drag"
       >
       <View style={styles.overviewHeader}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Quay lại danh sách dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => router.dismissTo('/(tabs)/groups' as never)} style={styles.overviewBack}><Text style={styles.overviewBackText}>‹</Text></Pressable>
         <View style={styles.headerTitleWrap}><Text style={styles.overviewEyebrow}>CHI TIẾT DỰ ÁN</Text><Text role="heading" aria-level={1} numberOfLines={2} style={styles.overviewTitle}>{project.title}</Text><Text style={[styles.statusHeaderBadge, project.status === ApiProjectStatus.Active ? styles.activeHeaderBadge : styles.inactiveHeaderBadge]}>{project.status === ApiProjectStatus.Active ? "Đang hoạt động" : project.status === ApiProjectStatus.Rejected ? "Bị từ chối" : "Chờ duyệt"}</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Chia sẻ dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => void shareProject()} style={styles.headerIcon}><Text style={styles.headerIconText}>↗</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Tùy chọn dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => setOptionsVisible(true)} style={styles.headerIcon}><Text style={styles.headerIconText}>⋮</Text></Pressable>
+
       </View>
       <ProjectOverview
         project={project}

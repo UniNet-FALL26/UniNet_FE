@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,18 +28,7 @@ export default function ProfilePreviewScreen() {
   // Static export cannot know the query-selected template/theme. Hydrate a stable shell first.
   if (Platform.OS === 'web' && !hydrated) return <SafeAreaView style={s.safe}><View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải mẫu hồ sơ" color={colors.primary} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại mẫu hồ sơ" onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/templates')} style={({ pressed }) => [s.back, pressed && s.pressed]}><SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={22} tintColor={colors.textPrimary} /></Pressable>
-      <View style={s.headerContent}>
-        <View style={s.titleRow}>
-          <Text role="heading" aria-level={1} style={s.title}>{template.name}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [s.selectButton, pressed && s.pressed]}>
-            <Text style={s.selectButtonText}>Chọn mẫu này</Text>
-          </Pressable>
-        </View>
-        <Text style={s.subtitle}>Xem trước hồ sơ</Text>
-      </View>
-    </View>
+    <DetailNavigation title={template.name} backLabel="Quay lại mẫu hồ sơ" onBack={() => router.canGoBack() ? router.back() : router.replace('/profile/templates')} actions={<Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={s.selectButton}><Text style={s.selectButtonText}>Chọn mẫu này</Text></Pressable>} />
     <View style={s.palette}>{template.themes.map(color => <Pressable key={color.id} accessibilityRole="button" accessibilityState={{ selected: color.id === theme.id }} aria-pressed={color.id === theme.id} accessibilityLabel={`Chọn màu ${color.name}`} onPress={() => router.setParams({ theme: color.id })} style={({ pressed }) => [s.paletteButton, { borderColor: color.id === theme.id ? color.accent : colors.border, backgroundColor: color.id === theme.id ? color.accentSoft : colors.surface }, pressed && s.pressed]}><View style={[s.swatch, { backgroundColor: color.swatch }]} /><Text style={[s.paletteLabel, { color: color.id === theme.id ? color.accentStrong : colors.textSecondary }]}>{color.name}{color.id === theme.id ? ' ✓' : ''}</Text></Pressable>)}</View>
     <ScrollView ref={scroll} contentContainerStyle={s.scroll}>
       <View style={s.notice}><Text style={s.noticeText}>Bạn đang xem hồ sơ với dữ liệu mẫu. Chọn mẫu này để xem với thông tin của bạn.</Text></View>

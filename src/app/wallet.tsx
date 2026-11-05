@@ -1,5 +1,6 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
@@ -45,7 +46,7 @@ export default function WalletScreen() {
   if (isLoading) return <ActivityIndicator />;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
   if (!account || account.role !== ACCOUNT_ROLE.ASSESSOR) return <View style={s.content}><Text>Ví thu nhập chỉ dành cho thẩm định viên.</Text></View>;
-  return <SafeAreaView style={s.root}><View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()}><Text style={s.back}>‹</Text></Pressable><Text role="heading" style={s.title}>Ví thu nhập</Text><Pressable accessibilityRole="button" disabled={busy} onPress={() => void refresh()}><Text style={s.link}>Tải lại</Text></Pressable></View>
+  return <SafeAreaView style={s.root}><DetailNavigation title="Ví thu nhập" actions={<Pressable accessibilityRole="button" disabled={busy} onPress={() => void refresh()}><Text style={s.link}>Tải lại</Text></Pressable>} />
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!!notice && <Text accessibilityRole="alert" style={s.success}>{notice}</Text>}
       {loading && !data ? <ActivityIndicator color={colors.primary} /> : data && <>

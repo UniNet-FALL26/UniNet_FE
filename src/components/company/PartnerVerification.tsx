@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -130,7 +131,7 @@ export function PartnerVerification({ onClose, onStatusChange }: Props) {
   const header = <View style={s.header}>
     <View style={s.headerIcon}><CompanyIcon name={{ ios: 'checkmark.shield', android: 'verified_user', web: 'verified_user' }} size={22} /></View>
     <View style={s.heading}><Text role="heading" aria-level={onClose ? 2 : 1} style={s.title}>{onClose ? 'Xác minh tài khoản đối tác' : 'Xác minh tổ chức'}</Text><Text numberOfLines={1} style={s.subtitle}>{profile?.companyName || 'Hồ sơ tổ chức UniNet'}</Text></View>
-    <Pressable accessibilityRole="button" accessibilityLabel="Đóng xác minh đối tác" disabled={saving} onPress={close} style={({ pressed }) => [s.close, pressed && s.pressed]}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} color={c.muted} /></Pressable>
+    {onClose && <Pressable accessibilityRole="button" accessibilityLabel="Đóng xác minh đối tác" disabled={saving} onPress={close} style={({ pressed }) => [s.close, pressed && s.pressed]}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} color={c.muted} /></Pressable>}
   </View>;
   const form = <>
     {!!formNotice && <ActionFeedback type={formNotice.type} message={formNotice.message} />}
@@ -186,7 +187,7 @@ export function PartnerVerification({ onClose, onStatusChange }: Props) {
       </View>
     </KeyboardAvoidingView>
   </Modal>;
-  return <CompanyPage><PageScroll contentStyle={s.pageContent}><View style={s.pageCard}>{header}<View style={s.content}>{form}</View>{footer}</View></PageScroll></CompanyPage>;
+  return <CompanyPage><DetailNavigation title="Xác minh tổ chức" disabled={saving} /><PageScroll contentStyle={s.pageContent}><View style={s.pageCard}>{header}<View style={s.content}>{form}</View>{footer}</View></PageScroll></CompanyPage>;
 }
 
 const s = StyleSheet.create({

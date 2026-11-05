@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { verificationDate, VERIFICATION_TIME_ZONE, VERIFICATION_TIME_LABEL } from '@/utils/verification-date';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -108,7 +109,7 @@ export function VerificationBookingScreen() {
   }
   const dates = slots ? [...new Set(slots.slots.map(s => slotDate(s.startAt, VERIFICATION_TIME_ZONE)))] : [];
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} style={s.back}><Text style={s.backText}>‹</Text></Pressable><Text style={s.headerTitle}>{detail ? 'Chọn lịch xác minh' : 'Chọn gói thẩm định'}</Text></View>
+    <DetailNavigation title={detail ? 'Chọn lịch xác minh' : 'Chọn gói thẩm định'} />
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}><Text style={s.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text><Text style={s.title}>{detail ? 'Hẹn gặp chuyên viên' : 'Thêm sự tin cậy cho dự án'}</Text><Text style={s.heroText}>{title || 'Dự án đã hoàn thành'}</Text><Text style={s.heroText}>{detail ? '02  Chọn lịch hẹn' : '01  Chọn gói dịch vụ'}  →  Thanh toán  →  Xác minh</Text></View>
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}

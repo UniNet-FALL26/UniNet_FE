@@ -1,17 +1,15 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { colors } from '@/constants/colors';
 
 export { verificationDate } from '@/utils/verification-date';
 export function DossierCard({ title, children }: { title: string; children: ReactNode }) {
   return <View style={ds.card}><Text accessibilityRole="header" style={ds.cardTitle}>{title}</Text>{children}</View>;
 }
-export function DossierLayout({ title, children }: { title: string; children: ReactNode }) {
-  return <SafeAreaView style={ds.safe}><View style={ds.header}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} style={ds.back}><Text style={ds.backText}>‹</Text></Pressable>
-    <Text style={ds.headerTitle}>{title}</Text></View><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ds.content}>{children}</ScrollView></SafeAreaView>;
+export function DossierLayout({ title, children, projectId }: { title: string; children: ReactNode; projectId?: string }) {
+  return <SafeAreaView style={ds.safe}><DetailNavigation title={title} projectId={projectId} /><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ds.content}>{children}</ScrollView></SafeAreaView>;
 }
 export const ds = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border },

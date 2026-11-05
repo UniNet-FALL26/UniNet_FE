@@ -1,3 +1,6 @@
+import { useDismissDetail } from '@/components/navigation/NavigationDismissContext';
+import { DetailNavigationFrame } from '@/components/navigation/DetailNavigation';
+import type { ReactNode } from 'react';
 import { desktopHeaderStyles } from '@/components/ui/desktop-header.styles';
 import { Slot, router, usePathname, type Href } from 'expo-router';
 import { useState } from 'react';
@@ -9,7 +12,8 @@ import { assessorTabs, assessorTabActive } from '@/constants/assessor-navigation
 import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
 import { useAuthStore } from '@/store/auth.store';
 
-export function AssessorShell() {
+export function AssessorShell({ children }: { children?: ReactNode } = {}) {
+  const dismissDetail = useDismissDetail();
   const { width } = useWindowDimensions(); const insets = useSafeAreaInsets();
   const { account } = useAuthStore(); const pathname = usePathname();
   const { unreadCount, synchronize } = useNotificationUpdates();
@@ -20,7 +24,7 @@ export function AssessorShell() {
       const active = assessorTabActive(tab.key, pathname); const notifications = tab.key === 'notifications';
       const profile = tab.key === 'profile', action = notifications || profile;
       return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={tab.label} accessibilityState={{ selected: active }} aria-selected={active}
-        onPress={() => { if (notifications) synchronize(); router.navigate(tab.href as Href); }}
+        onPress={() => { dismissDetail?.(); if (notifications) synchronize(); router.navigate(tab.href as Href); }}
         style={({ pressed, hovered }) => [desktop ? action ? s.actionButton : s.headerTab : s.tab, desktop && !action && width < 1200 && s.compactLink, desktop && profile && s.profileAction, desktop && active && s.selected, desktop && hovered && s.hovered, pressed && s.pressed]}>
         <View style={s.icon}>{desktop && profile && avatarUrl && avatarUrl !== failedAvatar ? <Image source={{ uri: avatarUrl }} onError={() => setFailedAvatar(avatarUrl)} style={s.headerAvatar} accessibilityLabel="Ảnh đại diện của bạn" /> : <SymbolView name={{ ios: tab.ios, android: tab.android, web: tab.web }} size={desktop ? action ? 24 : width < 1200 ? 17 : 19 : 23} tintColor={active ? colors.primary : colors.textSecondary} />}
           {notifications && unreadCount > 0 && <View testID="assessor-unread-badge" style={s.badge}><Text style={s.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
@@ -33,14 +37,13 @@ export function AssessorShell() {
   const navigation = <View testID={desktop ? 'assessor-header-navigation' : 'assessor-footer-navigation'} accessibilityRole="tablist" accessibilityLabel="Điều hướng thẩm định viên" style={desktop ? s.nav : [s.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
     {desktop ? <><View testID="assessor-header-main" style={s.mainNav}>{assessorTabs.slice(0, 3).map(renderTab)}</View><View testID="assessor-header-actions" style={s.headerActions}>{assessorTabs.slice(3).map(renderTab)}</View></> : assessorTabs.map(renderTab)}
   </View>;
-  const pageOwnsTopInset = pathname === '/assessor-community';
-  return <SafeAreaView edges={pageOwnsTopInset ? [] : ['top']} style={s.root}>
+  return <SafeAreaView edges={['top']} style={s.root}>
     {desktop && <View testID="assessor-header" style={s.header}><View style={[s.headerInner, width < 1200 && s.compactHeader]}>
-      <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => router.navigate('/(assessor)/assessor-community' as Href)} style={s.brand}>
+      <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => { dismissDetail?.(); router.navigate('/(assessor)/assessor-community' as Href); }} style={s.brand}>
         <Image source={require('@/assets/images/uninet-mark.png')} resizeMode="contain" style={s.logo} /><Text style={s.brandName}>UniNet</Text>
       </Pressable>{navigation}
     </View></View>}
-    <View testID="assessor-content" style={s.content}><Slot key={account?.id} /></View>
+    <View testID="assessor-content" style={s.content}><DetailNavigationFrame>{children ?? <Slot key={account?.id} />}</DetailNavigationFrame></View>
     {!desktop && navigation}
   </SafeAreaView>;
 }

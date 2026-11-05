@@ -11,6 +11,7 @@ import { toast } from '@/store/toast.store';
 
 type Props = {
   profile: CompanyProfile;
+  readOnly?: boolean;
   onViewCover: () => void;
   onEditCover: () => void;
   onViewAvatar: () => void;
@@ -19,7 +20,7 @@ type Props = {
   photoBusy: boolean;
 };
 
-export function CompanyProfileHero({ profile, onViewCover, onEditCover, onViewAvatar, onEditAvatar, onEditProfile, photoBusy }: Props) {
+export function CompanyProfileHero({ profile, onViewCover, onEditCover, onViewAvatar, onEditAvatar, onEditProfile, photoBusy, readOnly = false }: Props) {
   const { width } = useWindowDimensions();
   const mobile = width < 700;
   const [containerWidth, setContainerWidth] = useState(0);
@@ -38,14 +39,14 @@ export function CompanyProfileHero({ profile, onViewCover, onEditCover, onViewAv
     </View>)}
     {!availableContacts.length && <Text style={s.emptyContact}>Chưa thêm thông tin liên hệ.</Text>}
   </View>;
-  const editButton = <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" hitSlop={mobile ? 8 : undefined} onPress={onEditProfile} style={({ pressed }) => [s.editButton, !wide && s.mobileEditButton, pressed && s.pressed]}>
+  const editButton = !readOnly && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" hitSlop={mobile ? 8 : undefined} onPress={onEditProfile} style={({ pressed }) => [s.editButton, !wide && s.mobileEditButton, pressed && s.pressed]}>
     <CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={14} color={c.white} />
     <Text style={s.editLabel}>Chỉnh sửa hồ sơ</Text>
   </Pressable>;
 
   return <View testID="company-profile-hero" onLayout={event => setContainerWidth(event.nativeEvent.layout.width)} style={[s.hero, mobile && s.mobileHero]}>
     <View testID="company-profile-cover" style={[s.cover, !wide && s.compactCover]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={profile.coverUrl ? 'Xem ảnh bìa' : 'Thêm ảnh bìa'} onPress={onViewCover} style={StyleSheet.absoluteFill}>
+      <Pressable accessibilityRole="button" disabled={readOnly && !profile.coverUrl} accessibilityLabel={profile.coverUrl ? 'Xem ảnh bìa' : readOnly ? 'Ảnh bìa mặc định' : 'Thêm ảnh bìa'} onPress={onViewCover} style={StyleSheet.absoluteFill}>
         <Image testID="company-cover-blur" source={coverSource} contentFit="cover" blurRadius={24} accessible={false} aria-hidden style={[s.coverImage, s.coverBlur]} />
         <Image testID="company-cover-full-image" source={coverSource} contentFit="contain" accessibilityLabel={profile.coverUrl ? 'Ảnh bìa đối tác' : 'Ảnh bìa mặc định UniNet'} style={s.coverImage} />
         {!profile.coverUrl && <>
@@ -55,17 +56,17 @@ export function CompanyProfileHero({ profile, onViewCover, onEditCover, onViewAv
           </View>
         </>}
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh bìa" hitSlop={mobile ? 8 : undefined} disabled={photoBusy} onPress={onEditCover} style={({ pressed }) => [s.coverEdit, mobile && s.mobileCoverEdit, pressed && s.pressed, photoBusy && s.disabled]}>
+      {!readOnly && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh bìa" hitSlop={mobile ? 8 : undefined} disabled={photoBusy} onPress={onEditCover} style={({ pressed }) => [s.coverEdit, mobile && s.mobileCoverEdit, pressed && s.pressed, photoBusy && s.disabled]}>
         <CompanyIcon name={{ ios: 'camera', android: 'photo_camera', web: 'photo_camera' }} size={mobile ? 12 : 14} color={c.ink} />
         <Text style={[s.coverEditLabel, mobile && s.mobileCoverEditLabel]}>Chỉnh sửa ảnh bìa</Text>
-      </Pressable>
+      </Pressable>}
     </View>
     <View style={[s.identityRow, !wide && s.mobileIdentityRow]}>
       <View testID="company-profile-avatar" style={[s.avatar, !wide && s.mobileAvatar, mobile && s.phoneAvatar]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={profile.avatarUrl ? 'Xem ảnh đại diện' : 'Thêm ảnh đại diện'} onPress={onViewAvatar} style={[s.avatarFrame, !wide && s.mobileAvatarFrame, mobile && s.phoneAvatarFrame]}>
+      <Pressable accessibilityRole="button" disabled={readOnly && !profile.avatarUrl} accessibilityLabel={profile.avatarUrl ? 'Xem ảnh đại diện' : readOnly ? 'Ảnh đại diện' : 'Thêm ảnh đại diện'} onPress={onViewAvatar} style={[s.avatarFrame, !wide && s.mobileAvatarFrame, mobile && s.phoneAvatarFrame]}>
         {profile.avatarUrl ? <ProfileFramedImage uri={profile.avatarUrl} accessibilityLabel="Ảnh đại diện đối tác" /> : <Text style={s.avatarLetter}>{profile.companyName.trim().charAt(0).toUpperCase() || 'C'}</Text>}
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh đại diện" hitSlop={8} disabled={photoBusy} onPress={onEditAvatar} style={({ pressed }) => [s.avatarCamera, pressed && s.pressed, photoBusy && s.disabled]}><CompanyIcon name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={15} color={c.ink} /></Pressable>
+      {!readOnly && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh đại diện" hitSlop={8} disabled={photoBusy} onPress={onEditAvatar} style={({ pressed }) => [s.avatarCamera, pressed && s.pressed, photoBusy && s.disabled]}><CompanyIcon name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={15} color={c.ink} /></Pressable>}
       </View>
       <View style={s.details}>
         <View style={s.heading}>

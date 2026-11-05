@@ -27,21 +27,22 @@ function ProfileEditField({ label, value, onChangeText, multiline = false, error
   return <View style={[editStyles.field, half && editStyles.halfField]}><Text style={editStyles.label}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} multiline={multiline} editable={!disabled} keyboardType={keyboardType} autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} textAlignVertical={multiline ? 'top' : 'center'} style={[editStyles.input, multiline && editStyles.textarea, focused && editStyles.focused, !!error && s.editInputError]} />{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}</View>;
 }
 
-export default function CompanyProfile() {
+export default function CompanyProfile({ publicProfile, onOpenJob }: { publicProfile?: CompanyProfile; onOpenJob?: (id: string) => void } = {}) {
+  const readOnly = !!publicProfile;
   const { width } = useWindowDimensions();
   const mobile = width < 700;
   const desktop = Platform.OS === 'web' && width >= 1200;
   const [profileWidth, setProfileWidth] = useState(0);
   const [activeTab, setActiveTab] = useState<'about' | 'posts' | 'jobs'>('about');
   const [dismissedVerification, setDismissedVerification] = useState<string | null>(null);
-  const [profile, setProfile] = useState<CompanyProfile | null>(null);
+  const [profile, setProfile] = useState<CompanyProfile | null>(publicProfile ?? null);
   const [verification, setVerification] = useState<PartnerVerificationStatus | null>(null);
   const [verificationOpen, setVerificationOpen] = useState(false);
   const applyVerificationStatus = useCallback((next: PartnerVerificationStatus) => {
     setVerification(next);
     if (next.status !== null) setProfile(current => current ? { ...current, isVerified: next.status === 1 } : current);
   }, []);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!readOnly);
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<CompanyProfileInput | null>(null);
@@ -58,6 +59,7 @@ export default function CompanyProfile() {
   const { logout, loading: authLoading } = useAuth();
 
   useFocusEffect(useCallback(() => {
+    if (publicProfile) { setProfile(publicProfile); setLoading(false); return; }
     const controller = new AbortController();
     setLoading(true);
     setError('');
@@ -66,10 +68,10 @@ export default function CompanyProfile() {
       .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Không tải được hồ sơ đối tác.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [reload]));
+  }, [reload, publicProfile]));
 
   const edit = () => {
-    if (!profile) return;
+    if (readOnly || !profile) return;
     setCompanyNameError('');
     setProfileFieldErrors({});
     setEditNotice(null);
@@ -90,7 +92,7 @@ export default function CompanyProfile() {
   };
 
   const saveProfile = async () => {
-    if (!draft || !profile || saving) return;
+    if (readOnly || !draft || !profile || saving) return;
     const errors: Record<string, string> = {};
     let normalizedWebsites = (draft.websites ?? []).map(value => value.trim()).filter(Boolean);
     if (!draft.companyName.trim()) errors.companyName = 'Vui lòng nhập tên tổ chức.';
@@ -149,7 +151,7 @@ export default function CompanyProfile() {
   const addWebsite = () => setDraft(current => current && current.websites.length < 10 ? { ...current, websites: [...current.websites, ''] } : current);
   const removeWebsite = (index: number) => setDraft(current => current ? { ...current, websites: current.websites.filter((_, i) => i !== index) } : current);
   const choosePhoto = async (target: 'avatarUrl' | 'coverUrl') => {
-    if (choosingPhoto || saving) return;
+    if (readOnly || choosingPhoto || saving) return;
     setChoosingPhoto(target);
     try {
       const asset = await pickProfileImage(target);
@@ -193,7 +195,7 @@ export default function CompanyProfile() {
   const compactReminder = (profileWidth || width) < 600;
   const showVerificationReminder = !!profile && !profile.isVerified && verification?.status !== 1 && dismissedVerification !== profile.id;
   const verificationDescription = verification?.status === 0 ? 'Hồ sơ xác minh tổ chức đang được xét duyệt. Nhấn để xem trạng thái.' : verification?.status === 2 ? 'Hồ sơ cần bổ sung thông tin. Nhấn xác minh để xem lý do và cập nhật.' : verification?.status === 3 ? 'Hồ sơ đã hủy. Vui lòng gửi lại thông tin xác minh tổ chức.' : 'Xác minh thông tin tổ chức và tăng độ tin cậy với sinh viên.';
-  const profileHeader = (showVerificationReminder || !desktop) && <View testID={mobile ? 'company-profile-mobile-header' : undefined} style={[layoutStyles.verificationHeader, mobile && layoutStyles.fixedMobileHeader]}>
+  const profileHeader = !readOnly && (showVerificationReminder || !desktop) && <View testID={mobile ? 'company-profile-mobile-header' : undefined} style={[layoutStyles.verificationHeader, mobile && layoutStyles.fixedMobileHeader]}>
     <View style={layoutStyles.reminderSlot}>{showVerificationReminder && <VerificationBanner compact={compactReminder} title="Xác minh tài khoản đối tác" description={verificationDescription} actionLabel={verification?.status === 0 ? compactReminder ? 'Xem' : 'Xem trạng thái' : undefined} showHint={verification?.status !== 0} onVerify={() => setVerificationOpen(true)} onDismiss={() => setDismissedVerification(profile.id)} />}</View>
     <View style={layoutStyles.headerActions}>
       {mobile && <Pressable testID="company-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" disabled={!profile || loading || saving} onPress={() => edit()} style={({ pressed }) => [layoutStyles.settingsButton, compactReminder && layoutStyles.compactSettingsButton, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} color={c.ink} /></Pressable>}
@@ -208,9 +210,10 @@ export default function CompanyProfile() {
       {!!profile && <>
     <CompanyProfileHero
       profile={profile}
-      onViewCover={() => profile.coverUrl ? setPreviewPhotoTarget('coverUrl') : void choosePhoto('coverUrl')}
+      readOnly={readOnly}
+      onViewCover={() => profile.coverUrl ? setPreviewPhotoTarget('coverUrl') : !readOnly && void choosePhoto('coverUrl')}
       onEditCover={() => void choosePhoto('coverUrl')}
-      onViewAvatar={() => profile.avatarUrl ? setPreviewPhotoTarget('avatarUrl') : void choosePhoto('avatarUrl')}
+      onViewAvatar={() => profile.avatarUrl ? setPreviewPhotoTarget('avatarUrl') : !readOnly && void choosePhoto('avatarUrl')}
       onEditAvatar={() => void choosePhoto('avatarUrl')}
       onEditProfile={() => edit()}
       photoBusy={!!choosingPhoto || saving}
@@ -218,10 +221,10 @@ export default function CompanyProfile() {
     <View testID="company-profile-tabs" accessibilityRole="tablist" style={layoutStyles.profileTabs}>
       {([['about', 'Giới thiệu'], ['posts', 'Bài viết'], ['jobs', 'Tuyển dụng']] as const).map(([tab, label]) => <Pressable key={tab} accessibilityRole="tab" accessibilityLabel={label} aria-selected={activeTab === tab} accessibilityState={{ selected: activeTab === tab }} onPress={() => setActiveTab(tab)} style={[layoutStyles.profileTab, activeTab === tab && layoutStyles.profileTabActive]}><CompanyIcon name={tab === 'about' ? { ios: 'house', android: 'home', web: 'home' } : tab === 'posts' ? { ios: 'doc.text', android: 'article', web: 'article' } : { ios: 'briefcase', android: 'work_outline', web: 'work_outline' }} size={17} color={activeTab === tab ? c.blue : c.muted} /><Text style={[layoutStyles.profileTabLabel, activeTab === tab && { color: c.blue }]}>{label}</Text></Pressable>)}
     </View>
-    {activeTab === 'about' && <CompanyIntroductionCards profile={profile} onSaved={updated => { setProfile(updated); void companyService.getVerificationStatus().then(applyVerificationStatus).catch(() => {}); }} />}
-    {activeTab === 'posts' && <CompanyProfilePosts key={profile.id} profileId={profile.id} />}
-    {activeTab === 'jobs' && <Card style={mobile ? layoutStyles.mobileCard : undefined}><SectionTitle title="Cơ hội đang mở" action="Quản lý bài đăng" onAction={() => router.push('/(company)/jobs')} /><Text style={s.helper}>Dành cho sinh viên và người mới tốt nghiệp</Text>{profile.openJobs.map((job) => <View key={job.id} style={s.job}><View style={s.jobHead}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} size={17} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.helper}>{companyJobEmploymentTypeLabel[job.employmentType]} · {job.jobField || 'Chưa cập nhật lĩnh vực'}</Text><Text style={s.helper}>{job.location || 'Chưa có địa điểm'} · {job.workType === 0 ? 'Tại văn phòng' : job.workType === 1 ? 'Kết hợp' : 'Từ xa'}</Text></View><Tag tone="green">Đã đăng</Tag></View><Text style={s.salary}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></View>)}{profile.openJobs.length === 0 && <Text style={s.helper}>Hiện chưa có bài tuyển dụng đang mở.</Text>}</Card>}
-    {!desktop && <Pressable accessibilityRole="button" onPress={() => setLogoutOpen(true)} style={s.logoutButton}><CompanyIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={17} color={c.rose} /><Text style={s.logoutText}>Đăng xuất</Text></Pressable>}
+    {activeTab === 'about' && <CompanyIntroductionCards readOnly={readOnly} profile={profile} onSaved={updated => { setProfile(updated); void companyService.getVerificationStatus().then(applyVerificationStatus).catch(() => {}); }} />}
+    {activeTab === 'posts' && <CompanyProfilePosts readOnly={readOnly} key={profile.id} profileId={profile.id} />}
+    {activeTab === 'jobs' && <Card style={mobile ? layoutStyles.mobileCard : undefined}><SectionTitle title="Cơ hội đang mở" action={readOnly ? undefined : "Quản lý bài đăng"} onAction={() => router.push('/(company)/jobs')} /><Text style={s.helper}>Dành cho sinh viên và người mới tốt nghiệp</Text>{profile.openJobs.map((job) => <Pressable key={job.id} accessibilityRole={readOnly ? "button" : undefined} disabled={!readOnly} onPress={() => onOpenJob?.(job.id)} style={s.job}><View style={s.jobHead}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} size={17} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.helper}>{companyJobEmploymentTypeLabel[job.employmentType]} · {job.jobField || 'Chưa cập nhật lĩnh vực'}</Text><Text style={s.helper}>{job.location || 'Chưa có địa điểm'} · {job.workType === 0 ? 'Tại văn phòng' : job.workType === 1 ? 'Kết hợp' : 'Từ xa'}</Text></View><Tag tone="green">Đã đăng</Tag></View><Text style={s.salary}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></Pressable>)}{profile.openJobs.length === 0 && <Text style={s.helper}>Hiện chưa có bài tuyển dụng đang mở.</Text>}</Card>}
+    {!readOnly && !desktop && <Pressable accessibilityRole="button" onPress={() => setLogoutOpen(true)} style={s.logoutButton}><CompanyIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={17} color={c.rose} /><Text style={s.logoutText}>Đăng xuất</Text></Pressable>}
     </>}
     <Modal visible={logoutOpen} transparent animationType="fade" onRequestClose={() => setLogoutOpen(false)}>
       <View style={s.modalBackdrop}><View style={s.confirmCard}><Text style={s.modalTitle}>Đăng xuất?</Text><Text style={s.body}>Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng tài khoản đối tác.</Text><View style={s.modalActions}><ActionButton title="Ở lại" onPress={() => setLogoutOpen(false)} variant="outline" /><ActionButton title={authLoading ? 'Đang đăng xuất…' : 'Đăng xuất'} onPress={() => void confirmLogout()} /></View></View></View>
@@ -247,11 +250,11 @@ export default function CompanyProfile() {
       </ScrollView><View style={editStyles.footer}><Button title="Hủy" onPress={() => setEditOpen(false)} variant="outline" disabled={saving} style={editStyles.footerButton} textStyle={editStyles.footerLabel} /><Button title="Lưu thay đổi" loading={saving} onPress={() => void saveProfile()} style={editStyles.footerButton} textStyle={editStyles.footerLabel} /></View></View></KeyboardAvoidingView>
     </Modal>
       <Modal visible={!!previewPhotoTarget} transparent animationType="fade" onRequestClose={() => setPreviewPhotoTarget(null)}>
-        <View style={s.photoPreviewOverlay}><Pressable style={s.photoPreviewBackdrop} onPress={() => setPreviewPhotoTarget(null)} /><View style={[s.photoPreviewFrame, { width: '100%', maxWidth: 520, minHeight: undefined, aspectRatio: previewPhotoTarget === 'avatarUrl' ? 1 : 3, overflow: 'hidden' }]}>{previewPhotoTarget && profile?.[previewPhotoTarget] ? <ProfileFramedImage uri={profile[previewPhotoTarget]!} accessibilityLabel={previewPhotoTarget === 'avatarUrl' ? 'Ảnh đại diện' : 'Ảnh bìa'} /> : null}<Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh" disabled={!!choosingPhoto || saving} onPress={() => { const target = previewPhotoTarget; if (target) { setPreviewPhotoTarget(null); void choosePhoto(target); } }} style={s.photoPreviewEdit}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={18} color={c.blue} /></Pressable></View></View>
+        <View style={s.photoPreviewOverlay}><Pressable accessibilityRole="button" accessibilityLabel="Đóng xem ảnh" style={s.photoPreviewBackdrop} onPress={() => setPreviewPhotoTarget(null)} /><View style={[s.photoPreviewFrame, { width: '100%', maxWidth: 520, minHeight: undefined, aspectRatio: previewPhotoTarget === 'avatarUrl' ? 1 : 3, overflow: 'hidden' }]}>{previewPhotoTarget && profile?.[previewPhotoTarget] ? <ProfileFramedImage uri={profile[previewPhotoTarget]!} accessibilityLabel={previewPhotoTarget === 'avatarUrl' ? 'Ảnh đại diện' : 'Ảnh bìa'} /> : null}{!readOnly && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh" disabled={!!choosingPhoto || saving} onPress={() => { const target = previewPhotoTarget; if (target) { setPreviewPhotoTarget(null); void choosePhoto(target); } }} style={s.photoPreviewEdit}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={18} color={c.blue} /></Pressable>}</View></View>
     </Modal>
       {verificationOpen && <PartnerVerification onClose={() => setVerificationOpen(false)} onStatusChange={applyVerificationStatus} />}
       {photo && <CompanyPhotoDialog key={photo.target} initialAsset={photo.asset} target={photo.target} onClose={() => setPhoto(null)} onSave={savePhoto} />}
-  </PageScroll></View>{desktop && <View testID="company-profile-settings-column" style={layoutStyles.settingsColumn}><SettingsPanel embedded onPartnerVerificationStatusChange={applyVerificationStatus} /></View>}</View></CompanyPage>;
+  </PageScroll></View>{!readOnly && desktop && <View testID="company-profile-settings-column" style={layoutStyles.settingsColumn}><SettingsPanel embedded onPartnerVerificationStatusChange={applyVerificationStatus} /></View>}</View></CompanyPage>;
 }
 
 const layoutStyles = StyleSheet.create({

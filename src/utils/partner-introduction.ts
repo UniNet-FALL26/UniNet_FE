@@ -6,7 +6,7 @@ export type PartnerIntroductionDraft = { description: string; imageUrl: string; 
 
 export function introductionDraft(profile: CompanyProfile): PartnerIntroductionDraft {
   const intro = profile.introduction ?? emptyPartnerIntroduction();
-  return { description: profile.description ?? '', imageUrl: intro.imageUrl ?? '', address: profile.address ?? '', industry: profile.industry ?? '', foundedOn: intro.foundedOn ?? '', employeeRange: intro.employeeRange ?? '', branches: intro.branches.join('\n'), galleryUrls: [...intro.galleryUrls] };
+  return { description: profile.description ?? '', imageUrl: intro.imageUrl ?? '', address: profile.address ?? '', industry: profile.industry ?? '', foundedOn: intro.foundedOn?.split('-').reverse().join('/') ?? '', employeeRange: intro.employeeRange ?? '', branches: intro.branches.join('\n'), galleryUrls: [...intro.galleryUrls] };
 }
 
 export function introductionInput(latest: CompanyProfile, section: PartnerIntroductionSection, draft: PartnerIntroductionDraft): CompanyProfileInput {
@@ -26,8 +26,9 @@ export function introductionInput(latest: CompanyProfile, section: PartnerIntrod
     result.description = draft.description.trim() || null;
     introduction.imageUrl = imageUrl(draft.imageUrl);
   } else if (section === 'business') {
-    const date = draft.foundedOn.trim();
-    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date || date > new Date().toISOString().slice(0, 10))) throw new Error('Nhập ngày thành lập hợp lệ theo dạng YYYY-MM-DD, không ở tương lai.');
+    const enteredDate = draft.foundedOn.trim();
+    const date = enteredDate.split('/').reverse().join('-');
+    if (enteredDate && (!/^\d{2}\/\d{2}\/\d{4}$/.test(enteredDate) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date || date > new Date().toISOString().slice(0, 10))) throw new Error('Nhập ngày thành lập hợp lệ theo dạng dd/mm/yyyy, không ở tương lai.');
     const branches = [...new Set(draft.branches.split('\n').map(value => value.trim()).filter(Boolean))];
     if (draft.address.length > 2000 || draft.industry.length > 150 || draft.employeeRange.length > 100 || branches.length > 20 || branches.some(value => value.length > 255)) throw new Error('Thông tin quá dài. Tối đa 20 chi nhánh, mỗi chi nhánh 255 ký tự.');
     result.address = draft.address.trim() || null; result.industry = draft.industry.trim() || null;

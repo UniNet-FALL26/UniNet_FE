@@ -1,7 +1,7 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
@@ -30,7 +30,7 @@ export default function StudentProfileViewer() {
   const template = getProfileTemplate(data?.portfolio.appearance.profile.template);
   const theme = getProfileTheme(template.id, data?.portfolio.appearance.profile.theme);
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/community')} style={s.back}><SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={22} tintColor={colors.textPrimary} /></Pressable><Text role="heading" aria-level={1} style={s.title}>Hồ sơ sinh viên</Text></View>
+    <DetailNavigation title="Hồ sơ sinh viên" onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/community')} />
     {error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ sinh viên" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content}>
       <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={Math.min(frameWidth || width, 1120)} /></View>
     </ScrollView>}

@@ -5,12 +5,13 @@ import { Image } from 'expo-image';
 import { communityService, type PostResponse } from '@/services/community.service';
 import { CompanyIcon, companyColors as c } from './company-ui';
 
-export function CompanyProfilePosts({ profileId }: { profileId: string }) {
+export function CompanyProfilePosts({ profileId, readOnly = false }: { profileId: string; readOnly?: boolean }) {
   const [posts, setPosts] = useState<PostResponse[]>([]), [page, setPage] = useState(1), [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true), [error, setError] = useState(''), [hasMore, setHasMore] = useState(false);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController(); setLoading(true); setError('');
-    communityService.getOwnPosts(page, 10, controller.signal).then(items => {
+    const request = readOnly ? communityService.getAuthorPosts(profileId, page, 10, controller.signal) : communityService.getOwnPosts(page, 10, controller.signal);
+    request.then(items => {
       if (controller.signal.aborted) return;
       const own = items.filter(item => item.authorUserId === profileId);
       setPosts(current => page === 1 ? own : [...current, ...own.filter(item => !current.some(old => old.id === item.id))]);
@@ -18,10 +19,10 @@ export function CompanyProfilePosts({ profileId }: { profileId: string }) {
     }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tải được bài viết.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [profileId, page, revision]));
-  return <View style={s.posts}><View style={s.heading}><Text role="heading" style={s.title}>Bài viết của tổ chức</Text><Pressable accessibilityRole="button" onPress={() => router.push('/(company)/company-community')}><Text style={s.link}>Đến cộng đồng</Text></Pressable></View>
+  }, [profileId, page, revision, readOnly]));
+  return <View style={s.posts}><View style={s.heading}><Text role="heading" style={s.title}>Bài viết của tổ chức</Text>{!readOnly && <Pressable accessibilityRole="button" onPress={() => router.push('/(company)/company-community')}><Text style={s.link}>Đến cộng đồng</Text></Pressable>}</View>
     {!!error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Pressable accessibilityRole="button" onPress={() => setRevision(value => value + 1)}><Text style={s.link}>Thử lại</Text></Pressable></View>}
-    {!loading && !error && !posts.length && <View testID="company-posts-empty" style={s.empty}><CompanyIcon name={{ ios: 'doc.text', android: 'article', web: 'article' }} size={30} /><Text style={s.title}>Chưa có bài viết</Text><Text style={s.muted}>Bài viết bạn chia sẻ với cộng đồng sẽ xuất hiện tại đây.</Text></View>}
+    {!loading && !error && !posts.length && <View testID="company-posts-empty" style={s.empty}><CompanyIcon name={{ ios: 'doc.text', android: 'article', web: 'article' }} size={30} /><Text style={s.title}>Chưa có bài viết</Text><Text style={s.muted}>{readOnly ? 'Tổ chức chưa chia sẻ bài viết với cộng đồng.' : 'Bài viết bạn chia sẻ với cộng đồng sẽ xuất hiện tại đây.'}</Text></View>}
     {posts.map(post => <View key={post.id} style={s.card}><Text style={s.author}>{post.authorName}</Text><Text style={s.muted}>{new Date(post.createdAt).toLocaleDateString('vi-VN')}</Text><Text style={s.body}>{post.description}</Text>{post.mediaUrls.length > 0 && <Image source={{ uri: post.mediaUrls[0] }} accessibilityLabel="Ảnh bài viết" contentFit="cover" style={s.image} />}<Text style={s.muted}>{post.favoriteCount} lượt thích · {post.commentCount} bình luận</Text></View>)}
     {loading && <ActivityIndicator color={c.blue} />}
     {!loading && hasMore && <Pressable accessibilityRole="button" onPress={() => setPage(value => value + 1)} style={s.more}><Text style={s.link}>Xem thêm bài viết</Text></Pressable>}

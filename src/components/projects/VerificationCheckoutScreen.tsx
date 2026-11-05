@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { verificationDate as date } from '@/utils/verification-date';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -154,7 +155,7 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId }: 
   if (restoring) return <Loading />;
   if (!isAuthenticated) return <SafeAreaView style={s.safe}><View style={s.content}><Text style={s.heading}>Đăng nhập để kiểm tra thanh toán</Text><Button title="Đăng nhập" onPress={() => router.push({ pathname: '/(auth)/login', params: { paymentReturn: id } } as never)} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" style={s.back} onPress={() => router.back()}><Text style={s.backText}>‹</Text></Pressable><Text style={s.headerTitle}>Thanh toán xác minh</Text></View>
+    <DetailNavigation title="Thanh toán xác minh" projectId={detail?.verification.projectId || projectId} />
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}><Text style={s.kicker}>BƯỚC 03 · THANH TOÁN</Text><Text style={s.title}>Hoàn tất đăng ký thẩm định</Text><Text style={s.heroText}>Chọn gói → Giữ lịch → Thanh toán → Xác minh</Text></View>
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}

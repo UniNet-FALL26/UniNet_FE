@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ProjectInformationFields } from "./ProjectInformationFields";
 import { useAuthStore } from "@/store/auth.store";
 import { ACCOUNT_ROLE } from "@/constants/roles";
@@ -367,6 +368,7 @@ export function ProjectCreateScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
     >
+      <DetailNavigation title="Tạo dự án" backLabel="Quay lại danh sách dự án" onBack={() => router.dismissTo('/(tabs)/groups' as never)} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
@@ -375,18 +377,7 @@ export function ProjectCreateScreen() {
       >
         {/* HEADER */}
         <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Quay lại danh sách dự án"
-            hitSlop={12}
-            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
+
 
           <View style={styles.headerText}>
             <Text style={styles.eyebrow}>KHỞI TẠO DỰ ÁN</Text>

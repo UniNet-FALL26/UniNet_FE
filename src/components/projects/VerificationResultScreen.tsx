@@ -9,7 +9,7 @@ export function VerificationResultScreen() {
   const { detail, result, error, resultError, loading, refresh } = useVerificationDossier(id ?? '', true);
   const status = result?.status ?? detail?.verification.status;
   const title = status === 1 ? '✓ Đạt thẩm định' : status === 2 ? '× Không đạt thẩm định' : status === 3 ? 'Hồ sơ đã hủy' : 'Đang chờ kết luận thẩm định';
-  return <DossierLayout title="Kết quả thẩm định">
+  return <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Kết quả thẩm định">
     <View style={ds.hero}><Text style={ds.kicker}>KẾT LUẬN CHUYÊN VIÊN</Text><Text style={ds.title}>{detail ? title : 'Kết quả thẩm định'}</Text><Text style={ds.heroText}>{detail?.project?.title || detail?.verification.projectTitle || 'Hồ sơ xác minh dự án'}</Text></View>
     <Text style={ds.notice}>Trạng thái “Đã hoàn thành” của dự án và kết quả thẩm định là hai trạng thái độc lập.</Text>
     {loading && <Text accessibilityRole="progressbar" style={ds.small}>Đang tải kết luận mới nhất…</Text>}

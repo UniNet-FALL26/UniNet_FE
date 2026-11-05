@@ -21,7 +21,7 @@ export function VerificationMeetingScreen() {
       params: { id },
     } as never);
   return (
-    <DossierLayout title="Buổi thẩm định dự án">
+    <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Buổi thẩm định dự án">
       <Button title="Quay lại hồ sơ" variant="outline" onPress={dossier} />
       {loading && (
         <Text accessibilityRole="progressbar" style={ds.small}>

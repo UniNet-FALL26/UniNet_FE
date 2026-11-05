@@ -66,7 +66,7 @@ const photo = { name: 'company-photo.png', mimeType: 'image/png', buffer: fs.rea
     assert.equal(profile.phone, '0901234567'); assert.equal(await about.getByRole('img', { name: 'Ảnh giới thiệu SkillSnap Company', exact: true }).count(), 1);
     dialog = await open(business, 'Chỉnh sửa Thông tin doanh nghiệp');
     assert.equal(await dialog.getByRole('textbox').count(), 5);
-    for (const [label, value] of [['Trụ sở chính', 'Tòa nhà SkillSnap, TP. Hồ Chí Minh'], ['Ngày thành lập (YYYY-MM-DD)', '2019-03-15'], ['Quy mô nhân sự', '51 – 200'], ['Chi nhánh (mỗi dòng một chi nhánh)', 'Hà Nội\nĐà Nẵng\nCần Thơ']]) await dialog.getByRole('textbox', { name: label, exact: true }).fill(value);
+    for (const [label, value] of [['Trụ sở chính', 'Tòa nhà SkillSnap, TP. Hồ Chí Minh'], ['Ngày thành lập (dd/mm/yyyy)', '15/03/2019'], ['Quy mô nhân sự', '51 – 200'], ['Chi nhánh (mỗi dòng một chi nhánh)', 'Hà Nội\nĐà Nẵng\nCần Thơ']]) await dialog.getByRole('textbox', { name: label, exact: true }).fill(value);
     await save(dialog, 'Lưu thay đổi'); await business.getByText('15/03/2019', { exact: true }).waitFor();
     const introUrl = profile.introduction.imageUrl;
     dialog = await open(gallery, 'Chỉnh sửa Hình ảnh công ty');

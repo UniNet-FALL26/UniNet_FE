@@ -139,7 +139,7 @@ export function VerificationDossierScreen() {
   const remaining = detail ? holdSeconds(detail, Date.now()) : 0;
   const final = v?.status === 1 || v?.status === 2;
   return (
-    <DossierLayout title="Hồ sơ thẩm định">
+    <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Hồ sơ thẩm định">
       <View style={ds.hero}>
         <Text style={ds.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text>
         <Text style={ds.title}>

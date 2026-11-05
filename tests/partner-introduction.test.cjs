@@ -25,6 +25,15 @@ test('unsafe image URLs and invalid business inputs are rejected', () => {
     const latest = profile(), draft = introductionDraft(latest); draft.imageUrl = url; assert.throws(() => introductionInput(latest, 'about', draft));
     draft.galleryUrls = [url]; assert.throws(() => introductionInput(latest, 'gallery', draft));
   }
-  for (const date of ['2026-02-30', '2999-01-01', '15/03/2019']) { const latest = profile(), draft = introductionDraft(latest); draft.foundedOn = date; assert.throws(() => introductionInput(latest, 'business', draft)); }
+  for (const date of ['30/02/2026', '01/01/2999', '2019-03-15', '29/02/2023']) { const latest = profile(), draft = introductionDraft(latest); draft.foundedOn = date; assert.throws(() => introductionInput(latest, 'business', draft)); }
   const latest = profile(), draft = introductionDraft(latest); draft.galleryUrls = Array(21).fill('https://partner.test/a.png'); assert.throws(() => introductionInput(latest, 'gallery', draft));
+});
+test('business dates display day/month/year and save ISO without changing the day', () => {
+  const latest = profile(), draft = introductionDraft(latest);
+  assert.equal(draft.foundedOn, '15/03/2019');
+  assert.equal(introductionInput(latest, 'business', draft).introduction.foundedOn, '2019-03-15');
+  draft.foundedOn = '29/02/2024';
+  assert.equal(introductionInput(latest, 'business', draft).introduction.foundedOn, '2024-02-29');
+  draft.foundedOn = '';
+  assert.equal(introductionInput(latest, 'business', draft).introduction.foundedOn, null);
 });
