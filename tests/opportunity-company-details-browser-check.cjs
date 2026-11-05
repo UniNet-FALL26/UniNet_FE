@@ -5,10 +5,23 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8083';
 const websites = ['https://www.facebook.com/fixture', 'https://www.youtube.com/watch?v=fixture', 'https://www.tiktok.com/@fixture'];
 const account = { id: 'student-detail', email: 'student@example.test', role: 0, profileComplete: true, profile: { id: 'student-profile', fullName: 'Student Test', nickname: 'student', isVerified: false } };
 const baseJob = { id: 'company-job', title: 'IT Fullstack developer', workType: 0, employmentType: 0, jobField: 'Software', minSalaryVnd: null, maxSalaryVnd: null, location: 'HCM', description: 'Job description', startAt: null, deadline: null, responsibilities: [], requiredQualifications: [], preferredQualifications: [], projectAreas: [], skills: [], benefits: [], companyName: 'SkillSnap company', companyAvatarUrl: null, companyIndustry: 'Software', companyBio: null, companyAddress: null, companyWebsite: null, companyWebsites: websites, companyContactEmail: null, companyPhone: '0968110347', companyPartnerType: 0, isSaved: false, isApplied: false, applicationStatus: null, appliedAt: null, createdAt: '2026-11-01T00:00:00Z' };
+const partner = { id: 'partner', organizationName: 'SkillSnap company', partnerType: 0, isVerified: true, websites, openJobs: [] };
+async function assertNoPageAnimation(locator) {
+  const animations = await locator.evaluate(element => {
+    const names = [];
+    for (let node = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.animationName !== 'none') names.push(style.animationName);
+    }
+    return names;
+  });
+  assert.deepEqual(animations, [], 'Detail pages should open without a page transition animation');
+}
 (async () => {
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   const page = await browser.newPage();
   page.setDefaultTimeout(10000);
+  page.setDefaultNavigationTimeout(60000);
   const errors = [];
   let verified = true;
   let deferDetail = false;
@@ -19,6 +32,7 @@ const baseJob = { id: 'company-job', title: 'IT Fullstack developer', workType: 
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
     const job = { ...baseJob, companyIsVerified: verified };
+    if (path.endsWith('/partner-profile')) return route.fulfill({ json: partner });
     if (deferDetail && path.endsWith('/opportunities/company-job')) {
       detailStarted();
       await new Promise(resolve => { releaseDetail = resolve; });
@@ -45,9 +59,19 @@ const baseJob = { id: 'company-job', title: 'IT Fullstack developer', workType: 
         }
         const back = page.getByRole('button', { name: 'Quay lại danh sách cơ hội', exact: true });
         await back.waitFor();
+        await assertNoPageAnimation(back);
+        await page.getByRole('button', { name: 'Xem trang công ty SkillSnap company', exact: true }).first().click();
+        const companyBack = page.getByRole('button', { name: 'Đóng trang đối tác', exact: true });
+        await companyBack.waitFor();
+        await assertNoPageAnimation(companyBack);
+        await page.getByTestId('company-about-card').waitFor();
+        await companyBack.click();
+        await companyBack.waitFor({ state: 'detached' });
+        await back.waitFor();
+        await assertNoPageAnimation(back);
         assert.equal(await page.getByRole('button', { name: 'Đóng chi tiết', exact: true }).count(), 0);
         const backBounds = await back.boundingBox();
-        const titleBounds = await page.getByText('CHI TIẾT CƠ HỘI', { exact: true }).boundingBox();
+        const titleBounds = await page.getByText('Chi tiết cơ hội', { exact: true }).boundingBox();
         assert.ok(backBounds.x + backBounds.width <= titleBounds.x, 'Back arrow appears left of the title');
         if (isVerified) await page.screenshot({ path: `dist/opportunities-verification/detail-${width}.png`, fullPage: true });
         await back.click();

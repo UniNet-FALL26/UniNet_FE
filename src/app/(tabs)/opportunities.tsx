@@ -388,7 +388,7 @@ export default function OpportunitiesScreen() {
     </ScrollView>
 
 
-    <DetailModal crumbs={[{ label: 'Cơ hội', href: '/(tabs)/opportunities' }, { label: 'Chi tiết cơ hội' }]} backLabel="Quay lại danh sách cơ hội" visible={!!selectedJob && !companyProfileOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeJob}>
+    <DetailModal crumbs={[{ label: 'Cơ hội', href: '/(tabs)/opportunities' }, { label: 'Chi tiết cơ hội' }]} backLabel="Quay lại danh sách cơ hội" visible={!!selectedJob && !companyProfileOpen} animationType="none" presentationStyle="fullScreen" onRequestClose={closeJob}>
       {selectedJob && <SafeAreaView style={styles.detailSafe} edges={[]}>
         <ScrollView style={styles.detailScroll} contentContainerStyle={[styles.detailContent, isWideWeb && styles.detailContentWide]} keyboardShouldPersistTaps="handled">
           <View style={styles.detailHero}>
@@ -423,7 +423,7 @@ export default function OpportunitiesScreen() {
         </ScrollView>
       </SafeAreaView>}
     </DetailModal>
-    <DetailModal onNavigate={() => { setCompanyProfileOpen(false); setSnapshotOpen(false); closeJob(); }} crumbs={[{ label: 'Cơ hội', href: '/(tabs)/opportunities' }, { label: 'Chi tiết cơ hội', href: '/opportunities?jobId=' + selectedJob?.id }, { label: companyProfile?.organizationName || 'Trang công ty' }]} backLabel="Đóng trang đối tác" visible={companyProfileOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setCompanyProfileOpen(false)}>
+    <DetailModal onNavigate={() => { setCompanyProfileOpen(false); setSnapshotOpen(false); closeJob(); }} crumbs={[{ label: 'Cơ hội', href: '/(tabs)/opportunities' }, { label: 'Chi tiết cơ hội', href: '/opportunities?jobId=' + selectedJob?.id }, { label: companyProfile?.organizationName || 'Trang công ty' }]} backLabel="Đóng trang đối tác" visible={companyProfileOpen} animationType="none" presentationStyle="fullScreen" onRequestClose={() => setCompanyProfileOpen(false)}>
       <SafeAreaView style={styles.detailSafe} edges={[]}>
         {companyProfileLoading ? <View style={styles.companyProfileState}><ActivityIndicator color={colors.primary} /><Text style={styles.sectionHint}>Đang tải hồ sơ đối tác…</Text></View> : companyProfileError ? <View style={styles.companyProfileState}><Text accessibilityRole="alert" style={styles.detailError}>{companyProfileError}</Text><Pressable accessibilityRole="button" onPress={() => void openCompanyProfile()} style={styles.companyProfileButton}><Text style={styles.companyProfileButtonText}>Thử lại</Text></Pressable></View> : companyProfile && <CompanyProfileScreen key={companyProfile.id} publicProfile={{
           ...companyProfile, companyName: companyProfile.organizationName, partnerType: companyProfile.partnerType ?? 4,
