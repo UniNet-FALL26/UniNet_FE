@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -46,6 +47,7 @@ export default function ProfileEditorScreen() {
   const [leaving, setLeaving] = useState<'back' | 'templates' | null>(null);
   const [pendingDestination, setPendingDestination] = useState<'back' | 'templates' | null>(null);
   const pendingAction = useRef<NavigationAction | null>(null);
+  const pendingParent = useRef<string | null>(null);
   const navigation = useNavigation();
   const [frameWidth, setFrameWidth] = useState(0);
   const { width: windowWidth } = useWindowDimensions();
@@ -85,7 +87,9 @@ export default function ProfileEditorScreen() {
   useEffect(() => {
     if (!pendingDestination || dirty || saving) return;
     const action = pendingAction.current; pendingAction.current = null; setPendingDestination(null);
-    if (pendingDestination === 'templates') router.push('/profile/templates');
+    const parent = pendingParent.current; pendingParent.current = null;
+    if (parent) router.navigate(parent as never);
+    else if (pendingDestination === 'templates') router.push('/profile/templates');
     else if (action) navigation.dispatch(action);
     else if (router.canGoBack()) router.back();
     else router.replace({ pathname: '/profile/preview', params: { template: template.id, theme: theme.id } });
@@ -122,14 +126,10 @@ export default function ProfileEditorScreen() {
   // Static HTML cannot resolve query-selected appearance until the client hydrates.
   if (Platform.OS === 'web' && !hydrated) return <SafeAreaView style={s.safe}><View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải trình chỉnh sửa" color={colors.primary} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại xem mẫu" disabled={saving} onPress={() => dirty ? setLeaving('back') : back()} style={s.back}><SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={22} tintColor={colors.textPrimary} /></Pressable>
-      <View style={s.headerCopy}><Text role="heading" aria-level={1} style={s.title}>Hồ sơ của tôi</Text><Text style={s.subtitle}>{template.name} · {theme.name}</Text></View>
-      <View style={s.headerActions}>
+    <DetailNavigation onParentNavigate={href => { if (dirty) { pendingParent.current = href; setLeaving('back'); } else router.navigate(href as never); }} title="Hồ sơ của tôi" backLabel="Quay lại xem mẫu" disabled={saving} onBack={() => dirty ? setLeaving('back') : back()} actions={<View style={s.headerActions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Chọn mẫu khác" accessibilityState={{ disabled: saving }} disabled={saving} onPress={() => dirty ? setLeaving('templates') : router.push('/profile/templates')} style={({ pressed }) => [s.iconButton, pressed && s.pressed, saving && s.disabled]}><SymbolView name={{ ios: 'rectangle.grid.2x2', android: 'dashboard', web: 'dashboard' }} size={22} tintColor={colors.primary} /></Pressable>
         {!!data && <Pressable accessibilityRole="button" accessibilityLabel="Lưu hồ sơ" accessibilityState={{ disabled: !dirty || saving, busy: saving }} disabled={!dirty || saving} onPress={() => void save()} style={({ pressed }) => [s.iconButton, s.save, pressed && s.pressed, (!dirty || saving) && s.disabled]}>{saving ? <ActivityIndicator color={colors.surface} /> : <SymbolView name={{ ios: 'square.and.arrow.down', android: 'save', web: 'save' }} size={22} tintColor={colors.surface} />}</Pressable>}
-      </View>
-    </View>
+      </View>} />
     {!!data && <View style={s.palette}>{template.themes.map(color => <Pressable key={color.id} accessibilityRole="button" accessibilityLabel={`Chọn màu ${color.name}`} accessibilityState={{ selected: color.id === theme.id, disabled: saving }} aria-pressed={color.id === theme.id} disabled={saving} onPress={() => { setLoaded({ accountId: account!.id, data: updateProfileAppearance(data, template.id, color.id) }); setMessage(''); }} style={({ pressed }) => [s.paletteButton, { borderColor: color.id === theme.id ? color.accent : colors.border, backgroundColor: color.id === theme.id ? color.accentSoft : colors.surface }, pressed && s.pressed, saving && s.disabled]}><View style={[s.swatch, { backgroundColor: color.swatch }]} /><Text style={[s.paletteLabel, { color: color.id === theme.id ? color.accentStrong : colors.textSecondary }]}>{color.name}{color.id === theme.id ? ' ✓' : ''}</Text></Pressable>)}</View>}
     {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.state}><Text style={s.stateTitle}>Đăng nhập để tạo hồ sơ của bạn</Text><Text style={s.hint}>Mẫu đã chọn sẽ được giữ lại khi bạn quay lại trang này.</Text><Button title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ của bạn" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.notice}><Text style={s.hint}>Lưu để áp dụng nội dung, mẫu và màu cho hồ sơ của bạn. Quyền riêng tư và chế độ hiển thị hiện tại được giữ nguyên.</Text>{dirty && <Text accessibilityLiveRegion="polite" style={s.pending}>Có thay đổi chưa lưu.</Text>}{!!message && <ActionFeedback type={message.startsWith('Đã ') ? 'success' : 'error'} message={message} />}</View>
@@ -140,7 +140,7 @@ export default function ProfileEditorScreen() {
     {section && data && <ProfileEntryForm key={`${account?.id}-${section.id}`} section={section} data={data} onAdd={add} onClose={() => setSection(null)} />}
     {field && data && <ProfileFieldForm key={`${account?.id}-${field}`} data={data} field={field} onClose={() => setField(null)} onConfirm={next => { if (!saving && account) { setLoaded({ accountId: account.id, data: next }); setMessage(''); setField(null); } }} />}
     {photo && data && <ProfilePhotoForm portrait={photo.target === 'avatarUrl' && account?.role === ACCOUNT_ROLE.STUDENT} key={`${account?.id}-${typeof photo.target === 'string' ? photo.target : `${photo.target.section}-${photo.target.index}`}`} initialAsset={photo.asset} onClose={() => setPhoto(null)} onConfirm={url => { if (!saving && account) { const next = typeof photo.target === 'string' ? updateProfileField(data, photo.target, url) : updateProfileImage(data, photo.target, url); setLoaded({ accountId: account.id, data: next }); setMessage(''); setPhoto(null); } }} />}
-    <Modal visible={!!leaving} transparent animationType="fade" onRequestClose={() => { pendingAction.current = null; setLeaving(null); }}><View style={s.overlay}><View style={s.confirm}><Text style={s.stateTitle}>Thay đổi chưa được lưu</Text><Text style={s.hint}>Rời trang sẽ bỏ các thông tin bạn vừa thêm.</Text><Button title="Tiếp tục chỉnh sửa" onPress={() => { pendingAction.current = null; setLeaving(null); }} /><Button title={leaving === 'templates' ? 'Bỏ thay đổi và chọn mẫu khác' : 'Bỏ thay đổi và quay lại'} variant="outline" onPress={() => { if (baseline && account) setLoaded({ accountId: account.id, data: createProfileDraft(baseline) }); setPendingDestination(leaving); setLeaving(null); }} /></View></View></Modal>
+    <Modal visible={!!leaving} transparent animationType="fade" onRequestClose={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }}><View style={s.overlay}><View style={s.confirm}><Text style={s.stateTitle}>Thay đổi chưa được lưu</Text><Text style={s.hint}>Rời trang sẽ bỏ các thông tin bạn vừa thêm.</Text><Button title="Tiếp tục chỉnh sửa" onPress={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }} /><Button title={leaving === 'templates' ? 'Bỏ thay đổi và chọn mẫu khác' : 'Bỏ thay đổi và quay lại'} variant="outline" onPress={() => { if (baseline && account) setLoaded({ accountId: account.id, data: createProfileDraft(baseline) }); setPendingDestination(leaving); setLeaving(null); }} /></View></View></Modal>
   </SafeAreaView>;
 }
 const s = StyleSheet.create({

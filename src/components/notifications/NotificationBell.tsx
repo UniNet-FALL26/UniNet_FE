@@ -1,3 +1,4 @@
+import { useDismissDetail } from '@/components/navigation/NavigationDismissContext';
 import { router, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,9 +8,11 @@ import { useAuthStore } from '@/store/auth.store';
 import { useNotificationUpdates } from './NotificationsProvider';
 
 export function NotificationBell() {
+  const dismissDetail = useDismissDetail();
   const { account } = useAuthStore();
   const { unreadCount, synchronize } = useNotificationUpdates();
   const openInbox = () => {
+    dismissDetail?.();
     synchronize();
     router.navigate((account?.role === ACCOUNT_ROLE.ASSESSOR ? '/(assessor)/assessor-notifications' : account?.role === ACCOUNT_ROLE.PARTNER ? '/(company)/company-notifications' : '/(tabs)/notifications') as Href);
   };

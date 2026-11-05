@@ -25,7 +25,7 @@ test('level 1 uses public enum values and distinguishes stale, missing, rejected
   assert.match(helpers.level1Message(review({ status: 4 })), /bổ sung/);
   assert.match(helpers.level1Message(review({ status: 5, attempts: [{ number: 1, transient: true }] })), /tạm thời/);
   assert.match(helpers.level1Message(review({ status: 5, attempts: [{ number: 5, transient: true }] })), /hỗ trợ vận hành/);
-  assert.match(helpers.level2Label(detail({ verification: { status: 2 } }), true), /Không đạt cấp 2/);
+  assert.match(helpers.level2Label(detail({ verification: { status: 2 } }), true), /Không đạt thẩm định/);
 });
 
 test('level 2 resumes booking/payment/assignment states and never treats a payment as a final result', () => {

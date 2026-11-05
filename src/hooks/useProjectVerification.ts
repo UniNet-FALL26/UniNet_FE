@@ -11,7 +11,7 @@ const errorText = (error: unknown) => error instanceof ApiError && error.status 
   ? 'Bạn không có quyền xem dữ liệu xác minh này.'
   : error instanceof Error ? error.message : 'Không thể tải dữ liệu. Vui lòng thử lại.';
 
-export function useProjectVerification(projectId: string, isCreator: boolean, level1Only = false) {
+export function useProjectVerification(projectId: string, isCreator: boolean, level1Only = false, external = false) {
   const [level1, setLevel1] = useState<Block<EvidenceModeration>>(initial);
   const [level2, setLevel2] = useState<Block<VerificationDetail>>(initial);
   const [cycle, setCycle] = useState<Block<{ status: number }>>(initial);
@@ -35,6 +35,7 @@ export function useProjectVerification(projectId: string, isCreator: boolean, le
     const signal = controller.signal;
     async function load() {
       if (stopped || inFlight || AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
+      if (timer) clearTimeout(timer);
       inFlight = true;
       if (!forbidden1) setLevel1(v => ({ ...v, loading: true }));
       if (!forbidden2) setLevel2(v => ({ ...v, loading: true }));
@@ -77,17 +78,25 @@ export function useProjectVerification(projectId: string, isCreator: boolean, le
       ]);
       inFlight = false;
       failures = failed ? failures + 1 : 0;
-
+      if (external && !stopped && !signal.aborted && ((pending && !forbidden1) || (failed && failures < 4))) {
+        timer = setTimeout(() => void load(), failed ? Math.min(60000, 8000 * 2 ** failures) : 8000);
+      }
     }
     void load();
     setCycle(v => ({ ...v, loading: true }));
-    service.contribution(projectId, signal).then(data => {
+    if (external) setCycle({ data: null, loading: false, error: null });
+    else service.contribution(projectId, signal).then(data => {
       if (!signal.aborted) setCycle({ data, loading: false, error: null });
     }).catch(error => {
       if (!signal.aborted) setCycle({ data: null, loading: false, error: error instanceof ApiError && error.status === 404 ? null : errorText(error) });
     });
-    return () => { active.current = false; stopped = true; controller.abort(); };
-  }, [projectId, isCreator, revision, level1Only]));
+    const subscription = AppState.addEventListener('change', state => {
+      if (!external) return;
+      if (state === 'active') void load();
+      else if (timer) clearTimeout(timer);
+    });
+    return () => { active.current = false; stopped = true; controller.abort(); if (timer) clearTimeout(timer); subscription.remove(); };
+  }, [projectId, isCreator, revision, level1Only, external]));
 
   async function retry() {
     if (!isCreator || level1.forbidden || retryLock.current) return;

@@ -1,3 +1,4 @@
+import { useDismissDetail } from '@/components/navigation/NavigationDismissContext';
 import { useEffect, useState } from 'react';
 import { router, usePathname } from 'expo-router';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
@@ -8,6 +9,7 @@ import { apiRequest } from '@/services/api';
 import { useAuthStore } from '@/store/auth.store';
 
 export function CompanyHeaderActions() {
+  const dismissDetail = useDismissDetail();
   const { account } = useAuthStore();
   const pathname = usePathname();
   const [avatar, setAvatar] = useState<{ accountId: string; url: string | null } | null>(null);
@@ -32,7 +34,7 @@ export function CompanyHeaderActions() {
 
   return <View accessibilityRole="tablist" accessibilityLabel="Tài khoản và thông báo" style={s.actions}>
     <NotificationBell />
-    <Pressable accessibilityRole="tab" accessibilityLabel="Hồ sơ" accessibilityState={{ selected: active }} aria-selected={active} onPress={() => router.navigate('/(company)/profile')} style={({ hovered, pressed }) => [s.profile, (active || hovered) && s.highlight, pressed && s.pressed]}>
+    <Pressable accessibilityRole="tab" accessibilityLabel="Hồ sơ" accessibilityState={{ selected: active }} aria-selected={active} onPress={() => { dismissDetail?.(); router.navigate('/(company)/profile'); }} style={({ hovered, pressed }) => [s.profile, (active || hovered) && s.highlight, pressed && s.pressed]}>
       {avatarUrl ? <Image accessibilityLabel="Ảnh đại diện của bạn" source={{ uri: avatarUrl }} onError={() => setFailedAvatar(avatarUrl)} style={s.avatar} /> : <View testID="company-profile-avatar-fallback" style={[s.avatar, s.fallback]}><CompanyIcon name={{ ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' }} size={28} color={colors.textSecondary} /></View>}
       <CompanyIcon name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} color={colors.textSecondary} />
     </Pressable>

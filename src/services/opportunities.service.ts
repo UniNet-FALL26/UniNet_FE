@@ -45,7 +45,7 @@ export type OpportunityJob = {
 export type OpportunityJobsPage = { page: number; pageSize: number; totalItems: number; totalPages: number; jobs: OpportunityJob[] };
 export type SubmittedApplication = { id: string; applicationRound: number; appliedAt: string; status: number; submittedPortfolio: PortfolioResponse | null };
 export type PublicPartnerJob = { id: string; title: string; workType: OpportunityWorkType; employmentType: OpportunityEmploymentType; jobField: string; minSalaryVnd: number | null; maxSalaryVnd: number | null; location: string | null; deadline: string | null };
-export type PublicPartnerProfile = { id: string; organizationName: string; partnerType: OpportunityPartnerType | null; avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; industry: string | null; bio: string | null; address: string | null; contactEmail: string | null; phone: string | null; websites: string[]; openJobs: PublicPartnerJob[] };
+export type PublicPartnerProfile = { introduction?: import('@/types/partner-introduction').PartnerIntroduction | null; id: string; organizationName: string; partnerType: OpportunityPartnerType | null; avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; industry: string | null; bio: string | null; address: string | null; contactEmail: string | null; phone: string | null; websites: string[]; openJobs: PublicPartnerJob[] };
 
 export const opportunitiesService = {
   list: (params: { view?: OpportunityView; keyword?: string; workType?: OpportunityWorkType; page?: number; pageSize?: number }, signal?: AbortSignal) => {

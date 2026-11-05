@@ -21,7 +21,7 @@ export function VerificationMeetingScreen() {
       params: { id },
     } as never);
   return (
-    <DossierLayout title="Buổi thẩm định dự án">
+    <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Buổi thẩm định dự án">
       <Button title="Quay lại hồ sơ" variant="outline" onPress={dossier} />
       {loading && (
         <Text accessibilityRole="progressbar" style={ds.small}>
@@ -111,7 +111,7 @@ export function VerificationMeetingScreen() {
           )}
           {state.result && (
             <Button
-              title="Xem báo cáo cấp 2"
+              title="Xem báo cáo thẩm định"
               onPress={() =>
                 router.push({
                   pathname: "/group/verification-result/[id]",

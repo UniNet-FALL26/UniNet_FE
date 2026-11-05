@@ -1,3 +1,8 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
+import { ProjectInformationFields } from "./ProjectInformationFields";
+import { useAuthStore } from "@/store/auth.store";
+import { ACCOUNT_ROLE } from "@/constants/roles";
+import { Modal } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { colors } from "@/constants/colors";
@@ -31,21 +36,19 @@ const emptyRole = () => ({
 type DatePickerTarget = "recruitmentDeadline" | "expectedOutput" | null;
 
 export function ProjectCreateScreen() {
+  const { account } = useAuthStore();
+  const [importConfirmation, setImportConfirmation] = useState(false);
   const compact = useWindowDimensions().width < 600;
   const [title, setTitle] = useState("");
   const [projectField, setProjectField] = useState("");
   const [customProjectField, setCustomProjectField] = useState("");
   const [description, setDescription] = useState("");
 
-  const [availableTechnologies, setAvailableTechnologies] = useState<string[]>(
-    [],
-  );
   const [skillCatalog, setSkillCatalog] = useState<SkillCatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogRetry, setCatalogRetry] = useState(0);
   const [technologies, setTechnologies] = useState<string[]>([]);
-  const [customTechInput, setCustomTechInput] = useState("");
 
   const [memberTarget, setMemberTarget] = useState("");
   const [minimumQuantity, setMinimumQuantity] = useState("");
@@ -59,7 +62,6 @@ export function ProjectCreateScreen() {
   );
 
   const [isPrivate, setIsPrivate] = useState(false);
-  const [showFieldDropdown, setShowFieldDropdown] = useState(false);
 
   const [datePickerTarget, setDatePickerTarget] =
     useState<DatePickerTarget>(null);
@@ -79,7 +81,6 @@ export function ProjectCreateScreen() {
       .then((catalog) => {
         if (controller.signal.aborted) return;
         setSkillCatalog(catalog);
-        setAvailableTechnologies(catalog.map((skill) => skill.name));
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
@@ -96,31 +97,6 @@ export function ProjectCreateScreen() {
     () => roles.reduce((sum, role) => sum + Number(role.quantity || 0), 0),
     [roles],
   );
-
-  const toggleTechnology = (tech: string) => {
-    setTechnologies((current) =>
-      current.includes(tech)
-        ? current.filter((item) => item !== tech)
-        : [...current, tech],
-    );
-  };
-
-  const handleAddCustomTechnology = () => {
-    const trimmed = customTechInput.trim();
-    if (!trimmed) return;
-
-    const skill = skillCatalog.find(
-      (item) => item.name.toLowerCase() === trimmed.toLowerCase(),
-    );
-    if (!skill) {
-      setSubmitError("Vui lòng chọn công nghệ trong danh mục kỹ năng.");
-      return;
-    }
-    if (!technologies.includes(skill.name))
-      setTechnologies((prev) => [...prev, skill.name]);
-    setSubmitError(null);
-    setCustomTechInput("");
-  };
 
   const updateRole = (
     index: number,
@@ -392,6 +368,7 @@ export function ProjectCreateScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
     >
+      <DetailNavigation title="Tạo dự án" backLabel="Quay lại danh sách dự án" onBack={() => router.dismissTo('/(tabs)/groups' as never)} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
@@ -400,18 +377,7 @@ export function ProjectCreateScreen() {
       >
         {/* HEADER */}
         <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Quay lại danh sách dự án"
-            hitSlop={12}
-            onPress={() => router.dismissTo("/(tabs)/groups" as never)}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
+
 
           <View style={styles.headerText}>
             <Text style={styles.eyebrow}>KHỞI TẠO DỰ ÁN</Text>
@@ -436,176 +402,14 @@ export function ProjectCreateScreen() {
             </View>
           </View>
 
-          <View style={styles.card}>
-            <Input appearance="project"
-
-              label="Tên dự án *"
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Ví dụ: Nền tảng học tập cộng đồng"
-              error={errors.title}
-            />
-
-            {/* LĨNH VỰC */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.inputLabel}>Lĩnh vực dự án *</Text>
-
-              <Pressable
-                onPress={() => setShowFieldDropdown((current) => !current)}
-                style={({ pressed }) => [
-                  styles.dropdownButton,
-                  pressed && styles.dropdownPressed,
-                  errors.projectField && styles.dropdownError,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dropdownText,
-                    !projectField && styles.dropdownPlaceholder,
-                  ]}
-                >
-                  {projectField || "Chọn lĩnh vực dự án"}
-                </Text>
-                <Text style={styles.dropdownArrow}>
-                  {showFieldDropdown ? "⌃" : "⌄"}
-                </Text>
-              </Pressable>
-
-              {showFieldDropdown ? (
-                <View style={styles.dropdownMenu}>
-                  {projectFields.map((field) => {
-                    const selected = projectField === field;
-                    return (
-                      <Pressable
-                        key={field}
-                        onPress={() => {
-                          setProjectField(field);
-                          setShowFieldDropdown(false);
-                        }}
-                        style={({ pressed }) => [
-                          styles.dropdownItem,
-                          selected && styles.dropdownItemSelected,
-                          pressed && styles.dropdownItemPressed,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            selected && styles.dropdownItemTextSelected,
-                          ]}
-                        >
-                          {field}
-                        </Text>
-                        {selected ? (
-                          <Text style={styles.dropdownCheck}>✓</Text>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-
-              {errors.projectField ? (
-                <Text style={styles.errorText}>{errors.projectField}</Text>
-              ) : null}
-
-              {/* INPUT NẾU CHỌN LĨNH VỰC "KHÁC" */}
-              {projectField === "Khác" ? (
-                <View style={styles.customFieldInputWrapper}>
-                  <Input appearance="project"
-
-                    label="Tên lĩnh vực khác *"
-                    value={customProjectField}
-                    onChangeText={setCustomProjectField}
-                    placeholder="Ví dụ: Nông nghiệp công nghệ cao (AgriTech)..."
-                    error={errors.customProjectField}
-                  />
-                </View>
-              ) : null}
-            </View>
-
-            <Input appearance="project"
-
-              label="Mô tả dự án *"
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Mô tả mục đích, phạm vi và những gì dự án muốn xây dựng..."
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-              style={styles.textArea}
-              error={errors.description}
-            />
-
-            {/* TECHNOLOGIES */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.inputLabel}>Công nghệ sử dụng</Text>
-              <Text style={styles.helperText}>
-                Chọn hoặc thêm các công nghệ, công cụ dự án dự kiến sử dụng.
-              </Text>
-
-              {/* Ô thêm công nghệ custom */}
-              <View style={styles.customTechInputRow}>
-                <View style={styles.customTechInputContainer}>
-                  <Input appearance="project"
-
-                    label="Thêm công nghệ khác"
-                    value={customTechInput}
-                    onChangeText={setCustomTechInput}
-                    placeholder="Ví dụ: Flutter, Golang..."
-                    onSubmitEditing={handleAddCustomTechnology}
-                    returnKeyType="done"
-                  />
-                </View>
-                <Pressable
-                  onPress={handleAddCustomTechnology}
-                  style={({ pressed }) => [
-                    styles.addTechButton,
-                    pressed && styles.addTechButtonPressed,
-                  ]}
-                >
-                  <Text style={styles.addTechButtonText}>+ Thêm</Text>
-                </Pressable>
-              </View>
-
-              {catalogLoading && <Text style={styles.sectionDescription}>Đang tải danh mục kỹ năng…</Text>}
-              {catalogError && <Text accessibilityRole="alert" style={styles.errorText}>{catalogError}</Text>}
-              {!catalogLoading && !catalogError && !availableTechnologies.length && (
-                <Text style={styles.sectionDescription}>Chưa có kỹ năng trong danh mục.</Text>
-              )}
-              {!catalogLoading && (catalogError || !availableTechnologies.length) && (
-                <Button
-                  title="Tải lại danh mục kỹ năng"
-                  variant="outline"
-                  onPress={() => setCatalogRetry((value) => value + 1)}
-                />
-              )}
-              <View style={styles.tagsWrap}>
-                {availableTechnologies.map((tech) => {
-                  const selected = technologies.includes(tech);
-                  return (
-                    <Pressable
-                      key={tech}
-                      onPress={() => toggleTechnology(tech)}
-                      style={[
-                        styles.techChip,
-                        selected && styles.techChipSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.techChipText,
-                          selected && styles.techChipTextSelected,
-                        ]}
-                      >
-                        {tech} {selected ? "✕" : ""}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
+          <View style={styles.card}><ProjectInformationFields
+            title={title} projectField={projectField === 'Khác' ? customProjectField : projectField} description={description}
+            skillIds={skillCatalog.filter(skill => technologies.includes(skill.name)).map(skill => skill.id)}
+            onTitle={setTitle} onField={value => { if (projectFields.includes(value)) { setProjectField(value); setCustomProjectField(''); } else { setProjectField('Khác'); setCustomProjectField(value); } }} onDescription={setDescription}
+            onSkills={ids => setTechnologies(skillCatalog.filter(skill => ids.includes(skill.id)).map(skill => skill.name))}
+            catalog={skillCatalog} loading={catalogLoading} catalogError={catalogError} reloadCatalog={() => setCatalogRetry(value => value + 1)}
+            errors={{ ...errors, projectField: errors.projectField || errors.customProjectField }} disabled={submitting}
+          /></View>
         </View>
 
         {/* QUY MÔ */}
@@ -888,8 +692,13 @@ export function ProjectCreateScreen() {
         <Text style={styles.footerHint}>
           Sau khi tạo, dự án sẽ được tạo và chuyển sang bước đề xuất thành viên.
         </Text>
+        {account?.role === ACCOUNT_ROLE.STUDENT && <View style={[styles.card, { borderTopWidth: 1, marginTop: 8 }]}><Text style={styles.sectionTitle}>Bạn đã có dự án hoàn thành bên ngoài UniNet?</Text><Text style={styles.sectionDescription}>Tải tài liệu để điền nhanh hồ sơ và gửi thẩm định.</Text><Button title="Thêm dự án có sẵn" variant="outline" disabled={submitting} onPress={() => {
+          const dirty = !!(title || projectField || customProjectField || description || technologies.length || memberTarget || minimumQuantity || recruitmentDeadline || expectedOutputDate || isPrivate || roles.some(role => role.role || role.requirements || role.quantity !== 1));
+          if (dirty) setImportConfirmation(true); else router.push('/group/import' as never);
+        }} /></View>}
       </ScrollView>
 
+      <Modal visible={importConfirmation} transparent animationType="fade" onRequestClose={() => setImportConfirmation(false)}><View style={{ flex: 1, justifyContent: 'center', backgroundColor: '#00000066', padding: 24 }}><View style={[styles.card, { width: '100%', maxWidth: 520, alignSelf: 'center' }]}><Text style={styles.sectionTitle}>Chuyển sang thêm dự án có sẵn?</Text><Text style={styles.sectionDescription}>Thông tin tạo dự án chưa được gửi. Bạn có thể quay lại để tiếp tục nhập.</Text><Button title="Ở lại form hiện tại" variant="outline" onPress={() => setImportConfirmation(false)} /><Button title="Chuyển luồng" onPress={() => { setImportConfirmation(false); router.push('/group/import' as never); }} /></View></View></Modal>
       {renderDateTimePicker()}
     </KeyboardAvoidingView>
   );

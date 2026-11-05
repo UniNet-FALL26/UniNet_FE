@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
@@ -32,7 +33,7 @@ export default function AssessorAvailabilityScreen() {
   };
   const rows = loaded?.owner === account?.id ? loaded?.rows : null;
   return <View style={s.page}><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, narrow && s.mobileContent]}>
-    <Pressable accessibilityRole="button" onPress={() => router.back()} style={[s.secondaryButton, { alignSelf: 'flex-start' }]}><Text style={s.link}>← Danh sách thẩm định</Text></Pressable>
+    <DetailNavigation backLabel="Quay lại danh sách thẩm định" />
     <View style={s.headingCopy}><Text style={s.eyebrow}>LỊCH CHUYÊN GIA</Text><Text role="heading" aria-level={1} style={s.title}>Lịch làm việc</Text><Text style={s.muted}>Đăng ký khung giờ rảnh trong 365 ngày tới để nhận lịch thẩm định phù hợp.</Text></View>
     <View style={s.card}><Text style={s.sectionTitle}>{editingId ? 'Chỉnh sửa khung giờ' : 'Thêm khung giờ'}</Text><Text style={s.muted}>Chọn ngày và giờ bắt đầu, kết thúc theo múi giờ của bạn.</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}><AvailabilityDateTimePicker label="Bắt đầu khung giờ" value={start} onChange={setStart} disabled={busy} minimumDate={new Date()} maximumDate={new Date(Date.now() + 365 * 86400000)} /><AvailabilityDateTimePicker label="Kết thúc khung giờ" value={end} onChange={setEnd} disabled={busy} minimumDate={start ? new Date(start) : new Date()} maximumDate={new Date(Math.min(Date.now() + 365 * 86400000, start ? new Date(start).getTime() + 31 * 86400000 : Infinity))} /></View>{!!actionError && <Text accessibilityRole="alert" style={s.error}>{actionError}</Text>}{!!notice && <Text accessibilityRole="alert" style={s.link}>{notice}</Text>}<Button title={busy ? 'Đang lưu…' : editingId ? 'Lưu thay đổi' : 'Thêm khung giờ'} disabled={busy || !start || !end} onPress={save} /></View>
     {editingId && <Button title="Hủy chỉnh sửa" variant="outline" disabled={busy} onPress={() => { setEditingId(null); setStart(''); setEnd(''); }} />}

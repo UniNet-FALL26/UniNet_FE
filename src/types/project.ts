@@ -1,3 +1,6 @@
+import type { DraftData } from '@/types/external-project-draft';
+export enum ProjectOrigin { Internal, External }
+export type ProjectLeader = { userId: string | null; fullName: string; nickname: string | null; avatarUrl: string | null; role?: string | null; status?: number | null; joinedAt?: string | null };
 export type ProjectStatus =
   | "Private"
   | "Public"
@@ -43,14 +46,17 @@ export type UpdateProjectRequest = {
   expectedOutput: string;
 };
 export type ProjectListItem = {
+  origin?: ProjectOrigin;
+  ownerUserId?: string | null;
+  leader?: ProjectLeader | null;
   id: string;
   title: string;
   projectField: string;
   description: string;
-  memberTarget: number;
-  minimumQuantity: number;
+  memberTarget: number | null;
+  minimumQuantity: number | null;
   currentMemberCount: number;
-  recruitmentDeadline: string;
+  recruitmentDeadline: string | null;
   visibility: ProjectVisibility;
   recruitmentStatus: ApiRecruitmentStatus;
   status?: ApiProjectStatus;
@@ -72,6 +78,7 @@ export type ProjectListParams = {
   recruitmentStatus?: ApiRecruitmentStatus;
 };
 export type ProjectDetail = ProjectListItem & {
+  externalDetails?: DraftData | null;
   status: ApiProjectStatus;
   updatedAt: string | null;
   expectedOutput: string | null;

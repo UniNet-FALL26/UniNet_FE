@@ -38,12 +38,13 @@ export type CompanyJobInput = {
   skills: { skillId?: string; name?: string; requirementType: JobSkillRequirementType }[]; benefits: CompanyJobBenefit[];
 };
 export type CompanyProfile = {
+  introduction?: import('@/types/partner-introduction').PartnerIntroduction | null;
   id: string; companyName: string; partnerType: PartnerType; description: string | null; industry: string | null;
   website: string | null; websites: string[]; phone: string | null; address: string | null; contactEmail: string | null;
   avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; updatedAt: string; openJobs: CompanyJob[];
 };
 export type CompanyProfileInput = Pick<CompanyProfile,
-  'companyName' | 'partnerType' | 'description' | 'industry' | 'website' | 'websites' | 'phone' | 'address' | 'contactEmail' | 'avatarUrl' | 'coverUrl'>;
+  'companyName' | 'partnerType' | 'description' | 'industry' | 'website' | 'websites' | 'phone' | 'address' | 'contactEmail' | 'avatarUrl' | 'coverUrl' | 'introduction'>;
 export type CompanyDashboard = {
   companyName: string; totalJobs: number; publishedJobs: number; draftJobs: number; closedJobs: number;
   expiringJobs: number; totalApplications: number; pendingApplications: number; viewedApplications: number;
@@ -63,6 +64,7 @@ export type PartnerVerificationUploadDocument = { type: VerificationDocumentType
 export type PartnerVerificationInput = { taxCode?: string | null; representativeName?: string | null; documents: PartnerVerificationUploadDocument[] };
 
 type PartnerProfileResponse = {
+  introduction?: import('@/types/partner-introduction').PartnerIntroduction | null;
   id: string; fullName: string; organizationName: string | null; avatarUrl: string | null; coverUrl: string | null;
   bio: string | null; partnerType: PartnerType | null; industry: string | null; website: string | null;
   contactEmail: string | null; phone: string | null; address: string | null; isVerified: boolean; websites?: string[];
@@ -82,7 +84,7 @@ async function getProfile(signal?: AbortSignal): Promise<CompanyProfile> {
     id: profile.id, companyName: profile.organizationName || profile.fullName, partnerType: profile.partnerType ?? 4,
     description: profile.bio, industry: profile.industry, website: websites[0] ?? null, websites, phone: profile.phone,
     address: profile.address, contactEmail: profile.contactEmail, avatarUrl: profile.avatarUrl, coverUrl: profile.coverUrl,
-    isVerified: profile.isVerified, updatedAt: '', openJobs: dashboard.openJobs,
+    isVerified: profile.isVerified, updatedAt: '', openJobs: dashboard.openJobs, introduction: profile.introduction,
   };
 }
 
@@ -91,7 +93,7 @@ async function savePartnerProfile(input: CompanyProfileInput, signal?: AbortSign
       method: 'PUT', body: JSON.stringify({
         organizationName: input.companyName, partnerType: input.partnerType, avatarUrl: input.avatarUrl,
         coverUrl: input.coverUrl, bio: input.description, industry: input.industry, website: input.websites[0] ?? input.website, websites: input.websites,
-        contactEmail: input.contactEmail, phone: input.phone, address: input.address,
+        contactEmail: input.contactEmail, phone: input.phone, address: input.address, introduction: input.introduction,
       }), signal,
     });
 }

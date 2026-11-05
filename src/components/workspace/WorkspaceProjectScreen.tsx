@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { TaskEditorModal } from "@/components/workspace/TaskEditorModal";
@@ -291,38 +292,7 @@ export function WorkspaceProjectScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          hitSlop={10}
-          onPress={() =>
-            router.canGoBack()
-              ? router.back()
-              : router.replace("/(tabs)/workspace")
-          }
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <SymbolView
-            name={{
-              ios: "chevron.left",
-              android: "arrow_back",
-              web: "arrow_back",
-            }}
-            size={22}
-            tintColor={colors.navy}
-          />
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>KHÔNG GIAN LÀM VIỆC</Text>
-          <Text numberOfLines={1} style={styles.headerTitle}>
-            {loaded?.projectTitle || "Công việc dự án"}
-          </Text>
-        </View>
-      </View>
+      <DetailNavigation title={loaded?.projectTitle || 'Công việc dự án'} onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/workspace')} />
 
       {isLoading ? (
         <View style={styles.state}>

@@ -1,3 +1,6 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
+import { openEvidence } from '@/components/assessor/AssignmentDetailContent';
+import { toast } from '@/store/toast.store';
 import { ProjectOverview } from '@/components/projects/ProjectOverview';
 import { verificationDate as date } from '@/utils/verification-date';
 import { useState } from 'react';
@@ -13,13 +16,19 @@ import { level1Labels, level1Message, level2Label } from '@/utils/project-verifi
 
 const limitation = 'Chỉ kiểm tra văn bản báo cáo và độ an toàn URL. Chưa đọc nội dung file hoặc xác nhận công việc đã hoàn thành.';
 const checkLabels = ['Đạt', 'Không đạt', 'Lỗi dịch vụ', 'Chưa kiểm tra'];
-const kindLabel = (kind: string) => /url/i.test(kind) ? 'Độ an toàn URL' : /text|content/i.test(kind) ? 'Văn bản báo cáo' : 'Kiểm tra minh chứng';
+const kindLabel = (kind: string) => /filecontent/i.test(kind) ? 'Nội dung tệp (ngoài phạm vi kiểm tra)' : /url/i.test(kind) ? 'Độ an toàn URL' : /text|content/i.test(kind) ? 'Văn bản báo cáo' : 'Kiểm tra minh chứng';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return <View style={s.card}><Text style={s.heading}>{title}</Text>{children}</View>;
 }
 function ReviewEvidence({ review, checks = false }: { review: EvidenceModeration; checks?: boolean }) {
   const attempt = [...review.attempts].sort((a, b) => b.number - a.number)[0];
+  if (review.source.projectEvidence) {
+    const evidence = review.source.projectEvidence;
+    const checksFor = (documentId: string | null) => attempt?.results.filter(result => documentId ? result.projectEvidenceDocumentId === documentId : !result.projectEvidenceDocumentId && !result.projectTaskId) || [];
+    const renderChecks = (documentId: string | null) => checks && checksFor(documentId).map((result, index) => <View key={index} style={s.result}><Text style={s.label}>{kindLabel(result.kind)} · {checkLabels[result.status] || 'Chưa xác định'}</Text><Text style={s.body}>{result.reason}</Text><Text style={s.small}>Kiểm tra lúc {date(result.checkedAt)}</Text></View>);
+    return <View style={s.evidence}><Text style={s.heading}>Minh chứng dự án bên ngoài</Text><Text style={s.body}>{evidence.content}</Text>{renderChecks(null)}{evidence.documents.map(file => <View key={file.id} style={s.report}><Text style={s.label}>{file.fileName}</Text><Text style={s.small}>{(file.sizeBytes / 1024 / 1024).toFixed(2)} MB</Text><Button title="Mở tài liệu minh chứng" variant="outline" onPress={() => void openEvidence(file.fileUrl, message => toast.error(message))} />{renderChecks(file.id)}</View>)}</View>;
+  }
   if (!review.source.tasks.length) return <Text style={s.body}>Chưa có công việc trong phiên kiểm tra này.</Text>;
   return <>{review.source.tasks.map((task, taskIndex) => <View key={task.projectTaskId} style={s.evidence}>
     <Text style={s.heading}>Công việc {taskIndex + 1}</Text>
@@ -48,7 +57,8 @@ function ReviewEvidence({ review, checks = false }: { review: EvidenceModeration
 export function CompletedDetailView({ project, level1Only = false, initialTab = 'Tổng quan' }: { project: ProjectDetail; level1Only?: boolean; initialTab?: string }) {
   const [tab, setTab] = useState(initialTab);
   const wide = useWindowDimensions().width >= 900;
-  const { level1, level2, cycle, notice, retrying, refresh, retry } = useProjectVerification(project.id, project.isCreator, level1Only);
+  const external = project.origin === 1;
+  const { level1, level2, cycle, notice, retrying, refresh, retry } = useProjectVerification(project.id, project.isCreator, level1Only, external);
   const review = level1.data;
   const eligible = review?.status === 2 && review.isCurrent;
   const privateMessage = 'Kết quả xác minh riêng tư chỉ dành cho người tạo dự án. Trạng thái hoàn thành không đồng nghĩa đã xác minh.';
@@ -66,21 +76,18 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
   const cta = level1Only
     ? { title: 'Xem minh chứng cần cập nhật', action: showEvidence }
     : !level2.loading && !level2.error && (level2.data || eligible)
-    ? { title: level2.data ? level2.data.verification.status === 0 ? 'Tiếp tục hồ sơ cấp 2' : 'Xem hồ sơ và kết quả cấp 2' : 'Chọn gói xác minh cấp 2', action: openLevel2 }
+    ? { title: level2.data ? level2.data.verification.status === 0 ? 'Tiếp tục hồ sơ thẩm định' : 'Xem hồ sơ và kết quả thẩm định' : 'Chọn gói thẩm định', action: openLevel2 }
     : { title: 'Xem kết quả cấp 1', action: openLevel1 };
   return <SafeAreaView style={s.safe}>
-    <View style={s.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" style={s.back} onPress={() => level1Only ? router.back() : router.dismissTo('/(tabs)/groups' as never)}><Text style={s.backText}>‹</Text></Pressable>
-      <Text style={s.headerTitle}>{level1Only ? 'Kết quả kiểm tra cấp 1' : 'Dự án đã hoàn thành'}</Text>
-    </View>
+    <DetailNavigation title={level1Only ? 'Kết quả kiểm tra cấp 1' : 'Dự án đã hoàn thành'} onBack={() => level1Only ? router.back() : router.dismissTo('/(tabs)/groups' as never)} />
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}>
 
         <View style={s.heroTop}><Text style={s.heroKicker}>HỒ SƠ DỰ ÁN</Text><Text style={s.heroMark}>✓</Text></View>
         <Text style={s.eyebrow}>{project.projectField}</Text>
         <Text accessibilityRole="header" style={s.title}>{project.title}</Text>
-        <View style={s.badges}><Text style={s.badge}>✓ Đã hoàn thành</Text><Text style={s.role}>{project.isCreator ? 'Người tạo dự án' : project.isMember ? 'Thành viên' : 'Khách xem'}</Text></View>
-        <Text style={s.heroNote}>Hoàn thành dự án và xác minh là hai trạng thái độc lập.</Text>
+        <View style={s.badges}><Text style={s.badge}>✓ Đã hoàn thành</Text><Text style={s.role}>{project.isCreator ? external ? 'Người quản lý hồ sơ' : 'Người tạo dự án' : project.isMember ? 'Thành viên' : 'Khách xem'}</Text></View>
+        {external && <Text style={s.role}>Dự án bên ngoài</Text>}<Text style={s.heroNote}>Hoàn thành dự án và xác minh là hai trạng thái độc lập.</Text>
       </View>
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}
       {!level1Only && <View accessibilityRole="tablist" style={s.tabs}>{['Tổng quan', 'Minh chứng', 'Xác minh'].map(name => <Pressable key={name} accessibilityRole="tab" accessibilityState={{ selected: tab === name }} onPress={() => setTab(name)} style={[s.tab, tab === name && s.selectedTab]}><Text style={[s.tabText, tab === name && s.selectedText]}>{name}</Text></Pressable>)}</View>}
@@ -95,7 +102,7 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
           <View style={s.divider} />
           <View style={s.step}><View style={s.stepNumber}><Text style={s.stepNumberText}>02</Text></View><View style={s.stepBody}>
           <Text style={s.label}>Xác minh chuyên viên</Text>
-          <Text style={s.small}>{level2.error ? 'Chưa tải được trạng thái cấp 2' : level2.loading && !level2.data ? 'Đang tải cấp 2…' : level2Label(level2.data, !!eligible)}</Text>
+          <Text style={s.small}>{level2.error ? 'Chưa tải được trạng thái thẩm định' : level2.loading && !level2.data ? 'Đang tải thẩm định…' : level2Label(level2.data, !!eligible)}</Text>
           {level2.error && <Text accessibilityRole="alert" style={s.warning}>{level2.error}</Text>}
           </View></View>
           {(level1.loading || level2.loading) && <Text style={s.small}>Đang làm mới trạng thái…</Text>}
@@ -124,19 +131,19 @@ export function CompletedDetailView({ project, level1Only = false, initialTab = 
       </View> : <Card title="Thông tin xác minh"><Text style={s.body}>{privateMessage}</Text></Card>}
 
       {(level1Only || tab === 'Minh chứng') && project.isCreator && <Card title="Báo cáo và minh chứng">
-        {cycle.loading ? <Text style={s.small}>Đang kiểm tra quyền cập nhật minh chứng…</Text> : <Text style={s.notice}>{cycle.error ? 'Chưa xác định được quyền cập nhật. Tạm thời chỉ xem minh chứng.' : cycle.data?.status === 0 ? 'Đầu vào đóng góp đang mở. Bên dưới là minh chứng đã được ghi nhận trong phiên kiểm tra gần nhất.' : 'Minh chứng đang ở chế độ chỉ đọc: không có chu kỳ đóng góp đang thu thập đánh giá hoặc đầu vào đã khóa.'}</Text>}
-        <Text style={s.small}>Đây là bản chụp tại thời điểm kiểm tra, có thể khác dữ liệu hiện tại. Cập nhật minh chứng có thể làm kết quả cũ hết hiệu lực.</Text>
+        {external ? <Text style={s.notice}>Đánh giá đóng góp nội bộ: Không áp dụng. Minh chứng của dự án này là tài liệu được chọn khi thêm hồ sơ.</Text> : cycle.loading ? <Text style={s.small}>Đang kiểm tra quyền cập nhật minh chứng…</Text> : <Text style={s.notice}>{cycle.error ? 'Chưa xác định được quyền cập nhật. Tạm thời chỉ xem minh chứng.' : cycle.data?.status === 0 ? 'Đầu vào đóng góp đang mở. Bên dưới là minh chứng đã được ghi nhận trong phiên kiểm tra gần nhất.' : 'Minh chứng đang ở chế độ chỉ đọc: không có chu kỳ đóng góp đang thu thập đánh giá hoặc đầu vào đã khóa.'}</Text>}
+        {external && (review?.status === 3 || review?.status === 4) && <Text style={s.warning}>Hiện chưa hỗ trợ sửa hồ sơ hoặc thay minh chứng sau xác nhận. Hãy tạo hồ sơ mới từ tài liệu đã sửa hoặc liên hệ hỗ trợ.</Text>}<Text style={s.small}>Đây là bản chụp tại thời điểm kiểm tra, có thể khác dữ liệu hiện tại. Cập nhật minh chứng có thể làm kết quả cũ hết hiệu lực.</Text>
         {level1.error ? <Text style={s.warning}>{level1.error}</Text> : review ? <ReviewEvidence review={review} checks={level1Only} /> : <Text style={s.body}>{level1.loading ? 'Đang tải…' : 'Chưa có bản chụp minh chứng cấp 1.'}</Text>}
       </Card>}
       {!level1Only && tab === 'Minh chứng' && !project.isCreator && <Card title="Minh chứng"><Text style={s.body}>{project.isMember ? 'Minh chứng trong phiên kiểm tra chỉ dành cho người tạo dự án.' : 'Bạn không có quyền xem báo cáo và minh chứng riêng tư.'}</Text></Card>}
       {!level1Only && tab === 'Xác minh' && <Card title="Chi tiết xác minh">
         <Text style={s.body}>{project.isCreator ? nextMessage : privateMessage}</Text>
         {project.isCreator && <>
-          <Text style={s.label}>Cấp 2 · Xác minh chuyên viên</Text>
+          <Text style={s.label}>Thẩm định · Chuyên viên đánh giá</Text>
           <Text style={s.body}>{level2.error || (level2.loading && !level2.data ? 'Đang tải…' : level2Label(level2.data, !!eligible))}</Text>
           {level2.data?.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {date(level2.data.verification.scheduledStartAt)} — {date(level2.data.verification.scheduledEndAt)} (giờ Việt Nam, UTC+7)</Text>}
-          {!level2.loading && !level2.error && (eligible || level2.data) && <Button title={level2.data ? 'Xem hồ sơ cấp 2' : 'Chọn gói cấp 2'} onPress={openLevel2} />}
-          <Text style={s.small}>Theo dõi lịch hẹn, thanh toán và kết luận chuyên viên trong hồ sơ cấp 2.</Text>
+          {!level2.loading && !level2.error && (eligible || level2.data) && <Button title={level2.data ? 'Xem hồ sơ thẩm định' : 'Chọn gói thẩm định'} onPress={openLevel2} />}
+          <Text style={s.small}>Theo dõi lịch hẹn, thanh toán và kết luận chuyên viên trong hồ sơ thẩm định.</Text>
         </>}
       </Card>}
     </ScrollView>

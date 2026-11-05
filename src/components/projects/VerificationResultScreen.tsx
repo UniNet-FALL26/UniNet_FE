@@ -8,14 +8,14 @@ export function VerificationResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { detail, result, error, resultError, loading, refresh } = useVerificationDossier(id ?? '', true);
   const status = result?.status ?? detail?.verification.status;
-  const title = status === 1 ? '✓ Đạt xác minh cấp 2' : status === 2 ? '× Không đạt xác minh cấp 2' : status === 3 ? 'Hồ sơ đã hủy' : 'Đang chờ kết luận cấp 2';
-  return <DossierLayout title="Kết quả xác minh cấp 2">
-    <View style={ds.hero}><Text style={ds.kicker}>KẾT LUẬN CHUYÊN VIÊN</Text><Text style={ds.title}>{detail ? title : 'Kết quả cấp 2'}</Text><Text style={ds.heroText}>{detail?.project?.title || detail?.verification.projectTitle || 'Hồ sơ xác minh dự án'}</Text></View>
-    <Text style={ds.notice}>Trạng thái “Đã hoàn thành” của dự án và kết quả xác minh cấp 2 là hai trạng thái độc lập.</Text>
+  const title = status === 1 ? '✓ Đạt thẩm định' : status === 2 ? '× Không đạt thẩm định' : status === 3 ? 'Hồ sơ đã hủy' : 'Đang chờ kết luận thẩm định';
+  return <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Kết quả thẩm định">
+    <View style={ds.hero}><Text style={ds.kicker}>KẾT LUẬN CHUYÊN VIÊN</Text><Text style={ds.title}>{detail ? title : 'Kết quả thẩm định'}</Text><Text style={ds.heroText}>{detail?.project?.title || detail?.verification.projectTitle || 'Hồ sơ xác minh dự án'}</Text></View>
+    <Text style={ds.notice}>Trạng thái “Đã hoàn thành” của dự án và kết quả thẩm định là hai trạng thái độc lập.</Text>
     {loading && <Text accessibilityRole="progressbar" style={ds.small}>Đang tải kết luận mới nhất…</Text>}
     {error && <Text accessibilityRole="alert" style={ds.error}>{error} Dữ liệu đang hiển thị có thể chưa được cập nhật.</Text>}
     {detail && <DossierCard title="Kết luận hiện tại">
-      <Text style={ds.heading}>{title}</Text>
+      <Text style={[ds.resultBadge, status === 1 && ds.resultSuccess, status === 2 && ds.resultFailed]}>{title}</Text>
       {status === 1 || status === 2 ? <Text style={ds.body}>Thời điểm kết luận: {date(result?.finalizedAt ?? detail.finalResult?.finalizedAt)}</Text>
         : <Text style={ds.body}>{status === 3 ? 'Hồ sơ đã dừng xử lý.' : detail.meetingEndAt ? 'Buổi xác minh đã kết thúc. Đang chờ kết luận của chuyên viên.' : 'Chưa có kết luận cuối cùng. Tiếp tục theo dõi hồ sơ và lịch hẹn.'}</Text>}
       {result && status === 0 && <Text style={ds.small}>Các báo cáo bên dưới chưa phải kết luận cuối cùng của hồ sơ.</Text>}

@@ -139,9 +139,9 @@ export function VerificationDossierScreen() {
   const remaining = detail ? holdSeconds(detail, Date.now()) : 0;
   const final = v?.status === 1 || v?.status === 2;
   return (
-    <DossierLayout title="Hồ sơ xác minh cấp 2">
+    <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Hồ sơ thẩm định">
       <View style={ds.hero}>
-        <Text style={ds.kicker}>XÁC MINH CHUYÊN VIÊN · CẤP 2</Text>
+        <Text style={ds.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text>
         <Text style={ds.title}>
           {detail?.project?.title ||
             v?.projectTitle ||
@@ -171,7 +171,7 @@ export function VerificationDossierScreen() {
           <DossierCard title="Tiến trình hồ sơ">
             {dossierSteps(detail).map((step, index) => (
               <View key={step.title} style={ds.step}>
-                <Text style={ds.number}>
+                <Text style={[ds.number, step.done && ds.stepDone]}>
                   {step.done ? "✓" : String(index + 1).padStart(2, "0")}
                 </Text>
                 <Text style={ds.stepText}>
@@ -257,7 +257,7 @@ export function VerificationDossierScreen() {
                 />
               )}
             <Button
-              title={final ? "Xem kết quả cấp 2" : "Xem báo cáo cấp 2"}
+              title={final ? "Xem kết quả thẩm định" : "Xem báo cáo thẩm định"}
               variant="outline"
               disabled={!canAct}
               onPress={() =>
@@ -343,7 +343,7 @@ export function VerificationDossierScreen() {
             </>
           )}
           <Text style={ds.small}>
-            Thanh toán thành công không đồng nghĩa đạt xác minh cấp 2.
+            Thanh toán thành công không đồng nghĩa đạt thẩm định.
           </Text>
         </DossierCard>
       )}

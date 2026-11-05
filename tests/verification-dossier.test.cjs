@@ -76,10 +76,10 @@ function renderResult(snapshot) {
 test('S09 separates failed, passed, waiting and unavailable result reports', () => {
   const report = { id: 'r', summary: 'Tóm tắt thật', findings: 'Phát hiện thật', recommendations: 'Khuyến nghị thật', submittedAt: '2026-10-22' };
   const failed = renderResult({ detail: detail({ verification: { status: 2 } }), result: { status: 2, reports: [report], finalizedAt: '2026-10-22' } });
-  for (const text of ['Không đạt xác minh cấp 2', 'Tóm tắt thật', 'Phát hiện thật', 'Khuyến nghị thật', 'hai trạng thái độc lập']) assert.ok(failed.includes(text));
+  for (const text of ['Không đạt thẩm định', 'Tóm tắt thật', 'Phát hiện thật', 'Khuyến nghị thật', 'hai trạng thái độc lập']) assert.ok(failed.includes(text));
   const waiting = renderResult({ detail: detail({ payments: [{ status: 1 }] }), result: null });
-  assert.ok(waiting.includes('Đang chờ kết luận cấp 2'));
-  assert.ok(!waiting.includes('✓ Đạt xác minh cấp 2'));
+  assert.ok(waiting.includes('Đang chờ kết luận thẩm định'));
+  assert.ok(!waiting.includes('✓ Đạt thẩm định'));
   const partial = renderResult({ detail: detail(), result: { status: 0, reports: [report] } });
   assert.ok(partial.includes('chưa phải kết luận cuối cùng'));
   const denied = renderResult({ detail: null, result: null, error: 'Không có quyền' });
@@ -107,12 +107,12 @@ test('S07 resumes existing dossier, hides locked cancellation and exposes final 
   }
   const pending = render(detail());
   assert.ok(pending.includes('Chưa chọn lịch') && pending.includes('Chọn lịch xác minh') && pending.includes('Hủy hồ sơ'));
-  assert.ok(!pending.includes('Chọn gói cấp 2'));
+  assert.ok(!pending.includes('Chọn gói thẩm định'));
   const assigned = render(detail({ assignments: [{ id: 'a', status: 0, assignedAt: '2026-10-22' }] }));
   assert.ok(assigned.includes('Đã phân công'));
   assert.ok(!assigned.includes('Hủy hồ sơ'));
   const final = render(detail({ verification: { status: 2 } }));
-  assert.ok(final.includes('Không đạt cấp 2') && final.includes('Xem kết quả cấp 2'));
+  assert.ok(final.includes('Không đạt thẩm định') && final.includes('Xem kết quả thẩm định'));
   assert.ok(!final.includes('Hủy hồ sơ') && !final.includes('Chọn lịch xác minh'));
 });
 

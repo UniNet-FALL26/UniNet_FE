@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ToastHost } from '@/components/ui/ToastHost';
 import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import { type Href, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -56,10 +57,7 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
   const openDialog = (value: 'account' | 'terms' | 'privacy') => { clearError(); setDialog(value); if (value === 'account' && student) void verification.refresh(); };
   const closeDialog = () => { if (!loggingOut) { setDialog(null); clearError(); } };
   return <SafeAreaView style={[s.safe, embedded && s.embeddedSafe]} edges={embedded ? [] : undefined}>
-    {!embedded && <View style={s.topBar}><View style={s.topInner}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại hồ sơ cá nhân" disabled={busy} onPress={() => router.canGoBack() ? router.back() : router.replace(student ? '/(tabs)/profile' : '/(company)/profile')} style={({ pressed }) => [s.back, pressed && s.pressed]}><SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={20} tintColor={colors.navy} /></Pressable>
-      <Text role="heading" aria-level={1} style={s.brand}>UniNet<Text style={s.breadcrumb}> / Cài đặt</Text></Text>
-    </View></View>}
+    {!embedded && <DetailNavigation title="Cài đặt" backLabel="Quay lại hồ sơ cá nhân" disabled={busy} />}
     <ScrollView showsVerticalScrollIndicator={!embedded} contentContainerStyle={[s.content, !wide && s.mobileContent, embedded && s.embeddedContent]}>
       {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.panel}><Text style={s.sectionTitle}>Chào mừng đến với UniNet</Text><Text style={s.body}>Đăng nhập để quản lý tài khoản và hồ sơ của bạn.</Text><Button style={s.actionButton} textStyle={s.actionButtonText} title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : <View style={[s.columns, wide && s.wideColumns]}>
         {!embedded && <View style={[s.identity, wide && s.identityRail]}>

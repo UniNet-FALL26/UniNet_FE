@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { authStore, useAuthStore } from '@/store/auth.store';
 import { assessorProfileService, type AssessorProfile as ExpertProfile } from '@/services/assessor-profile.service';
 import { AssessorSectionEditor } from '@/components/assessor/AssessorSectionEditor';
 import { AssessorProfileContent } from '@/components/assessor/AssessorProfileContent';
-import { AssessorProfileTabs } from '@/components/assessor/AssessorProfileTabs';
-import type { AssessorProfileTab } from '@/constants/assessor-profile-tabs';
 import type { AssessorProfileSection, AssessorProfileSectionValues } from '@/constants/assessor-profile-sections';
 import { AssessorNameEditor } from '@/components/assessor/AssessorNameEditor';
 import { AssessorProfileHero } from '@/components/assessor/AssessorProfileHero';
@@ -23,10 +21,7 @@ export default function AssessorProfileScreen() {
   const { account } = useAuthStore(); const { width } = useWindowDimensions(); const wide = width >= 1200, compactHeader = width < 600;
   const [loaded, setLoaded] = useState<{ owner: string; profile: ExpertProfile | null } | null>(null), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState<{ owner: string; section: AssessorProfileSection; summary: boolean } | null>(null);
-  const [confirmClear, setConfirmClear] = useState(false), [clearing, setClearing] = useState(false);
   const [editingNameOwner, setEditingNameOwner] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<AssessorProfileTab>('posts');
-  useEffect(() => { setActiveTab('posts'); }, [account?.id]);
   const [photo, setPhoto] = useState<{ owner: string; target: 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null), [choosingPhoto, setChoosingPhoto] = useState(false);
   const choosing = useRef(false), alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -71,12 +66,6 @@ export default function AssessorProfileScreen() {
     }, signal);
     if (!signal.aborted && alive.current && identity.current === owner) { setLoaded({ owner, profile: updated.profile }); authStore.updateAccount(updated); }
   };
-  const clearExpertise = async () => {
-    if (clearing) return; const owner = account?.id; if (!owner) return; setClearing(true);
-    try { const result = await assessorProfileService.clear(); if (alive.current && identity.current === owner) { setLoaded({ owner, profile: result.profile }); authStore.updateAccount(result); setConfirmClear(false); } }
-    catch (cause) { if (alive.current && identity.current === owner) setError(cause instanceof Error ? cause.message : 'Chưa xóa được dữ liệu chuyên môn.'); }
-    finally { if (alive.current && identity.current === owner) setClearing(false); }
-  };
   return <View style={shared.page} testID="assessor-profile-page">
     {!wide && <View testID="assessor-profile-header" style={s.mobileHeader}><View style={s.headerSpacer} /><View style={[s.headerActions, compactHeader && s.compactHeaderActions]}>
       <Pressable testID="assessor-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa họ tên" disabled={!data || choosingPhoto || !!photo} hitSlop={compactHeader ? 6 : undefined} onPress={() => setEditingNameOwner(account?.id ?? null)} style={({ pressed }) => [s.settingsButton, compactHeader && s.compactSettings, pressed && s.pressed, !data && s.disabled]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} tintColor={colors.textPrimary} /></Pressable>
@@ -84,13 +73,10 @@ export default function AssessorProfileScreen() {
     </View></View>}
     <View style={[s.columns, wide && s.desktopColumns]}><ScrollView testID="assessor-profile-main-column" style={s.mainColumn} showsVerticalScrollIndicator={false} contentContainerStyle={[s.content, wide && s.desktopContent]}>
       <AssessorProfileHero fullName={name} avatarUrl={avatar} coverUrl={data?.coverUrl} isVerified={data?.isVerified ?? account?.profile?.isVerified ?? false}
-        disabled={!data || choosingPhoto || !!photo} onEditCover={() => void choosePhoto('coverUrl')} onEditAvatar={() => void choosePhoto('avatarUrl')} onEditProfile={() => setEditingNameOwner(account?.id ?? null)}>
-        <AssessorProfileTabs active={activeTab} onChange={setActiveTab} />
-      </AssessorProfileHero>
+        disabled={!data || choosingPhoto || !!photo} onEditCover={() => void choosePhoto('coverUrl')} onEditAvatar={() => void choosePhoto('avatarUrl')} onEditProfile={() => setEditingNameOwner(account?.id ?? null)} />
       {!!error && <AssessorState error={error} retry={() => setAttempt(v => v + 1)} />}
       {!data && !error && <AssessorState loading />}
-      {data && <AssessorProfileContent profile={data} active={activeTab} accountEmail={account?.email} joinedAt={account?.createdAt} onEdit={section => { if (account) setEditing({ owner: account.id, section, summary: activeTab === 'posts' }); }} />}
-      {activeTab === 'work' && data?.assessorJson && <View style={[shared.card, { marginHorizontal: 20 }]}><Text style={shared.sectionTitle}>Dữ liệu chuyên môn</Text><Text style={shared.muted}>{confirmClear ? 'Xác nhận xóa toàn bộ dữ liệu chuyên môn? Thông tin cá nhân và ảnh được giữ lại.' : 'Bạn có thể xóa toàn bộ thông tin chuyên môn đã khai báo.'}</Text><Pressable accessibilityRole="button" disabled={clearing} onPress={() => { if (confirmClear) void clearExpertise(); else setConfirmClear(true); }} style={shared.secondaryButton}><Text style={shared.error}>{clearing ? 'Đang xóa…' : confirmClear ? 'Xác nhận xóa dữ liệu chuyên môn' : 'Xóa dữ liệu chuyên môn'}</Text></Pressable>{confirmClear && <Pressable accessibilityRole="button" disabled={clearing} onPress={() => setConfirmClear(false)}><Text style={shared.link}>Giữ lại thông tin</Text></Pressable>}</View>}
+      {data && <AssessorProfileContent profile={data} active="posts" accountEmail={account?.email} joinedAt={account?.createdAt} onEdit={section => { if (account) setEditing({ owner: account.id, section, summary: true }); }} />}
     </ScrollView>{wide && <View testID="assessor-profile-settings-column" style={s.settingsRail}><SettingsPanel embedded /></View>}</View>
     {editing && editing.owner === account?.id && !!data && <AssessorSectionEditor key={`${editing.owner}:${editing.section}`} section={editing.section} summary={editing.summary} profile={data} onSave={(values, signal) => saveSection(editing.section, values, signal, editing.summary)} onClose={() => setEditing(null)} />}
     {editingNameOwner === account?.id && !!data && <AssessorNameEditor key={editingNameOwner} fullName={data.fullName} onSave={saveName} onClose={() => setEditingNameOwner(null)} />}

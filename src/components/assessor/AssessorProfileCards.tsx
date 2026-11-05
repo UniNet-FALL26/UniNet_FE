@@ -33,7 +33,7 @@ export function AssessorProfileCards({ profile, accountEmail, onEdit, sections, 
         </View>
         {section === 'bio' && <View style={s.fields}><Text selectable numberOfLines={summary ? 4 : undefined} style={[s.bio, !profile.bio && s.empty]}>{profile.bio || 'Thêm vài dòng giới thiệu về bản thân và kinh nghiệm của bạn.'}</Text>{summary && <>
           {d?.jobTitle && row('Chức danh', d.jobTitle, icons.work, work)}
-          {(d?.companyName || university) && row('Đơn vị / trường', d?.companyName || university, { ios: 'building.2.fill', android: 'business', web: 'business' }, education)}
+          {d?.companyName && row('Đang làm việc tại', d.companyName, { ios: 'building.2.fill', android: 'business', web: 'business' }, education)}
           {profile.address && row('Địa chỉ', profile.address, { ios: 'mappin.circle.fill', android: 'location_on', web: 'location_on' }, contact)}
           {joinedAt && Number.isFinite(Date.parse(joinedAt)) && row('Tham gia UniNet', new Date(joinedAt).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }), { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, contact)}
         </>}</View>}

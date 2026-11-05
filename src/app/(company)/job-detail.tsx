@@ -1,3 +1,5 @@
+import { DetailModal } from '@/components/navigation/DetailModal';
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ActionButton, Card, CompanyIcon, CompanyPage, PageTitle, Tag, companyColors as c, type CompanyIconName } from '@/components/company/company-ui';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { jobApplicationIcons as jobIcons } from '@/constants/job-applicant-icons';
@@ -16,7 +18,7 @@ const canMoveApplicantStatus = (current: CompanyJobApplicationStatus, next: Comp
 export default function CompanyJobDetail() {
   const { width, height } = useWindowDimensions();
   const wide = Platform.OS === 'web' && width >= 900;
-  const mobile = width < 600;
+  const mobile = width < 1024;
   const { jobId } = useLocalSearchParams<{ jobId?: string }>();
   const [job, setJob] = useState<CompanyJob | null>(null);
   const [applicants, setApplicants] = useState<CompanyApplicant[]>([]);
@@ -108,12 +110,8 @@ export default function CompanyJobDetail() {
   );
 
   return <CompanyPage>
-    {mobile && <View testID="job-detail-mobile-header" style={s.mobileHeader}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} style={s.mobileBack}><CompanyIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} color={c.ink} size={21} /></Pressable>
-      {jobActions}
-    </View>}
+    <DetailNavigation title="Chi tiết bài đăng" mobileActions={jobActions} />
     <ScrollView style={s.detailScroll} contentContainerStyle={[s.page, mobile && s.mobilePage]}>
-    {!mobile && <Pressable accessibilityRole="button" onPress={() => router.back()} style={s.back}><CompanyIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} color={c.ink} /><Text style={s.muted}>Quản lý bài đăng</Text><Text style={s.muted}>›</Text><Text style={s.muted}>Chi tiết</Text></Pressable>}
     {!mobile && <View style={s.heading}>
       <View style={s.headingCopy}><PageTitle title="Chi tiết bài đăng" subtitle="Thông tin, hiệu suất và danh sách ứng viên." /></View>
       {jobActions}
@@ -169,7 +167,7 @@ export default function CompanyJobDetail() {
       </View>
     </View></View>
   </Modal>
-  <Modal visible={!!selectedCv} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setSelectedCv(null)}><SafeAreaView style={s.cvModal} edges={['top', 'bottom']}><View style={s.cvModalHeader}><View><Text style={s.cvModalTitle}>CV đã nộp</Text><Text style={s.muted}>{selectedCv?.owner}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Đóng CV" onPress={() => setSelectedCv(null)} style={s.closeButton}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} color={c.ink} size={17} /></Pressable></View><ScrollView contentContainerStyle={s.cvModalContent}>{selectedCv && <View onLayout={event => setCvFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={cvTemplate.id} data={selectedCv.portfolio} theme={cvTheme} width={Math.min(cvFrameWidth || width, 1120)} /></View>}</ScrollView></SafeAreaView></Modal><Modal visible={!!statusConfirmation} transparent animationType="fade" onRequestClose={() => { if (!statusSaving) setStatusConfirmation(null); }}><View style={s.confirmOverlay}><View style={s.confirmCard}><Text style={s.confirmTitle}>Xác nhận chuyển trạng thái</Text><Text style={s.confirmMessage}>{statusConfirmation ? "Chuyển hồ sơ của " + statusConfirmation.applicant.fullName + " sang “" + companyJobApplicationStatusLabel[statusConfirmation.status] + "”?" : ""}{statusConfirmation?.status === 4 ? " Sau khi từ chối, hồ sơ sẽ kết thúc quy trình." : statusConfirmation?.status === 3 ? " Sau khi nhận, hồ sơ sẽ kết thúc quy trình." : ""}</Text>{!!statusError && <Text accessibilityRole="alert" style={s.confirmError}>{statusError}</Text>}<View style={s.confirmActions}><Pressable accessibilityRole="button" accessibilityLabel="Hủy cập nhật trạng thái" disabled={statusSaving} onPress={() => setStatusConfirmation(null)} style={[s.confirmButton, s.cancelButton]}><Text style={s.cancelText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Xác nhận cập nhật trạng thái" disabled={statusSaving} onPress={() => void confirmApplicantStatus()} style={[s.confirmButton, s.saveButton]}><Text style={s.saveText}>{statusSaving ? "Đang lưu…" : "Xác nhận"}</Text></Pressable></View></View></View></Modal></CompanyPage>;
+  <DetailModal crumbs={[{ label: 'Quản lý bài đăng', href: '/(company)/jobs' }, { label: 'Chi tiết', href: '/job-detail?jobId=' + jobId }, { label: 'CV đã nộp' }]} backLabel="Đóng CV" visible={!!selectedCv} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setSelectedCv(null)}><SafeAreaView style={s.cvModal} edges={[]}><ScrollView contentContainerStyle={s.cvModalContent}>{selectedCv && <View onLayout={event => setCvFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={cvTemplate.id} data={selectedCv.portfolio} theme={cvTheme} width={Math.min(cvFrameWidth || width, 1120)} /></View>}</ScrollView></SafeAreaView></DetailModal><Modal visible={!!statusConfirmation} transparent animationType="fade" onRequestClose={() => { if (!statusSaving) setStatusConfirmation(null); }}><View style={s.confirmOverlay}><View style={s.confirmCard}><Text style={s.confirmTitle}>Xác nhận chuyển trạng thái</Text><Text style={s.confirmMessage}>{statusConfirmation ? "Chuyển hồ sơ của " + statusConfirmation.applicant.fullName + " sang “" + companyJobApplicationStatusLabel[statusConfirmation.status] + "”?" : ""}{statusConfirmation?.status === 4 ? " Sau khi từ chối, hồ sơ sẽ kết thúc quy trình." : statusConfirmation?.status === 3 ? " Sau khi nhận, hồ sơ sẽ kết thúc quy trình." : ""}</Text>{!!statusError && <Text accessibilityRole="alert" style={s.confirmError}>{statusError}</Text>}<View style={s.confirmActions}><Pressable accessibilityRole="button" accessibilityLabel="Hủy cập nhật trạng thái" disabled={statusSaving} onPress={() => setStatusConfirmation(null)} style={[s.confirmButton, s.cancelButton]}><Text style={s.cancelText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Xác nhận cập nhật trạng thái" disabled={statusSaving} onPress={() => void confirmApplicantStatus()} style={[s.confirmButton, s.saveButton]}><Text style={s.saveText}>{statusSaving ? "Đang lưu…" : "Xác nhận"}</Text></Pressable></View></View></View></Modal></CompanyPage>;
 }
 
 function Info({ label, value, icon }: { label: string; value: string; icon: CompanyIconName }) { return <View style={s.info}><View style={s.infoLabel}><CompanyIcon name={icon} size={14} color={c.blue} /><Text style={s.muted}>{label}</Text></View><Text style={s.infoValue}>{value}</Text></View>; }

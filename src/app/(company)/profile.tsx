@@ -1,4 +1,5 @@
-import { CompanyAboutCard } from '@/components/company/CompanyAboutCard';
+import { CompanyIntroductionCards } from '@/components/company/CompanyIntroductionCards';
+import { CompanyProfilePosts } from '@/components/company/CompanyProfilePosts';
 import { PartnerVerification } from '@/components/company/PartnerVerification';
 import { VerificationBanner } from '@/components/profile/VerificationBanner';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
@@ -7,7 +8,7 @@ import { CompanyProfileHero } from '@/components/company/CompanyProfileHero';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { Button } from '@/components/ui/Button';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import type { ImagePickerAsset } from 'expo-image-picker';
@@ -21,41 +22,29 @@ import { WebsiteBrandIcon } from '@/components/company/WebsiteBrandIcon';
 import { imageBody } from '@/utils/image-picker';
 import { authStore } from '@/store/auth.store';
 
-async function openWebsite(value: string | null | undefined) {
-  const website = value?.trim();
-  if (!website) return;
-  const href = /^https?:\/\//i.test(website) ? website : `https://${website}`;
-  try {
-    const url = new URL(href);
-    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error('invalid URL');
-    await Linking.openURL(url.toString());
-  } catch {
-    Alert.alert('Không mở được website', 'Liên kết website không hợp lệ hoặc không thể mở.');
-  }
-}
-
 function ProfileEditField({ label, value, onChangeText, multiline = false, error, disabled = false, keyboardType = 'default', half = false }: { label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean; error?: string; disabled?: boolean; keyboardType?: 'default' | 'email-address' | 'phone-pad'; half?: boolean }) {
   const [focused, setFocused] = useState(false);
   return <View style={[editStyles.field, half && editStyles.halfField]}><Text style={editStyles.label}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} multiline={multiline} editable={!disabled} keyboardType={keyboardType} autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} textAlignVertical={multiline ? 'top' : 'center'} style={[editStyles.input, multiline && editStyles.textarea, focused && editStyles.focused, !!error && s.editInputError]} />{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}</View>;
 }
 
-export default function CompanyProfile() {
+export default function CompanyProfile({ publicProfile, onOpenJob }: { publicProfile?: CompanyProfile; onOpenJob?: (id: string) => void } = {}) {
+  const readOnly = !!publicProfile;
   const { width } = useWindowDimensions();
   const mobile = width < 700;
   const desktop = Platform.OS === 'web' && width >= 1200;
   const [profileWidth, setProfileWidth] = useState(0);
+  const [activeTab, setActiveTab] = useState<'about' | 'posts' | 'jobs'>('about');
   const [dismissedVerification, setDismissedVerification] = useState<string | null>(null);
-  const [profile, setProfile] = useState<CompanyProfile | null>(null);
+  const [profile, setProfile] = useState<CompanyProfile | null>(publicProfile ?? null);
   const [verification, setVerification] = useState<PartnerVerificationStatus | null>(null);
   const [verificationOpen, setVerificationOpen] = useState(false);
   const applyVerificationStatus = useCallback((next: PartnerVerificationStatus) => {
     setVerification(next);
     if (next.status !== null) setProfile(current => current ? { ...current, isVerified: next.status === 1 } : current);
   }, []);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!readOnly);
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
-  const [editSection, setEditSection] = useState<'profile' | 'about'>('profile');
   const [draft, setDraft] = useState<CompanyProfileInput | null>(null);
   const [saving, setSaving] = useState(false);
   const [companyNameError, setCompanyNameError] = useState('');
@@ -70,6 +59,7 @@ export default function CompanyProfile() {
   const { logout, loading: authLoading } = useAuth();
 
   useFocusEffect(useCallback(() => {
+    if (publicProfile) { setProfile(publicProfile); setLoading(false); return; }
     const controller = new AbortController();
     setLoading(true);
     setError('');
@@ -78,14 +68,13 @@ export default function CompanyProfile() {
       .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Không tải được hồ sơ đối tác.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [reload]));
+  }, [reload, publicProfile]));
 
-  const edit = (section: 'profile' | 'about') => {
-    if (!profile) return;
+  const edit = () => {
+    if (readOnly || !profile) return;
     setCompanyNameError('');
     setProfileFieldErrors({});
     setEditNotice(null);
-    setEditSection(section);
     setDraft({
       companyName: profile.companyName,
       partnerType: profile.partnerType,
@@ -103,12 +92,12 @@ export default function CompanyProfile() {
   };
 
   const saveProfile = async () => {
-    if (!draft || !profile || saving) return;
+    if (readOnly || !draft || !profile || saving) return;
     const errors: Record<string, string> = {};
     let normalizedWebsites = (draft.websites ?? []).map(value => value.trim()).filter(Boolean);
     if (!draft.companyName.trim()) errors.companyName = 'Vui lòng nhập tên tổ chức.';
     else if (draft.companyName.trim().length > 255) errors.companyName = 'Tên tổ chức không được dài quá 255 ký tự.';
-    if (editSection === 'profile') {
+    {
       if ((draft.industry?.length ?? 0) > 150) errors.industry = 'Lĩnh vực không được dài quá 150 ký tự.';
       if ((draft.contactEmail?.length ?? 0) > 255) errors.contactEmail = 'Email liên hệ không được dài quá 255 ký tự.';
       else if (draft.contactEmail?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail.trim())) errors.contactEmail = 'Email liên hệ không đúng định dạng.';
@@ -119,7 +108,8 @@ export default function CompanyProfile() {
         if (!/^\+?[0-9().\-\s]+$/.test(phone) || digits < 7 || digits > 15) errors.phone = 'Số điện thoại chỉ gồm chữ số và ký hiệu + ( ) . -, dài từ 7 đến 15 chữ số.';
       }
       if ((draft.address?.length ?? 0) > 2000) errors.address = 'Địa chỉ không được dài quá 2.000 ký tự.';
-    } else {
+    }
+    {
       if (normalizedWebsites.length > 10) errors.websites = 'Tối đa 10 liên kết website.';
       normalizedWebsites = normalizedWebsites.map(value => /^https?:\/\//i.test(value) ? value : `https://${value}`);
       if (normalizedWebsites.some(value => value.length > 2048)) errors.websites = 'Mỗi liên kết website tối đa 2.048 ký tự.';
@@ -151,7 +141,7 @@ export default function CompanyProfile() {
     }
   };
 
-  const setField = (key: Exclude<keyof CompanyProfileInput, 'partnerType' | 'websites'>, value: string) => {
+  const setField = (key: Exclude<keyof CompanyProfileInput, 'partnerType' | 'websites' | 'introduction'>, value: string) => {
     setDraft(current => current ? { ...current, [key]: value } : current);
     if (key === 'companyName') setCompanyNameError('');
     setProfileFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
@@ -161,7 +151,7 @@ export default function CompanyProfile() {
   const addWebsite = () => setDraft(current => current && current.websites.length < 10 ? { ...current, websites: [...current.websites, ''] } : current);
   const removeWebsite = (index: number) => setDraft(current => current ? { ...current, websites: current.websites.filter((_, i) => i !== index) } : current);
   const choosePhoto = async (target: 'avatarUrl' | 'coverUrl') => {
-    if (choosingPhoto || saving) return;
+    if (readOnly || choosingPhoto || saving) return;
     setChoosingPhoto(target);
     try {
       const asset = await pickProfileImage(target);
@@ -205,10 +195,10 @@ export default function CompanyProfile() {
   const compactReminder = (profileWidth || width) < 600;
   const showVerificationReminder = !!profile && !profile.isVerified && verification?.status !== 1 && dismissedVerification !== profile.id;
   const verificationDescription = verification?.status === 0 ? 'Hồ sơ xác minh tổ chức đang được xét duyệt. Nhấn để xem trạng thái.' : verification?.status === 2 ? 'Hồ sơ cần bổ sung thông tin. Nhấn xác minh để xem lý do và cập nhật.' : verification?.status === 3 ? 'Hồ sơ đã hủy. Vui lòng gửi lại thông tin xác minh tổ chức.' : 'Xác minh thông tin tổ chức và tăng độ tin cậy với sinh viên.';
-  const profileHeader = (showVerificationReminder || !desktop) && <View testID={mobile ? 'company-profile-mobile-header' : undefined} style={[layoutStyles.verificationHeader, mobile && layoutStyles.fixedMobileHeader]}>
+  const profileHeader = !readOnly && (showVerificationReminder || !desktop) && <View testID={mobile ? 'company-profile-mobile-header' : undefined} style={[layoutStyles.verificationHeader, mobile && layoutStyles.fixedMobileHeader]}>
     <View style={layoutStyles.reminderSlot}>{showVerificationReminder && <VerificationBanner compact={compactReminder} title="Xác minh tài khoản đối tác" description={verificationDescription} actionLabel={verification?.status === 0 ? compactReminder ? 'Xem' : 'Xem trạng thái' : undefined} showHint={verification?.status !== 0} onVerify={() => setVerificationOpen(true)} onDismiss={() => setDismissedVerification(profile.id)} />}</View>
     <View style={layoutStyles.headerActions}>
-      {mobile && <Pressable testID="company-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" disabled={!profile || loading || saving} onPress={() => edit('profile')} style={({ pressed }) => [layoutStyles.settingsButton, compactReminder && layoutStyles.compactSettingsButton, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} color={c.ink} /></Pressable>}
+      {mobile && <Pressable testID="company-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa thông tin tổ chức" disabled={!profile || loading || saving} onPress={() => edit()} style={({ pressed }) => [layoutStyles.settingsButton, compactReminder && layoutStyles.compactSettingsButton, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} color={c.ink} /></Pressable>}
       {!desktop && <Pressable testID="company-profile-settings-action" accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [layoutStyles.settingsButton, compactReminder && layoutStyles.compactSettingsButton, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} color={c.ink} /></Pressable>}
     </View>
   </View>;
@@ -220,29 +210,34 @@ export default function CompanyProfile() {
       {!!profile && <>
     <CompanyProfileHero
       profile={profile}
-      onViewCover={() => profile.coverUrl ? setPreviewPhotoTarget('coverUrl') : void choosePhoto('coverUrl')}
+      readOnly={readOnly}
+      onViewCover={() => profile.coverUrl ? setPreviewPhotoTarget('coverUrl') : !readOnly && void choosePhoto('coverUrl')}
       onEditCover={() => void choosePhoto('coverUrl')}
-      onViewAvatar={() => profile.avatarUrl ? setPreviewPhotoTarget('avatarUrl') : void choosePhoto('avatarUrl')}
+      onViewAvatar={() => profile.avatarUrl ? setPreviewPhotoTarget('avatarUrl') : !readOnly && void choosePhoto('avatarUrl')}
       onEditAvatar={() => void choosePhoto('avatarUrl')}
-      onEditProfile={() => edit('profile')}
+      onEditProfile={() => edit()}
       photoBusy={!!choosingPhoto || saving}
     />
-    <CompanyAboutCard name={profile.companyName} description={profile.description} websites={profile.websites} onEdit={() => edit('about')} onOpenWebsite={website => void openWebsite(website)} />
-    <Card style={mobile ? layoutStyles.mobileCard : undefined}><SectionTitle title="Cơ hội đang mở" action="Quản lý bài đăng" onAction={() => router.push('/(company)/jobs')} /><Text style={s.helper}>Dành cho sinh viên và người mới tốt nghiệp</Text>{profile.openJobs.map((job) => <View key={job.id} style={s.job}><View style={s.jobHead}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} size={17} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.helper}>{companyJobEmploymentTypeLabel[job.employmentType]} · {job.jobField || 'Chưa cập nhật lĩnh vực'}</Text><Text style={s.helper}>{job.location || 'Chưa có địa điểm'} · {job.workType === 0 ? 'Tại văn phòng' : job.workType === 1 ? 'Kết hợp' : 'Từ xa'}</Text></View><Tag tone="green">Đã đăng</Tag></View><Text style={s.salary}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></View>)}{profile.openJobs.length === 0 && <Text style={s.helper}>Hiện chưa có bài tuyển dụng đang mở.</Text>}</Card>
-    {!desktop && <Pressable accessibilityRole="button" onPress={() => setLogoutOpen(true)} style={s.logoutButton}><CompanyIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={17} color={c.rose} /><Text style={s.logoutText}>Đăng xuất</Text></Pressable>}
+    <View testID="company-profile-tabs" accessibilityRole="tablist" style={layoutStyles.profileTabs}>
+      {([['about', 'Giới thiệu'], ['posts', 'Bài viết'], ['jobs', 'Tuyển dụng']] as const).map(([tab, label]) => <Pressable key={tab} accessibilityRole="tab" accessibilityLabel={label} aria-selected={activeTab === tab} accessibilityState={{ selected: activeTab === tab }} onPress={() => setActiveTab(tab)} style={[layoutStyles.profileTab, activeTab === tab && layoutStyles.profileTabActive]}><CompanyIcon name={tab === 'about' ? { ios: 'house', android: 'home', web: 'home' } : tab === 'posts' ? { ios: 'doc.text', android: 'article', web: 'article' } : { ios: 'briefcase', android: 'work_outline', web: 'work_outline' }} size={17} color={activeTab === tab ? c.blue : c.muted} /><Text style={[layoutStyles.profileTabLabel, activeTab === tab && { color: c.blue }]}>{label}</Text></Pressable>)}
+    </View>
+    {activeTab === 'about' && <CompanyIntroductionCards readOnly={readOnly} profile={profile} onSaved={updated => { setProfile(updated); void companyService.getVerificationStatus().then(applyVerificationStatus).catch(() => {}); }} />}
+    {activeTab === 'posts' && <CompanyProfilePosts readOnly={readOnly} key={profile.id} profileId={profile.id} />}
+    {activeTab === 'jobs' && <Card style={mobile ? layoutStyles.mobileCard : undefined}><SectionTitle title="Cơ hội đang mở" action={readOnly ? undefined : "Quản lý bài đăng"} onAction={() => router.push('/(company)/jobs')} /><Text style={s.helper}>Dành cho sinh viên và người mới tốt nghiệp</Text>{profile.openJobs.map((job) => <Pressable key={job.id} accessibilityRole={readOnly ? "button" : undefined} disabled={!readOnly} onPress={() => onOpenJob?.(job.id)} style={s.job}><View style={s.jobHead}><View style={s.jobIcon}><CompanyIcon name={{ ios: 'chevron.left.forwardslash.chevron.right', android: 'code', web: 'code' }} size={17} /></View><View style={{ flex: 1 }}><Text style={s.jobTitle}>{job.title}</Text><Text style={s.helper}>{companyJobEmploymentTypeLabel[job.employmentType]} · {job.jobField || 'Chưa cập nhật lĩnh vực'}</Text><Text style={s.helper}>{job.location || 'Chưa có địa điểm'} · {job.workType === 0 ? 'Tại văn phòng' : job.workType === 1 ? 'Kết hợp' : 'Từ xa'}</Text></View><Tag tone="green">Đã đăng</Tag></View><Text style={s.salary}>{formatCompanySalary(job.minSalaryVnd, job.maxSalaryVnd)}</Text></Pressable>)}{profile.openJobs.length === 0 && <Text style={s.helper}>Hiện chưa có bài tuyển dụng đang mở.</Text>}</Card>}
+    {!readOnly && !desktop && <Pressable accessibilityRole="button" onPress={() => setLogoutOpen(true)} style={s.logoutButton}><CompanyIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={17} color={c.rose} /><Text style={s.logoutText}>Đăng xuất</Text></Pressable>}
     </>}
     <Modal visible={logoutOpen} transparent animationType="fade" onRequestClose={() => setLogoutOpen(false)}>
       <View style={s.modalBackdrop}><View style={s.confirmCard}><Text style={s.modalTitle}>Đăng xuất?</Text><Text style={s.body}>Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng tài khoản đối tác.</Text><View style={s.modalActions}><ActionButton title="Ở lại" onPress={() => setLogoutOpen(false)} variant="outline" /><ActionButton title={authLoading ? 'Đang đăng xuất…' : 'Đăng xuất'} onPress={() => void confirmLogout()} /></View></View></View>
     </Modal>
     <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => { if (!saving) setEditOpen(false); }}>
-      <KeyboardAvoidingView style={editStyles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>{editOpen && <ToastHost modal />}<View testID="company-profile-edit-dialog" role="dialog" aria-modal accessibilityLabel={editSection === 'profile' ? 'Chỉnh sửa thông tin tổ chức' : 'Chỉnh sửa phần giới thiệu'} accessibilityViewIsModal style={editStyles.card}>
+      <KeyboardAvoidingView style={editStyles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>{editOpen && <ToastHost modal />}<View testID="company-profile-edit-dialog" role="dialog" aria-modal accessibilityLabel="Chỉnh sửa thông tin tổ chức" accessibilityViewIsModal style={editStyles.card}>
         <View style={editStyles.header}>
           {width >= 480 && <View style={editStyles.headerIcon}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={20} /></View>}
-          <View style={editStyles.heading}><Text style={editStyles.title}>{editSection === 'profile' ? 'Chỉnh sửa thông tin tổ chức' : 'Chỉnh sửa phần giới thiệu'}</Text><Text style={editStyles.subtitle}>{editSection === 'profile' ? 'Cập nhật thông tin để mọi người dễ dàng kết nối.' : 'Giới thiệu tổ chức và các kênh liên hệ của bạn.'}</Text></View>
+          <View style={editStyles.heading}><Text style={editStyles.title}>Chỉnh sửa thông tin tổ chức</Text><Text style={editStyles.subtitle}>Cập nhật thông tin để mọi người dễ dàng kết nối.</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel="Đóng chỉnh sửa" disabled={saving} onPress={() => setEditOpen(false)} style={({ pressed }) => [editStyles.close, pressed && layoutStyles.pressed]}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} color={c.muted} /></Pressable>
         </View>
         {!!editNotice && <ActionFeedback type={editNotice.type} message={editNotice.message} />}<ScrollView keyboardShouldPersistTaps="handled" style={s.modalScroll} contentContainerStyle={editStyles.content}>
-        {draft && editSection === 'profile' && <>
+        {draft && <>
           <ProfileEditField label="Tên tổ chức *" value={draft.companyName} onChangeText={value => setField('companyName', value)} error={companyNameError} disabled={saving} />
           <ProfileEditField label="Lĩnh vực" value={draft.industry ?? ''} onChangeText={value => setField('industry', value)} error={profileFieldErrors.industry} disabled={saving} />
           <View style={[editStyles.contactFields, width < 600 && editStyles.stackedFields]}>
@@ -250,22 +245,22 @@ export default function CompanyProfile() {
             <ProfileEditField label="Số điện thoại" value={draft.phone ?? ''} onChangeText={value => setField('phone', value)} error={profileFieldErrors.phone} disabled={saving} keyboardType="phone-pad" half={width >= 600} />
           </View>
           <ProfileEditField label="Địa chỉ" value={draft.address ?? ''} onChangeText={value => setField('address', value)} multiline error={profileFieldErrors.address} disabled={saving} />
-        </>}
-        {draft && editSection === 'about' && <>
-          <ProfileEditField label="Giới thiệu" value={draft.description ?? ''} onChangeText={value => setField('description', value)} multiline disabled={saving} />
           <View style={s.editField}><Text style={s.editLabel}>Liên kết website</Text>{draft.websites.map((website, index) => <View key={index} style={s.websiteEditRow}><WebsiteBrandIcon url={website} size={17} /><TextInput value={website} onChangeText={value => setWebsiteAt(index, value)} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://facebook.com/..." style={[s.editInput, s.websiteEditInput, !!profileFieldErrors.websites && s.editInputError]} /><Pressable accessibilityRole="button" accessibilityLabel="Xóa liên kết" onPress={() => removeWebsite(index)} style={s.websiteRemove}><CompanyIcon name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} size={20} color={c.muted} /></Pressable></View>)}{!!profileFieldErrors.websites && <Text accessibilityRole="alert" style={s.error}>{profileFieldErrors.websites}</Text>}<Pressable accessibilityRole="button" disabled={draft.websites.length >= 10} onPress={addWebsite} style={s.addWebsite}><CompanyIcon name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={16} color={draft.websites.length >= 10 ? c.muted : c.blue} /><Text style={[s.addWebsiteText, draft.websites.length >= 10 && { color: c.muted }]}>Thêm liên kết</Text></Pressable></View>
         </>}
       </ScrollView><View style={editStyles.footer}><Button title="Hủy" onPress={() => setEditOpen(false)} variant="outline" disabled={saving} style={editStyles.footerButton} textStyle={editStyles.footerLabel} /><Button title="Lưu thay đổi" loading={saving} onPress={() => void saveProfile()} style={editStyles.footerButton} textStyle={editStyles.footerLabel} /></View></View></KeyboardAvoidingView>
     </Modal>
       <Modal visible={!!previewPhotoTarget} transparent animationType="fade" onRequestClose={() => setPreviewPhotoTarget(null)}>
-        <View style={s.photoPreviewOverlay}><Pressable style={s.photoPreviewBackdrop} onPress={() => setPreviewPhotoTarget(null)} /><View style={[s.photoPreviewFrame, { width: '100%', maxWidth: 520, minHeight: undefined, aspectRatio: previewPhotoTarget === 'avatarUrl' ? 1 : 3, overflow: 'hidden' }]}>{previewPhotoTarget && profile?.[previewPhotoTarget] ? <ProfileFramedImage uri={profile[previewPhotoTarget]!} accessibilityLabel={previewPhotoTarget === 'avatarUrl' ? 'Ảnh đại diện' : 'Ảnh bìa'} /> : null}<Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh" disabled={!!choosingPhoto || saving} onPress={() => { const target = previewPhotoTarget; if (target) { setPreviewPhotoTarget(null); void choosePhoto(target); } }} style={s.photoPreviewEdit}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={18} color={c.blue} /></Pressable></View></View>
+        <View style={s.photoPreviewOverlay}><Pressable accessibilityRole="button" accessibilityLabel="Đóng xem ảnh" style={s.photoPreviewBackdrop} onPress={() => setPreviewPhotoTarget(null)} /><View style={[s.photoPreviewFrame, { width: '100%', maxWidth: 520, minHeight: undefined, aspectRatio: previewPhotoTarget === 'avatarUrl' ? 1 : 3, overflow: 'hidden' }]}>{previewPhotoTarget && profile?.[previewPhotoTarget] ? <ProfileFramedImage uri={profile[previewPhotoTarget]!} accessibilityLabel={previewPhotoTarget === 'avatarUrl' ? 'Ảnh đại diện' : 'Ảnh bìa'} /> : null}{!readOnly && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa ảnh" disabled={!!choosingPhoto || saving} onPress={() => { const target = previewPhotoTarget; if (target) { setPreviewPhotoTarget(null); void choosePhoto(target); } }} style={s.photoPreviewEdit}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={18} color={c.blue} /></Pressable>}</View></View>
     </Modal>
       {verificationOpen && <PartnerVerification onClose={() => setVerificationOpen(false)} onStatusChange={applyVerificationStatus} />}
       {photo && <CompanyPhotoDialog key={photo.target} initialAsset={photo.asset} target={photo.target} onClose={() => setPhoto(null)} onSave={savePhoto} />}
-  </PageScroll></View>{desktop && <View testID="company-profile-settings-column" style={layoutStyles.settingsColumn}><SettingsPanel embedded onPartnerVerificationStatusChange={applyVerificationStatus} /></View>}</View></CompanyPage>;
+  </PageScroll></View>{!readOnly && desktop && <View testID="company-profile-settings-column" style={layoutStyles.settingsColumn}><SettingsPanel embedded onPartnerVerificationStatusChange={applyVerificationStatus} /></View>}</View></CompanyPage>;
 }
 
 const layoutStyles = StyleSheet.create({
+  profileTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.line, backgroundColor: c.white, marginTop: -14 },
+  profileTab: { flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  profileTabActive: { borderBottomColor: c.blue }, profileTabLabel: { fontSize: 12, color: c.muted, fontWeight: '700' },
   body: { flex: 1, minHeight: 0 },
   desktopBody: { flexDirection: 'row', gap: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20, width: '100%', maxWidth: 1800, alignSelf: 'center' },
   main: { flex: 1, minWidth: 0, minHeight: 0 },

@@ -1,3 +1,4 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Linking, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
@@ -50,7 +51,7 @@ export default function AssessorAssignmentDetailScreen() {
   const tab = data && detailTabs(data, active, canReport).some(item => item.key === preferredTab) ? preferredTab : data?.report ? 'results' : 'info';
   useEffect(() => { setSelectedTab(null); }, [key]);
   return <View style={s.page}><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, narrow && s.mobileContent]}>
-    <Pressable accessibilityRole="button" onPress={() => router.back()} style={[s.secondaryButton, { alignSelf: 'flex-start' }]}><Text style={s.link}>← Danh sách thẩm định</Text></Pressable>
+    <DetailNavigation backLabel="Quay lại danh sách thẩm định" />
     {error ? <AssessorState error={error} retry={() => setAttempt(v => v + 1)} /> : !data || !assignment ? <AssessorState loading /> : <>
       <DetailHeader key={`header:${key}`} data={data} tab={tab} onTab={setSelectedTab} active={active} canReport={canReport} />
       {!!actionError && <Text accessibilityRole="alert" style={s.error}>{actionError}</Text>}
