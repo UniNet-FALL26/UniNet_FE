@@ -1,6 +1,21 @@
 // src/services/advertisement.service.ts
 import { apiRequest } from "./api";
 
+// ------------------------------
+// 1. ENUMS
+// ------------------------------
+export enum AdCampaignStatus {
+  Draft = 0, // Nháp (mới tạo, chưa gán gói)
+  PendingModeration = 1, // Chờ AI/Admin duyệt thủ công (nội dung nhạy cảm)
+  PendingPayment = 2, // Đã duyệt (AI duyệt hoặc Admin duyệt), chờ Partner thanh toán
+  Active = 3, // Đang chạy (Đã thanh toán & Publish)
+  Completed = 4, // Đã hoàn thành / Hết hạn
+  Rejected = 5, // Bị từ chối
+}
+
+// ------------------------------
+// 2. INTERFACES (MODELS)
+// ------------------------------
 export interface AdPackage {
   id: string;
   code: string;
@@ -23,7 +38,6 @@ export interface PaginatedPackagesResponse {
   packages: AdPackage[];
 }
 
-// Khớp chính xác với cấu trúc item trong mảng campaigns từ API response
 export interface AdCampaign {
   id: string;
   companyUserId: string;
@@ -32,14 +46,15 @@ export interface AdCampaign {
   packageName: string;
   title: string;
   content: string;
-  destinationUrl?: string;
-  mediaUrl?: string;
-  status: number; // Trạng thái trả về dạng số (ví dụ: 3 là Active)
+  destinationUrl: string;
+  mediaUrl?: string | null;
+  status: AdCampaignStatus;
   budgetCap: number;
-  impressionCount: number; // Khớp với impressionCount
-  clickCount: number; // Khớp với clickCount
-  startedAt: string; // Khớp với startedAt
-  expiredAt: string; // Khớp với expiredAt
+  rejectionReason?: string | null;
+  impressionCount: number;
+  clickCount: number;
+  startedAt?: string | null;
+  expiredAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,18 +67,40 @@ export interface PaginatedCampaignsResponse {
   campaigns: AdCampaign[];
 }
 
-export interface CreateAdCampaignDto {
-  packageId: string;
+// ------------------------------
+// 3. REQUEST/RESPONSE DTOs
+// ------------------------------
+export interface CreateCampaignRequest {
   title: string;
   content: string;
-  mediaUrl?: string;
-  destinationUrl?: string;
-  returnUrl: string;
-  cancelUrl: string;
+  destinationUrl: string;
+  mediaUrl?: string | null;
 }
 
+export interface AssignPackageRequest {
+  packageId: string;
+}
+
+export interface UpdateCampaignRequest {
+  packageId?: string | null;
+  title: string;
+  content: string;
+  destinationUrl: string;
+  mediaUrl?: string | null;
+}
+
+export interface TransactionResponse {
+  transactionId: string;
+  campaignId: string;
+  amount: number;
+  checkoutUrl: string;
+  status: string;
+}
+
+// ------------------------------
+// 4. API SERVICE
+// ------------------------------
 export const advertisementService = {
-  // Lấy danh sách gói quảng cáo
   getPackages: (
     params?: { page?: number; pageSize?: number; isActive?: boolean },
     signal?: AbortSignal,
@@ -80,16 +117,71 @@ export const advertisementService = {
     });
   },
 
-  // Lấy danh sách chiến dịch của công ty (trả về kiểu phân trang PaginatedCampaignsResponse)
-  getMyCampaigns: (signal?: AbortSignal) =>
-    apiRequest<PaginatedCampaignsResponse>("/advertisements/campaigns/my", {
-      signal,
-    }),
+  getMyCampaigns: (
+    params?: { page?: number; pageSize?: number },
+    signal?: AbortSignal,
+  ) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", params.page.toString());
+    if (params?.pageSize) query.append("pageSize", params.pageSize.toString());
 
-  // Đăng ký gói (Tạo chiến dịch và nhận checkoutUrl từ PayOS)
-  createCampaign: (data: CreateAdCampaignDto) =>
-    apiRequest<{ checkoutUrl: string }>("/advertisements/campaigns", {
+    const queryString = query.toString() ? `?${query.toString()}` : "";
+    return apiRequest<PaginatedCampaignsResponse>(
+      `/advertisements/campaigns/my${queryString}`,
+      {
+        signal,
+      },
+    );
+  },
+
+  getCampaignDetail: (id: string, signal?: AbortSignal) => {
+    return apiRequest<AdCampaign>(`/advertisements/campaigns/${id}`, {
+      signal,
+    });
+  },
+
+  /**
+   * 1. Tạo chiến dịch bản nháp (Status = Draft, PackageId = null)
+   * POST /advertisements/campaigns
+   */
+  createCampaign: (
+    formData: FormData,
+    signal?: AbortSignal,
+  ): Promise<AdCampaign> => {
+    return apiRequest<AdCampaign>("/advertisements/campaigns", {
       method: "POST",
+      body: formData,
+      signal,
+    });
+  },
+
+  /**
+   * 2. Gán gói vào chiến dịch Draft và chạy AI review nội dung
+   * PATCH /advertisements/campaigns/{campaignId}/package
+   */
+  assignPackage: (campaignId: string, data: AssignPackageRequest) => {
+    return apiRequest<AdCampaign>(
+      `/advertisements/campaigns/${campaignId}/package`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+    );
+  },
+
+  updateCampaign: (id: string, data: UpdateCampaignRequest) => {
+    return apiRequest<AdCampaign>(`/advertisements/campaigns/${id}`, {
+      method: "PUT",
       body: JSON.stringify(data),
-    }),
+    });
+  },
+
+  createPayment: (id: string) => {
+    return apiRequest<TransactionResponse>(
+      `/advertisements/campaigns/${id}/payments`,
+      {
+        method: "POST",
+      },
+    );
+  },
 };

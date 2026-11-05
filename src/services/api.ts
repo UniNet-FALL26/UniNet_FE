@@ -1,11 +1,18 @@
-import { API_URL } from "@/constants/config";
+// import { API_URL } from "@/constants/config";
 import { localizeProjectError } from "@/services/project-errors";
+import { toast } from "@/store/toast.store";
 import type { LoginResponse } from "@/types/auth";
+import {
+  apiErrorMessage,
+  apiFeedbackPolicy,
+  apiSuccessMessage,
+  readableApiMessage,
+} from "@/utils/api-feedback";
 import { tokenStorage, type AuthSession } from "@/utils/storage";
-import { apiErrorMessage, apiFeedbackPolicy, apiSuccessMessage, readableApiMessage } from '@/utils/api-feedback';
-import { toast } from '@/store/toast.store';
-export type ApiRequestOptions = RequestInit & { feedback?: false | { success?: string | false; error?: boolean } };
-
+export type ApiRequestOptions = RequestInit & {
+  feedback?: false | { success?: string | false; error?: boolean };
+};
+const API_URL = "https://localhost:7201/api";
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -17,7 +24,11 @@ export class ApiError extends Error {
 }
 export function reportApiFailure(cause: unknown, fallback: string) {
   // API failures already emitted their specific toast; handle only local operation failures here.
-  if (!(cause instanceof ApiError)) toast.error(readableApiMessage(cause instanceof Error ? cause.message : null) || fallback);
+  if (!(cause instanceof ApiError))
+    toast.error(
+      readableApiMessage(cause instanceof Error ? cause.message : null) ||
+        fallback,
+    );
 }
 const expired = () =>
   new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", 401);
@@ -51,9 +62,23 @@ async function responseError(response: Response, path: string, method = "GET") {
     typeof body.code === "string"
       ? body.code
       : undefined;
-  const originalMessage = body && typeof body === 'object' && 'message' in body && typeof body.message === 'string' ? body.message : message;
-  const projectMessage = /^\/(?:api\/)?(?:moderator\/)?projects(?:\/|$)/.test(path)
-    ? localizeProjectError(path, method.toUpperCase(), response.status, code, originalMessage)
+  const originalMessage =
+    body &&
+    typeof body === "object" &&
+    "message" in body &&
+    typeof body.message === "string"
+      ? body.message
+      : message;
+  const projectMessage = /^\/(?:api\/)?(?:moderator\/)?projects(?:\/|$)/.test(
+    path,
+  )
+    ? localizeProjectError(
+        path,
+        method.toUpperCase(),
+        response.status,
+        code,
+        originalMessage,
+      )
     : null;
   return new ApiError(
     readableApiMessage(projectMessage) || message,
@@ -257,30 +282,60 @@ async function requestMultipart<T>(
   return result;
 }
 
-async function withFeedback<T>(path: string, options: ApiRequestOptions, request: (init: RequestInit) => Promise<T>): Promise<T> {
+async function withFeedback<T>(
+  path: string,
+  options: ApiRequestOptions,
+  request: (init: RequestInit) => Promise<T>,
+): Promise<T> {
   const { feedback, ...init } = options;
-  const method = (init.method || 'GET').toUpperCase();
+  const method = (init.method || "GET").toUpperCase();
   const policy = apiFeedbackPolicy(path, method);
   try {
     const result = await request(init);
     if (init.signal?.aborted) return result;
-    if (result && typeof result === 'object' && ('success' in result && result.success === false || 'isSuccess' in result && result.isSuccess === false)) {
-      const code = 'code' in result && typeof result.code === 'string' ? result.code : undefined;
+    if (
+      result &&
+      typeof result === "object" &&
+      (("success" in result && result.success === false) ||
+        ("isSuccess" in result && result.isSuccess === false))
+    ) {
+      const code =
+        "code" in result && typeof result.code === "string"
+          ? result.code
+          : undefined;
       throw new ApiError(apiErrorMessage(path, 400, result), 400, code);
     }
-    if (feedback !== false && feedback?.success !== false && (policy.success || typeof feedback?.success === 'string'))
-      toast.success(typeof feedback?.success === 'string' ? feedback.success : apiSuccessMessage(path, method, result));
+    if (
+      feedback !== false &&
+      feedback?.success !== false &&
+      (policy.success || typeof feedback?.success === "string")
+    )
+      toast.success(
+        typeof feedback?.success === "string"
+          ? feedback.success
+          : apiSuccessMessage(path, method, result),
+      );
     return result;
   } catch (cause) {
     if (init.signal?.aborted) throw cause;
-    const error = cause instanceof ApiError ? cause : new ApiError(apiErrorMessage(path, 502, null), 502);
-    if (feedback !== false && feedback?.error !== false && policy.error) toast.error(error.message);
+    const error =
+      cause instanceof ApiError
+        ? cause
+        : new ApiError(apiErrorMessage(path, 502, null), 502);
+    if (feedback !== false && feedback?.error !== false && policy.error)
+      toast.error(error.message);
     throw error;
   }
 }
-export function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  return withFeedback(path, options, init => requestJson<T>(path, init));
+export function apiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  return withFeedback(path, options, (init) => requestJson<T>(path, init));
 }
-export function apiMultipartRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  return withFeedback(path, options, init => requestMultipart<T>(path, init));
+export function apiMultipartRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  return withFeedback(path, options, (init) => requestMultipart<T>(path, init));
 }

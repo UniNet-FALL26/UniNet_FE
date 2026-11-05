@@ -1,3 +1,4 @@
+import { useNotificationUpdates } from "@/components/notifications/NotificationsProvider";
 import { colors as appColors } from "@/constants/colors";
 import { router, usePathname } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -13,7 +14,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
 
 export const companyColors = {
   purple: appColors.primary,
@@ -211,8 +211,16 @@ const tabs = [
   {
     label: "Nhắn tin",
     route: "/(company)/company-messages",
-    icon: { ios: "bubble.left", android: "chat_bubble_outline", web: "chat_bubble_outline" },
-    active: { ios: "bubble.left.fill", android: "chat_bubble", web: "chat_bubble" },
+    icon: {
+      ios: "bubble.left",
+      android: "chat_bubble_outline",
+      web: "chat_bubble_outline",
+    },
+    active: {
+      ios: "bubble.left.fill",
+      android: "chat_bubble",
+      web: "chat_bubble",
+    },
   },
   {
     label: "Tuyển dụng",
@@ -221,55 +229,142 @@ const tabs = [
     active: { ios: "briefcase.fill", android: "work", web: "work" },
   },
   {
+    label: "Quảng cáo",
+    route: "/(company)/advertisement",
+    icon: { ios: "megaphone", android: "campaign", web: "campaign" },
+    active: { ios: "megaphone.fill", android: "campaign", web: "campaign" },
+  },
+  {
     label: "Thông báo",
     route: "/(company)/company-notifications",
-    icon: { ios: "bell", android: "notifications_none", web: "notifications_none" },
-    active: { ios: "bell.fill", android: "notifications", web: "notifications" },
+    icon: {
+      ios: "bell",
+      android: "notifications_none",
+      web: "notifications_none",
+    },
+    active: {
+      ios: "bell.fill",
+      android: "notifications",
+      web: "notifications",
+    },
   },
   {
     label: "Hồ sơ",
     route: "/(company)/profile",
-    icon: { ios: "person.crop.circle", android: "account_circle", web: "account_circle" },
-    active: { ios: "person.crop.circle.fill", android: "account_circle", web: "account_circle" },
+    icon: {
+      ios: "person.crop.circle",
+      android: "account_circle",
+      web: "account_circle",
+    },
+    active: {
+      ios: "person.crop.circle.fill",
+      android: "account_circle",
+      web: "account_circle",
+    },
   },
 ] as const;
 
-export function CompanyTabBar({ placement = 'footer' }: { placement?: 'header' | 'footer' }) {
+export function CompanyTabBar({
+  placement = "footer",
+}: {
+  placement?: "header" | "footer";
+}) {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { unreadCount, synchronize } = useNotificationUpdates();
-  const inHeader = placement === 'header';
+  const inHeader = placement === "header";
   const compactHeader = inHeader && width < 1200;
   return (
     <View
-      testID={inHeader ? 'company-header-navigation' : 'company-footer-navigation'}
-      style={inHeader ? styles.headerTabBar : [styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}
+      testID={
+        inHeader ? "company-header-navigation" : "company-footer-navigation"
+      }
+      style={
+        inHeader
+          ? styles.headerTabBar
+          : [styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]
+      }
       accessibilityRole="tablist"
     >
-      {tabs.filter(tab => !inHeader || (tab.route !== '/(company)/profile' && tab.route !== '/(company)/company-notifications')).map((tab) => {
-        const targetPath = tab.route.slice(tab.route.indexOf(")") + 1);
-        const isActive = pathname === targetPath || (tab.route.endsWith("/jobs") && pathname === "/create");
-        const notification = tab.route === '/(company)/company-notifications';
-        const icon = <CompanyIcon name={isActive ? tab.active : tab.icon} size={inHeader ? compactHeader ? 17 : 19 : 23} color={isActive ? companyColors.purple : appColors.textSecondary} />;
-        return (
-          <Pressable
-            key={tab.label}
-            accessibilityRole="tab"
-            accessibilityLabel={tab.label}
-            accessibilityState={{ selected: isActive }}
-            aria-selected={isActive}
-            onPress={() => { if (notification) synchronize(); router.navigate(tab.route as never); }}
-            style={({ pressed }) => [inHeader ? styles.headerTab : styles.tab, compactHeader && styles.compactHeaderTab, inHeader && isActive && styles.headerTabActive, pressed && styles.pressed]}
-          >
-            {inHeader ? icon : <View style={styles.tabIcon}>{icon}{notification && unreadCount > 0 && <View testID="company-footer-unread-badge" style={styles.tabBadge}><Text style={styles.tabBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}</View>}
-            <Text numberOfLines={1} style={[styles.tabLabel, inHeader && styles.headerTabLabel, compactHeader && styles.compactHeaderLabel, isActive && styles.tabLabelActive, inHeader && isActive && styles.headerActiveLabel]}>
-              {tab.label}
-            </Text>
-            {!inHeader && <View style={[styles.tabIndicator, isActive && styles.tabIndicatorActive]} />}
-          </Pressable>
-        );
-      })}
+      {tabs
+        .filter(
+          (tab) =>
+            !inHeader ||
+            (tab.route !== "/(company)/profile" &&
+              tab.route !== "/(company)/company-notifications"),
+        )
+        .map((tab) => {
+          const targetPath = tab.route.slice(tab.route.indexOf(")") + 1);
+          const isActive =
+            pathname === targetPath ||
+            (tab.route.endsWith("/jobs") && pathname === "/create");
+          const notification = tab.route === "/(company)/company-notifications";
+          const icon = (
+            <CompanyIcon
+              name={isActive ? tab.active : tab.icon}
+              size={inHeader ? (compactHeader ? 17 : 19) : 23}
+              color={isActive ? companyColors.purple : appColors.textSecondary}
+            />
+          );
+          return (
+            <Pressable
+              key={tab.label}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: isActive }}
+              aria-selected={isActive}
+              onPress={() => {
+                if (notification) synchronize();
+                router.navigate(tab.route as never);
+              }}
+              style={({ pressed }) => [
+                inHeader ? styles.headerTab : styles.tab,
+                compactHeader && styles.compactHeaderTab,
+                inHeader && isActive && styles.headerTabActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              {inHeader ? (
+                icon
+              ) : (
+                <View style={styles.tabIcon}>
+                  {icon}
+                  {notification && unreadCount > 0 && (
+                    <View
+                      testID="company-footer-unread-badge"
+                      style={styles.tabBadge}
+                    >
+                      <Text style={styles.tabBadgeText}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.tabLabel,
+                  inHeader && styles.headerTabLabel,
+                  compactHeader && styles.compactHeaderLabel,
+                  isActive && styles.tabLabelActive,
+                  inHeader && isActive && styles.headerActiveLabel,
+                ]}
+              >
+                {tab.label}
+              </Text>
+              {!inHeader && (
+                <View
+                  style={[
+                    styles.tabIndicator,
+                    isActive && styles.tabIndicatorActive,
+                  ]}
+                />
+              )}
+            </Pressable>
+          );
+        })}
     </View>
   );
 }
@@ -342,26 +437,83 @@ const styles = StyleSheet.create({
   tabBar: {
     minHeight: 70,
     flexDirection: "row",
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     backgroundColor: companyColors.white,
     borderTopWidth: 1,
     borderTopColor: companyColors.line,
     paddingTop: 7,
-    shadowColor: '#0B3E9C', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 8, zIndex: 2,
+    shadowColor: "#0B3E9C",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 8,
+    zIndex: 2,
   },
-  headerTabBar: { flex: 1, paddingLeft: 24, flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 },
-  headerTab: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 11, gap: 6, borderRadius: 11 },
+  headerTabBar: {
+    flex: 1,
+    paddingLeft: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexWrap: "wrap",
+    paddingVertical: 10,
+  },
+  headerTab: {
+    flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 11,
+    gap: 6,
+    borderRadius: 11,
+  },
   headerTabActive: { backgroundColor: companyColors.purpleSoft },
   headerTabLabel: { fontSize: 13, color: appColors.textSecondary },
-  headerActiveLabel: { fontWeight: '700' },
+  headerActiveLabel: { fontWeight: "700" },
   compactHeaderTab: { paddingHorizontal: 6, gap: 4 },
   compactHeaderLabel: { fontSize: 11 },
-  tab: { flex: 1, minHeight: 62, justifyContent: 'center', alignItems: "center", gap: 2 },
-  tabIcon: { width: 32, height: 28, alignItems: 'center', justifyContent: 'center' },
-  tabLabel: { color: appColors.textSecondary, fontSize: 10, fontWeight: "600", textAlign: 'center' },
+  tab: {
+    flex: 1,
+    minHeight: 62,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 2,
+  },
+  tabIcon: {
+    width: 32,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabLabel: {
+    color: appColors.textSecondary,
+    fontSize: 10,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   tabLabelActive: { color: companyColors.purple, fontWeight: "700" },
-  tabIndicator: { width: 18, height: 3, borderRadius: 2, backgroundColor: 'transparent', marginTop: 2 },
+  tabIndicator: {
+    width: 18,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "transparent",
+    marginTop: 2,
+  },
   tabIndicatorActive: { backgroundColor: companyColors.blue },
-  tabBadge: { position: 'absolute', top: -4, right: -8, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: '#E24555', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: companyColors.white },
-  tabBadgeText: { color: companyColors.white, fontSize: 9, fontWeight: '800' },
+  tabBadge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: "#E24555",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: companyColors.white,
+  },
+  tabBadgeText: { color: companyColors.white, fontSize: 9, fontWeight: "800" },
 });
