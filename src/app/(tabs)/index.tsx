@@ -1,8 +1,8 @@
 import { CommentModal } from "@/components/community/CommentModal";
-import { reportApiFailure } from '@/services/api';
 import { CommunityComposer } from "@/components/community/CommunityComposer";
 import { UpdatePostModal } from "@/components/community/UpdatePostModal";
 import { colors } from "@/constants/colors";
+import { reportApiFailure } from "@/services/api";
 import {
   communityService,
   type PostResponse,
@@ -13,9 +13,9 @@ import { SymbolView } from "expo-symbols";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -24,7 +24,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
+// Danh sách các lý do báo cáo
+const REPORT_REASONS = [
+  "Nội dung spam, không mong muốn",
+  "Ngôn từ gây thù ghét, đả kích",
+  "Thông tin sai sự thật",
+  "Quấy rối hoặc bắt nạt",
+  "Vi phạm bản quyền, pháp luật",
+  "Khác",
+];
 // Cpn xử lý Description xem thêm
 const ExpandableDescription = ({ text }: { text: string }) => {
   const [expanded, setExpanded] = useState(false);
@@ -43,13 +51,14 @@ const ExpandableDescription = ({ text }: { text: string }) => {
     </View>
   );
 };
-
+// CẤU HÌNH TẦN SUẤT QUẢNG CÁO: Cứ 5 bài viết sẽ có 1 quảng cáo
+const AD_FREQUENCY = 5;
 export default function CommunityScreen() {
   const { isAuthenticated, account } = useAuthStore();
   const [detailPostId, setDetailPostId] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<PostResponse[]>([]);
-  const [adPost, setAdPost] = useState<any | null>(null);
+  const [adPool, setAdPool] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
@@ -60,49 +69,77 @@ export default function CommunityScreen() {
     null,
   );
   const [editingPost, setEditingPost] = useState<PostResponse | null>(null);
-
+  const [reportPostId, setReportPostId] = useState<string | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>("");
   const [lightboxPost, setLightboxPost] = useState<PostResponse | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
     null,
   );
 
+  // Cập nhật detailPost để tìm trong adPool
   const detailPost = useMemo(() => {
     if (!detailPostId) return null;
-    // Tìm post từ danh sách posts đang hiển thị, hoặc từ adPost để luôn có data mới nhất
     return (
       posts.find((p) => p.id === detailPostId) ||
-      (adPost?.id === detailPostId ? adPost : null)
+      adPool.find((ad) => ad.id === detailPostId) ||
+      null
     );
-  }, [detailPostId, posts, adPost]);
-  const fetchAdPost = async () => {
+  }, [detailPostId, posts, adPool]);
+  // Cập nhật hàm fetch Ads: Lấy cả mảng Ads và đảo lộn (shuffle) để random
+  const fetchAdPool = async () => {
     try {
       const data = await communityService.getAdFeed();
-      const fetchedAd = Array.isArray(data)
-        ? data[0]
-        : ((data as any)?.data ?? data);
-      if (fetchedAd) setAdPost(fetchedAd);
+      // Đảm bảo data luôn là mảng
+      let fetchedAds = Array.isArray(data) ? data : ((data as any)?.data ?? []);
+      if (!Array.isArray(fetchedAds) && data) {
+        fetchedAds = [data]; // Fallback nếu API trả về 1 object
+      }
+
+      // Thuật toán Fisher-Yates Shuffle để random thứ tự Ads
+      const shuffledAds = [...fetchedAds].sort(() => 0.5 - Math.random());
+      setAdPool(shuffledAds);
     } catch (error) {
-      console.error("Lỗi tải Ad Post:", error);
+      console.error("Lỗi tải Ad Pool:", error);
     }
   };
 
   const feedData = useMemo(() => {
     const combined: Array<{ type: "POST" | "AD"; id: string; data: any }> = [];
+    let adIndexUsed = 0; // Đếm số quảng cáo đã được lấy ra từ kho
+
     posts.forEach((post, index) => {
+      // 1. Luôn chèn bài viết Organic trước
       combined.push({ type: "POST", id: `post-${post.id}`, data: post });
-      if (index === 2 && adPost) {
-        combined.push({ type: "AD", id: `ad-${adPost.id}`, data: adPost });
+
+      // 2. Kiểm tra xem đã đủ số lượng bài để chèn Ad chưa
+      // (Ví dụ: sau bài index 4, 9, 14... -> tức là bài thứ 5, 10, 15)
+      const postNumber = index + 1;
+      if (postNumber % AD_FREQUENCY === 0 && adPool.length > 0) {
+        // Lấy quảng cáo tiếp theo trong kho.
+        // Dùng % adPool.length để lặp lại quảng cáo nếu scroll quá dài và hết kho.
+        // Nếu API trả về nhiều ads, người dùng sẽ hiếm khi thấy trùng lại.
+        const ad = adPool[adIndexUsed % adPool.length];
+
+        combined.push({
+          type: "AD",
+          // Cần kèm thêm postNumber vào ID để React Key không bị trùng nếu Ad bị lặp lại vòng 2
+          id: `ad-${ad.id}-pos-${postNumber}`,
+          data: ad,
+        });
+
+        adIndexUsed++; // Tăng biến đếm quảng cáo đã dùng
       }
     });
     return combined;
-  }, [posts, adPost]);
+  }, [posts, adPool]);
 
   const fetchFeed = useCallback(async (pageNum: number, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else if (pageNum === 1) setLoading(true);
 
     try {
-      if (pageNum === 1) fetchAdPost();
+      // Lấy mới kho quảng cáo nếu là trang 1 hoặc refresh
+      if (pageNum === 1 || isRefresh) fetchAdPool();
 
       const data = await communityService.getPosts({
         page: pageNum,
@@ -138,7 +175,8 @@ export default function CommunityScreen() {
         await communityService.deletePost(deleteConfirmPostId);
       }
       setPosts((prev) => prev.filter((p) => p.id !== deleteConfirmPostId));
-      if (adPost?.id === deleteConfirmPostId) setAdPost(null);
+      // Cập nhật cả adPool nếu Ad bị xóa (dù thực tế hiếm khi User xóa được Ad)
+      setAdPool((prev) => prev.filter((ad) => ad.id !== deleteConfirmPostId));
       setDeleteConfirmPostId(null);
     } catch (error) {
       reportApiFailure(error, "Không thể xóa bài viết.");
@@ -156,7 +194,22 @@ export default function CommunityScreen() {
       reportApiFailure(error, "Không thể thực hiện lưu bài viết.");
     }
   };
+  const handleConfirmReport = async () => {
+    // Đảm bảo phải có post ID và đã chọn lý do
+    if (!reportPostId || !selectedReason) return;
 
+    try {
+      await communityService.reportPost(reportPostId, {
+        reason: selectedReason,
+      } as any);
+
+      // Đóng modal & reset
+      setReportPostId(null);
+      setSelectedReason("");
+    } catch (error) {
+      reportApiFailure(error, "Không thể gửi báo cáo bài viết.");
+    }
+  };
   const handleToggleReaction = async (postId: string) => {
     try {
       await communityService.toggleReact(postId);
@@ -304,27 +357,47 @@ export default function CommunityScreen() {
   };
 
   const renderAdCard = (ad: any) => {
+    const displayName = ad.companyName || "Đối tác tài trợ";
+    const avatarFallback = displayName.charAt(0).toUpperCase();
+    const displayUrl = ad.destinationUrl
+      ? ad.destinationUrl.replace(/^https?:\/\/(www\.)?/, "")
+      : "https://uninet.com";
+
+    // Hàm xử lý khi click vào bất kỳ đâu trên quảng cáo
+    const handleAdClick = async () => {
+      if (ad.destinationUrl) {
+        // TODO: Gọi API đếm lượt click (clickCount) ở đây
+        console.log("Đã click Ad ID:", ad.id);
+
+        try {
+          // Mở URL (Sẽ mở tab mới trên Web hoặc mở trình duyệt mặc định trên Mobile)
+          await Linking.openURL(ad.destinationUrl);
+        } catch (error) {
+          console.error("Không thể mở URL:", error);
+        }
+      }
+    };
+
     return (
-      <View style={styles.card}>
+      // Thay đổi thẻ ngoài cùng thành Pressable và gắn sự kiện onPress
+      <Pressable style={styles.card} onPress={handleAdClick}>
         <View style={styles.cardHeader}>
           <View style={styles.authorInfo}>
             <View style={[styles.avatarPlaceholder, { overflow: "hidden" }]}>
-              {ad.sponsorLogo ? (
+              {ad.companyLogo ? (
                 <Image
-                  source={{ uri: ad.sponsorLogo }}
+                  source={{ uri: ad.companyLogo }}
                   style={styles.avatarImage}
                 />
               ) : (
-                <Text style={styles.avatarText}>AD</Text>
+                <Text style={styles.avatarText}>{avatarFallback}</Text>
               )}
             </View>
             <View>
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
               >
-                <Text style={styles.authorName}>
-                  {ad.sponsorName || "Đối tác tài trợ"}
-                </Text>
+                <Text style={styles.authorName}>{displayName}</Text>
                 <SymbolView
                   name={{
                     ios: "checkmark.seal.fill",
@@ -340,29 +413,51 @@ export default function CommunityScreen() {
           </View>
         </View>
 
-        {ad.description && <ExpandableDescription text={ad.description} />}
+        {ad.title && (
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: "600",
+              color: "#111827",
+              marginBottom: 2,
+            }}
+          >
+            {ad.title}
+          </Text>
+        )}
+
+        {/* 
+          Lưu ý: Nếu người dùng click vào chữ "Xem thêm" trong ExpandableDescription, 
+          React Native mặc định sẽ ưu tiên component con (nút Xem thêm) thay vì thẻ Pressable cha, 
+          nên nó sẽ mở rộng text chứ không mở link (điều này hoàn toàn hợp lý về mặt UX).
+        */}
+        {ad.content && <ExpandableDescription text={ad.content} />}
 
         <View style={styles.mediaContainer}>
-          <View style={styles.adMediaBox}>
-            <Image
-              source={{ uri: ad.mediaUrl || ad.imageUrl }}
-              style={styles.singleImage}
-              resizeMode="contain"
-            />
-          </View>
+          {ad.mediaUrl && (
+            <View style={styles.adMediaBox}>
+              <Image
+                source={{ uri: ad.mediaUrl }}
+                style={styles.singleImage}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+
           <View style={styles.adCtaRow}>
             <Text style={styles.adDestinationText} numberOfLines={1}>
-              {ad.destinationUrl || "https://uninet.com"}
+              {displayUrl}
             </Text>
-            <Pressable style={styles.adCtaButton}>
+
+            {/* Đổi từ Pressable thành View vì toàn bộ Card đã click được rồi */}
+            <View style={styles.adCtaButton}>
               <Text style={styles.adCtaButtonText}>Xem ngay</Text>
-            </Pressable>
+            </View>
           </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
-
   const renderPostCard = ({ item }: { item: PostResponse }) => {
     const isPostOwner =
       account?.id === item.authorUserId ||
@@ -483,22 +578,7 @@ export default function CommunityScreen() {
                       <Pressable
                         onPress={() => {
                           setOptionsPostId(null);
-                          Alert.alert(
-                            "Báo cáo",
-                            "Báo cáo bài viết này với quản trị viên?",
-                            [
-                              { text: "Hủy", style: "cancel" },
-                              {
-                                text: "Gửi báo cáo",
-                                style: "destructive",
-                                onPress: () =>
-                                  Alert.alert(
-                                    "Cảm ơn",
-                                    "Báo cáo của bạn đã được ghi nhận.",
-                                  ),
-                              },
-                            ],
-                          );
+                          setReportPostId(item.id); // Mở Modal báo cáo
                         }}
                         style={styles.dropdownItem}
                       >
@@ -740,6 +820,86 @@ export default function CommunityScreen() {
           )}
         </View>
       </Modal>
+      {/* OVERLAY BÁO CÁO BÀI VIẾT */}
+      {/* OVERLAY BÁO CÁO BÀI VIẾT */}
+      <Modal visible={!!reportPostId} transparent animationType="fade">
+        {/* Bỏ KeyboardAvoidingView đi vì không còn nhập phím nữa */}
+        <View style={[styles.popupOverlay, { alignItems: "center" }]}>
+          <View style={[styles.popupContent, { width: "85%", maxWidth: 400 }]}>
+            <Text style={styles.popupTitle}>Báo cáo bài viết</Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: colors.textSecondary,
+                marginBottom: 12,
+              }}
+            >
+              Vui lòng chọn một lý do:
+            </Text>
+
+            {/* Vòng lặp render các Radio Buttons */}
+            <View style={styles.radioGroup}>
+              {REPORT_REASONS.map((reason, index) => {
+                const isSelected = selectedReason === reason;
+                return (
+                  <Pressable
+                    key={index}
+                    style={styles.radioRow}
+                    onPress={() => setSelectedReason(reason)}
+                  >
+                    <View
+                      style={[
+                        styles.radioOuter,
+                        isSelected && { borderColor: colors.primary },
+                      ]}
+                    >
+                      {isSelected && (
+                        <View
+                          style={[
+                            styles.radioInner,
+                            { backgroundColor: colors.primary },
+                          ]}
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.radioText}>{reason}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.popupActions}>
+              <Pressable
+                style={[styles.popupBtn, { backgroundColor: "#F3F4F6" }]}
+                onPress={() => {
+                  setReportPostId(null);
+                  setSelectedReason(""); // Reset nếu ấn Hủy
+                }}
+              >
+                <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                  Hủy
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.popupBtn,
+                  // Nếu chưa chọn lý do thì nút mờ đi (màu xám), chọn rồi thì xanh dương
+                  {
+                    backgroundColor: selectedReason
+                      ? colors.primary
+                      : "#D1D5DB",
+                  },
+                ]}
+                onPress={handleConfirmReport}
+                disabled={!selectedReason} // Vô hiệu hóa nút nếu chưa chọn
+              >
+                <Text style={{ color: "#FFF", fontWeight: "600" }}>Gửi</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -965,4 +1125,43 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   adCtaButtonText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
+  textInputArea: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 80,
+    color: "#111827",
+  },
+  radioGroup: {
+    gap: 12,
+    marginVertical: 10,
+  },
+  radioRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#D1D5DB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  radioText: {
+    fontSize: 15,
+    color: "#374151",
+    flex: 1, // Để chữ dài tự động xuống dòng chứ không đẩy layout
+  },
 });
