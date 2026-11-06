@@ -162,7 +162,7 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId }: 
       {loading && <Text accessibilityRole="progressbar" style={s.small}>Đang kiểm tra trạng thái từ hệ thống…</Text>}
       {snapshot && presentation && <>
         <View style={s.card}><Text accessibilityRole="header" style={s.heading}>{presentation.title}</Text><Text style={s.body}>{presentation.message}</Text>
-          {transaction?.status === 0 && !link && <Text style={s.notice}>Checkout chưa có đường dẫn khả dụng, đã hết hạn hoặc đang cần đối soát. Hãy kiểm tra trạng thái; không tạo thêm giao dịch khi giao dịch cũ đang chờ.</Text>}
+          {transaction?.status === 0 && !link && !qrPayload && <Text style={s.notice}>Giao dịch chưa có mã QR khả dụng, đã hết hạn hoặc đang cần đối soát. Hãy kiểm tra trạng thái; không tạo thêm giao dịch khi giao dịch cũ đang chờ.</Text>}
           {transaction?.paidAt && transaction.status === 1 && <Text style={s.small}>Backend ghi nhận lúc: {date(transaction.paidAt)}</Text>}
         </View>
         <View style={s.card}><Text style={s.heading}>Chi tiết thanh toán</Text><Text style={s.body}>{snapshot.packageData?.name || 'Gói xác minh chuyên viên'}</Text><Text style={s.small}>{transaction ? 'Số tiền trên giao dịch' : 'Giá gói hiện tại · xác nhận lại khi tạo checkout'}</Text><Text style={s.amount}>{amount != null ? money(amount) : 'Chưa có số tiền'}</Text>
@@ -171,7 +171,7 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId }: 
           {transaction?.expiredAt && <Text style={s.small}>Hạn checkout: {date(transaction.expiredAt)} (giờ Việt Nam, UTC+7)</Text>}
         </View>
         {transaction?.status !== 1 && !transaction?.requiresReview && !transaction?.reconciliationRequired && <View style={s.card}><Text style={s.heading}>Thanh toán qua PayOS</Text>
-          {qrPayload ? <><Text style={s.body}>Mở ứng dụng ngân hàng và quét mã QR để thanh toán đúng số tiền của giao dịch này.</Text><PaymentQrCode value={qrPayload} /><Text style={s.small}>Trạng thái thanh toán sẽ tự cập nhật sau khi hệ thống ghi nhận giao dịch. Bạn cũng có thể mở PayOS bằng nút bên dưới.</Text></>
+          {qrPayload ? <><Text style={s.body}>Mở ứng dụng ngân hàng và quét mã QR để thanh toán đúng số tiền của giao dịch này.</Text><PaymentQrCode value={qrPayload} /><Text style={s.small}>Trạng thái thanh toán sẽ tự cập nhật sau khi hệ thống ghi nhận giao dịch.{link ? ' Bạn cũng có thể mở PayOS bằng nút bên dưới.' : ''}</Text></>
             : <Text style={s.body}>{!transaction && canCreate ? 'Chọn “Tạo mã QR thanh toán” bên dưới để tạo giao dịch và hiển thị mã QR.' : link ? 'Giao dịch này chưa có dữ liệu QR. Chọn “Mở PayOS để thanh toán” bên dưới để xem mã QR trên PayOS.' : 'Mã QR chỉ hiển thị khi giao dịch đang chờ thanh toán và lịch giữ còn hiệu lực. Kiểm tra trạng thái để nhận kết quả mới nhất.'}</Text>}
           <Text style={s.small}>Thanh toán thành công chưa phải kết quả đạt thẩm định.</Text></View>}
       </>}

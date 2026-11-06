@@ -41,6 +41,7 @@ test('success comes only from backend payment state and confirmed booking', () =
 test('QR uses the backend payload only while checkout remains payable', () => {
   const tx = transaction({ qrCode: '000201-bank-payment-payload' });
   assert.equal(rules.paymentQrPayload(tx, detail(), now), tx.qrCode);
+  assert.equal(rules.paymentQrPayload({ ...tx, checkoutUrl: null }, detail(), now), tx.qrCode);
   for (const overrides of [{ qrCode: null }, { qrCode: '' }, { qrCode: '  ' }, { qrCode: 'x'.repeat(4097) }, { status: 1 }, { status: 2 }, { requiresReview: true }, { reconciliationRequired: true }]) {
     assert.equal(rules.paymentQrPayload({ ...tx, ...overrides }, detail(), now), null);
   }
