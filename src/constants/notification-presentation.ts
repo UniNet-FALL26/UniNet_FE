@@ -6,21 +6,23 @@ type NotificationVisual = { icon: ComponentProps<typeof SymbolView>['name']; for
 export const notificationTheme = {
   page: '#F3F8FF', surface: '#FFFFFF', border: '#E1EAF6', divider: '#EAF0F8',
   title: '#10284B', secondary: '#596F8E', blue: '#1769E0', active: '#1769E0',
-  badge: '#EAF3FF', hovered: '#F1F7FF', unread: '#F7FAFF', error: '#C73542',
+  badge: '#EAF3FF', hovered: '#DFEDFF', unread: '#EAF3FF', error: '#C73542',
 } as const;
 
 // One registry owns cross-platform glyphs and their color pairs for every notification surface.
 export const notificationVisuals = {
   like: { icon: { ios: 'heart', android: 'favorite_border', web: 'favorite_border' }, foreground: '#DF3656', background: '#FFF0F3' },
-  comment: { icon: { ios: 'bubble.left', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }, foreground: '#1769E0', background: '#EAF3FF' },
+  comment: { icon: { ios: 'bubble.left', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }, foreground: '#596F8E', background: '#EDF2F8' },
   mention: { icon: { ios: 'at', android: 'alternate_email', web: 'alternate_email' }, foreground: '#833CE6', background: '#F2EAFF' },
   reply: { icon: { ios: 'arrowshape.turn.up.left', android: 'reply', web: 'reply' }, foreground: '#11855A', background: '#E6FAF0' },
   follow: { icon: { ios: 'person.2', android: 'group_add', web: 'group_add' }, foreground: '#833CE6', background: '#F2EAFF' },
   community: { icon: { ios: 'person.2', android: 'groups', web: 'groups' }, foreground: '#833CE6', background: '#F2EAFF' },
   verification: { icon: { ios: 'checkmark.shield.fill', android: 'verified_user', web: 'verified_user' }, foreground: '#11855A', background: '#E6FAF0' },
   recruitment: { icon: { ios: 'briefcase', android: 'work_outline', web: 'work_outline' }, foreground: '#C36909', background: '#FFF3E5' },
-  project: { icon: { ios: 'person.3', android: 'groups', web: 'groups' }, foreground: '#1769E0', background: '#EAF3FF' },
+  project: { icon: { ios: 'briefcase', android: 'work_outline', web: 'work_outline' }, foreground: '#1769E0', background: '#EAF3FF' },
   system: { icon: { ios: 'megaphone.fill', android: 'campaign', web: 'campaign' }, foreground: '#C36909', background: '#FFF3E5' },
+  promotion: { icon: { ios: 'gift', android: 'card_giftcard', web: 'card_giftcard' }, foreground: '#833CE6', background: '#F2EAFF' },
+  payment: { icon: { ios: 'creditcard', android: 'credit_card', web: 'credit_card' }, foreground: '#1769E0', background: '#EAF3FF' },
   default: { icon: { ios: 'bell', android: 'notifications_none', web: 'notifications_none' }, foreground: '#596F8E', background: '#EDF2F8' },
 } as const satisfies Record<string, NotificationVisual>;
 
@@ -29,6 +31,7 @@ export const notificationTypeVisuals: Readonly<Record<string, keyof typeof notif
   'community.mentioned': 'mention', 'community.post.mentioned': 'mention',
   'community.comment.replied': 'reply', 'community.user.followed': 'follow',
   'community.report.submitted': 'community', 'systemannouncement': 'system',
+  'system.promotion': 'promotion', 'payment.succeeded': 'payment',
 };
 
 export function notificationVisual(type: string, category: string): NotificationVisual {

@@ -19,4 +19,4 @@ export type AccountNotification = {
 };
 
 export type NotificationPage = { items: AccountNotification[]; page: number; pageSize: number; total: number; unreadCount: number };
-export type NotificationFilter = { unreadOnly?: boolean; category?: string };
+export type NotificationFilter = { unreadOnly?: boolean; readOnly?: boolean; category?: string };

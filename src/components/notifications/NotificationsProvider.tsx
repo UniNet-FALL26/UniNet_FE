@@ -6,14 +6,20 @@ import { refreshSession } from '@/services/api';
 import { notificationsService } from '@/services/notifications.service';
 import { useAuthStore } from '@/store/auth.store';
 import { tokenStorage } from '@/utils/storage';
+import { toast } from '@/store/toast.store';
+import type { AccountNotification } from '@/types/notifications';
 
-type NotificationsContextValue = { unreadCount: number; revision: number; synchronize: () => void };
-const NotificationsContext = createContext<NotificationsContextValue>({ unreadCount: 0, revision: 0, synchronize: () => {} });
+type NotificationsContextValue = { unreadCount: number; totalCount: number; revision: number; readStates: Record<string, string | null>; synchronize: () => void; read: (item: AccountNotification) => Promise<void>; readAll: () => Promise<void> };
+const NotificationsContext = createContext<NotificationsContextValue>({ unreadCount: 0, totalCount: 0, revision: 0, readStates: {}, synchronize: () => {}, read: async () => {}, readAll: async () => {} });
 export const useNotificationUpdates = () => useContext(NotificationsContext);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { account, isAuthenticated } = useAuthStore();
-  const [snapshot, setSnapshot] = useState({ accountId: '', unreadCount: 0, revision: 0 });
+  const [snapshot, setSnapshot] = useState({ accountId: '', unreadCount: 0, totalCount: 0, revision: 0 });
+  const [readStates, setReadStates] = useState<Record<string, string | null>>({});
+  const localReads = useRef<Record<string, string | null>>({});
+  const pendingReads = useRef(new Set<string>());
+  const readVersion = useRef(0);
   const refreshRef = useRef<() => void>(() => {});
   const synchronize = useCallback(() => refreshRef.current(), []);
 
@@ -25,12 +31,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const active = () => !disposed && tokenStorage.getSession()?.generation === generation && tokenStorage.getSession()?.account?.id === accountId;
     const refresh = () => {
       if (!active()) return;
-      setSnapshot(current => ({ accountId, unreadCount: current.accountId === accountId ? current.unreadCount : 0, revision: current.revision + 1 }));
+      setSnapshot(current => ({ accountId, unreadCount: current.accountId === accountId ? current.unreadCount : 0, totalCount: current.accountId === accountId ? current.totalCount : 0, revision: current.revision + 1 }));
       countRequest?.abort();
       countRequest = new AbortController();
       const signal = countRequest.signal;
-      notificationsService.unread(signal).then(unreadCount => {
-        if (active() && !signal.aborted) setSnapshot(current => ({ ...current, accountId, unreadCount }));
+      const version = readVersion.current;
+      notificationsService.list({}, 1, 1, signal).then(({ unreadCount, total }) => {
+        if (active() && !signal.aborted && version === readVersion.current && !pendingReads.current.size) setSnapshot(current => ({ ...current, accountId, unreadCount, totalCount: total }));
       }).catch(() => {});
     };
     refreshRef.current = refresh;
@@ -74,6 +81,33 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
   }, [account?.id, isAuthenticated]);
 
+  const read = async (item: AccountNotification) => {
+    if (pendingReads.current.has(item.id) || (item.id in localReads.current ? localReads.current[item.id] : item.readAt)) return;
+    const session = tokenStorage.getSession();
+    if (!session || session.account?.id !== account?.id || item.recipientUserId !== account?.id) return;
+    const active = () => tokenStorage.getSession()?.generation === session.generation && tokenStorage.getSession()?.account?.id === session.account?.id;
+    pendingReads.current.add(item.id); readVersion.current++;
+    localReads.current = { ...localReads.current, [item.id]: new Date().toISOString() };
+    setReadStates(localReads.current);
+    setSnapshot(value => ({ ...value, unreadCount: Math.max(0, value.unreadCount - 1) }));
+    try { await notificationsService.read(item.id); }
+    catch (cause) {
+      if (active()) {
+        localReads.current = { ...localReads.current, [item.id]: null };
+        setReadStates(localReads.current);
+        setSnapshot(value => ({ ...value, unreadCount: value.unreadCount + 1 }));
+        toast.error(cause instanceof Error ? cause.message : 'Chưa đánh dấu được thông báo. Vui lòng thử lại.');
+      }
+    } finally {
+      pendingReads.current.delete(item.id); readVersion.current++;
+      if (active() && !pendingReads.current.size) synchronize();
+    }
+  };
+  const readAll = async () => {
+    await notificationsService.readAll();
+    localReads.current = {}; setReadStates({}); synchronize();
+  };
+
   const own = isAuthenticated && snapshot.accountId === account?.id;
-  return <NotificationsContext.Provider value={{ unreadCount: own ? snapshot.unreadCount : 0, revision: own ? snapshot.revision : 0, synchronize }}>{children}</NotificationsContext.Provider>;
+  return <NotificationsContext.Provider value={{ unreadCount: own ? snapshot.unreadCount : 0, totalCount: own ? snapshot.totalCount : 0, revision: own ? snapshot.revision : 0, readStates: own ? readStates : {}, synchronize, read, readAll }}>{children}</NotificationsContext.Provider>;
 }

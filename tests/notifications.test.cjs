@@ -35,7 +35,7 @@ test('pagination merges by notification id without duplicate rows', () => {
   assert.equal(a.readAt, null);
 });
 
-test('calendar groups use local day boundaries and keep yesterday separate from the current week', () => {
+test('calendar groups separate today from earlier notifications at local midnight', () => {
   const now = new Date(2026, 9, 26, 12);
   const row = (id, date) => ({ id, createdAt: date.toISOString() });
   const groups = output.groupNotifications([
@@ -44,7 +44,7 @@ test('calendar groups use local day boundaries and keep yesterday separate from 
     row('older', new Date(2026, 9, 24, 12)),
   ], now);
   assert.equal(JSON.stringify(groups.map(group => [group.label, group.items.map(item => item.id)])), JSON.stringify([
-    ['Hôm nay', ['today']], ['Hôm qua', ['yesterday']], ['Trước đó', ['older']],
+    ['Hôm nay', ['today']], ['Trước đó', ['yesterday', 'older']],
   ]));
   assert.equal(output.notificationRelativeTime(new Date(now - 5 * 60000).toISOString(), now), '5 phút trước');
   assert.equal(output.notificationRelativeTime('invalid', now), 'Không rõ thời gian');

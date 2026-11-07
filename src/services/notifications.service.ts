@@ -7,6 +7,7 @@ const prefix = () => API_URL.endsWith('/api') ? '/notifications' : '/api/notific
 export const notificationsService = {
   async list(filter: NotificationFilter = {}, page = 1, pageSize = 20, signal?: AbortSignal) {
     const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize), unreadOnly: String(!!filter.unreadOnly) });
+    if (filter.readOnly) query.set('readOnly', 'true');
     if (filter.category) query.set('category', filter.category);
     return parseNotificationPage(await apiRequest<unknown>(`${prefix()}?${query}`, { signal }));
   },
@@ -15,10 +16,10 @@ export const notificationsService = {
     if (!result || !Number.isInteger(result.count) || result.count < 0) throw new Error('Không tải được số thông báo chưa đọc.');
     return result.count;
   },
-  read: (id: string, signal?: AbortSignal) => apiRequest<void>(`${prefix()}/${encodeURIComponent(id)}/read`, { method: 'PATCH', signal }),
-  readAll: (signal?: AbortSignal) => apiRequest<void>(`${prefix()}/read-all`, { method: 'PATCH', signal }),
+  read: (id: string, signal?: AbortSignal) => apiRequest<void>(`${prefix()}/${encodeURIComponent(id)}/read`, { method: 'PATCH', signal, feedback: false }),
+  readAll: (signal?: AbortSignal) => apiRequest<void>(`${prefix()}/read-all`, { method: 'PATCH', signal, feedback: false }),
   async target(id: string, signal?: AbortSignal) {
-    const result = await apiRequest<{ targetUrl: string | null }>(`${prefix()}/${encodeURIComponent(id)}/target`, { signal });
+    const result = await apiRequest<{ targetUrl: string | null }>(`${prefix()}/${encodeURIComponent(id)}/target`, { signal, feedback: false });
     return safeNotificationTarget(result?.targetUrl);
   },
 };

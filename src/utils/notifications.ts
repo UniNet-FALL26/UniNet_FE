@@ -38,12 +38,10 @@ export const notificationCategories = [
 
 export function groupNotifications<T extends { createdAt: string }>(items: readonly T[], now = new Date()) {
   const today = new Date(now.getTime()); today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today.getTime()); yesterday.setDate(yesterday.getDate() - 1);
-  const week = new Date(today.getTime()); week.setDate(week.getDate() - (week.getDay() + 6) % 7);
-  const groups: { label: string; items: T[] }[] = ['Hôm nay', 'Hôm qua', 'Tuần này', 'Trước đó'].map(label => ({ label, items: [] }));
+  const groups: { label: string; items: T[] }[] = ['Hôm nay', 'Trước đó'].map(label => ({ label, items: [] }));
   for (const item of items) {
     const time = Date.parse(item.createdAt);
-    const index = time >= today.getTime() ? 0 : time >= yesterday.getTime() ? 1 : time >= week.getTime() ? 2 : 3;
+    const index = time >= today.getTime() ? 0 : 1;
     groups[index].items.push(item);
   }
   return groups.filter(group => group.items.length > 0);

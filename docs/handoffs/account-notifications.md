@@ -4,7 +4,9 @@
 - `GET /api/notifications?page&pageSize&unreadOnly&category` returns `{ items, page, pageSize, total, unreadCount }`.
 - `GET /api/notifications/unread-count` returns `{ count }`.
 - `PATCH /api/notifications/{id}/read`, `PATCH /api/notifications/read-all` return 204.
-- `GET /api/notifications/{id}/target` rechecks recipient, permission, resource access and returns `{ targetUrl }`. Missing/forbidden resources show an inline message; FE rejects paths outside its local business-route allowlist.
+- `GET /api/notifications/{id}/target` rechecks recipient, permission, resource access and returns `{ targetUrl }`. Missing/forbidden resources and absent destinations are silent; FE rejects paths outside its local business-route allowlist.
+- Clicking a row starts marking it read and resolving its destination concurrently. Navigation does not wait for the read request, and read failures do not block a valid destination. Row option menus are removed. Regression coverage: `node tests/notification-open.test.cjs`.
+- November 6 click-flow verification: 5 hook regressions, 6 notification utility tests and Student/Partner Chrome fixtures pass. Full TypeScript check remains blocked by errors outside notifications in `src/app/(tabs)/opportunities.tsx` and `src/components/assessor/AssessorProfilePosts.tsx`.
 - SignalR `/hubs/notifications`, authenticated with the current account token; `NotificationChanged` is an invalidation event. API/database remain authoritative.
 
 ## UI and lifecycle
