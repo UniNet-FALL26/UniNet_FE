@@ -34,7 +34,7 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 3 },
   tile: { position: 'relative', minWidth: 0, overflow: 'hidden', backgroundColor: '#EAF0F7' },
   single: { width: '100%', height: 280 },
-  pair: { flex: 1, aspectRatio: 0.85, minHeight: 220, maxHeight: 360 },
+  pair: { flex: 1, height: 280 },
   hero: { width: '100%', aspectRatio: 2.1, minHeight: 180, maxHeight: 310 },
   half: { flex: 1, aspectRatio: 1.2, minHeight: 160, maxHeight: 260 },
   third: { flex: 1, aspectRatio: 1, minHeight: 150, maxHeight: 220 },

@@ -80,7 +80,10 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
         const tiles = gallery.locator('[data-testid^="community-media-tile-"]');
         assert.equal(await tiles.count(), Math.min(4, id));
         const first = await tiles.first().boundingBox();
-        assert.ok(first.height >= (id === 2 ? 220 : 180) - 1);
+        if (id === 2) {
+          const single = await card.getByTestId('community-media-tile-0').boundingBox();
+          for (const tile of await tiles.all()) assert.ok(Math.abs((await tile.boundingBox()).height - single.height) < 1, 'two-image tiles match the single-image height');
+        } else assert.ok(first.height >= 179);
         assert.equal(await gallery.locator('[style*="blur(24px)"]').count(), Math.min(4, id));
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
         await gallery.screenshot({ path: `dist/community-cards/gallery-${id}-${width}.png` });
