@@ -1,0 +1,8 @@
+# Student profile tabs — 2026-11-07
+
+- Student profile header now offers Hồ sơ / Bài viết tabs with matching icons; mobile settings and verification reminders remain available. Tab selection resets on account change. Switching tabs resets the content scroll position.
+- Owner edit action moved from the page header into the top-right of the introduction hero. Optional `heroAction` passes through all three profile templates; compact names reserve space for the action. Editor navigation retains the current template/theme. Public profiles and template previews receive no owner action.
+- Extracted `CommunityProfilePosts` from the Partner implementation to reuse own-post queries, author filtering, shared cards, galleries, likes/saves, comment sheets, edit/delete/report and pagination. `CompanyProfilePosts` remains a compatibility wrapper with its original Partner labels and navigation.
+- Student posts load only after opening Bài viết and show only the active profile's posts. The redundant posts heading/community link is hidden for Students; Partner retains its existing heading. Empty/error states remain usable. The relocated edit button uses a translucent white background.
+- Verified: Student Chrome fixture at 320/390/768/1440px for all three templates, action placement, tab state, editor link, own-post filtering, likes/comments, empty posts and public-profile isolation. Partner post interaction regression also passed. Screenshots inspected under ignored `dist/student-profile-tabs`.
+- Existing full-project TypeScript errors remain in opportunities and AssessorProfilePosts; no new errors were reported for this feature. Native-device testing was not performed.

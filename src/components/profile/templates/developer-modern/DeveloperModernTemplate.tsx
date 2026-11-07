@@ -1,13 +1,14 @@
 import { StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
 import type { PortfolioResponse, ProfileTheme } from '@/types/portfolio';
 import { DeveloperHero } from './DeveloperHero';
 import { ArticleSection, CertificateSection, ExtraSection, JourneySection, ProjectSection, SkillSection, Statistics } from './PortfolioSections';
 import { PortfolioLink, ui } from './PortfolioPrimitives';
 import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 
-export type DeveloperModernTemplateProps = { data: PortfolioResponse; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean; onNavigate?: (id: string) => void; onSectionLayout?: (id: string, y: number) => void };
+export type DeveloperModernTemplateProps = { data: PortfolioResponse; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean; heroAction?: ReactNode; onNavigate?: (id: string) => void; onSectionLayout?: (id: string, y: number) => void };
 const defaultOrder = ['stats', 'skills', 'journey', 'other-projects', 'certificates', 'activities', 'articles'];
-export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = false, onNavigate, onSectionLayout }: DeveloperModernTemplateProps) {
+export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = false, heroAction, onNavigate, onSectionLayout }: DeveloperModernTemplateProps) {
   const editing = useProfileEditing();
   const compact = width < 720;
   const props = { portfolio: data.portfolio, theme, compact, thumbnail, demo };
@@ -21,7 +22,7 @@ export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = 
   const requestedOrder = !editing && appearance?.sectionOrder?.length ? appearance.sectionOrder : defaultOrder;
   const order = [...new Set([...requestedOrder, ...defaultOrder])].filter(id => sections[id] && (editing || !appearance?.hiddenSections?.includes(id)));
   return <View style={{ width, backgroundColor: theme.page }}>
-    <View onLayout={event => onSectionLayout?.('hero', event.nativeEvent.layout.height)}><DeveloperHero data={data} theme={theme} compact={compact} thumbnail={thumbnail} onNavigate={onNavigate} /></View>
+    <View onLayout={event => onSectionLayout?.('hero', event.nativeEvent.layout.height)}><DeveloperHero data={data} theme={theme} compact={compact} thumbnail={thumbnail} heroAction={heroAction} onNavigate={onNavigate} /></View>
     <View style={[s.content, { paddingHorizontal: compact ? 18 : 42 }]}>{order.map(id => <View key={id} onLayout={event => onSectionLayout?.(id, event.nativeEvent.layout.y)}>{sections[id]}</View>)}</View>
     <View style={[s.footer, { marginHorizontal: compact ? 18 : 32, backgroundColor: theme.heroBackground, borderColor: theme.heroBorder }]}>
       <View>

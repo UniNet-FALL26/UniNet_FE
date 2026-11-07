@@ -5,13 +5,13 @@ import { ProfilePortrait } from './ProfilePortrait';
 import { EditField, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { portfolioMetrics, type ProfileEditField } from '@/utils/profile-fields';
 
-export function ShowcaseHero({ data, theme, width, thumbnail }: DeveloperModernTemplateProps) {
+export function ShowcaseHero({ data, theme, width, thumbnail, heroAction }: DeveloperModernTemplateProps) {
   const editing = useProfileEditing();
   const { profile, portfolio } = data;
   const compact = width < 768;
   const desktop = thumbnail || width >= 1024;
   const name = profile.fullName.trim().split(/\s+/);
-  const title = <View style={s.titles}>
+  const title = <View style={[s.titles, compact && !!heroAction && { paddingRight: 40 }]}>
     <EditField overlay field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.name, { color: theme.heroText, fontSize: compact ? 36 : desktop ? 46 : 40, lineHeight: compact ? 46 : 56 }]}>{name.slice(0, -1).join(' ')}{name.length > 1 ? ' ' : ''}<Text style={{ color: theme.accent }}>{name.at(-1)}</Text></Text></EditField>
     {(profile.nickname || editing) && <EditField overlay field="nickname" label="Biệt danh" color={theme.heroMuted}><Text style={[s.nickname, { color: theme.heroMuted }]}>@{profile.nickname || 'Biệt danh'}</Text></EditField>}
     <EditField overlay field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{portfolio.headline || (editing ? 'Thêm chức danh' : '')}</Text></EditField>
@@ -27,6 +27,7 @@ export function ShowcaseHero({ data, theme, width, thumbnail }: DeveloperModernT
   ];
   const visibleStats = stats.filter(item => editing || item.hasData);
   return <View testID="showcase-hero" style={[s.hero, { backgroundColor: thumbnail ? theme.page : theme.heroBackground, paddingHorizontal: compact ? 22 : 40 }]}>
+    {heroAction && <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>{heroAction}</View>}
     {/* Keep the scaled thumbnail edge light so the dark background cannot bleed below the curve. */}
     {thumbnail && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: 4, backgroundColor: theme.heroBackground }]} />}
     <View style={[s.composition, { flexDirection: compact ? 'column' : 'row' }]}>

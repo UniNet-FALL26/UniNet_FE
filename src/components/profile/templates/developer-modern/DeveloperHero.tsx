@@ -1,19 +1,21 @@
 import { Image } from 'expo-image';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioResponse, ProfileTheme } from '@/types/portfolio';
 import { profileMedia, profileHeroCover, profileMobileDecoration } from '@/components/profile/profile-media';
 import { EditField, EditPhoto, useProfileEditing } from '@/components/profile/ProfileEditContext';
 
-type Props = { data: PortfolioResponse; theme: ProfileTheme; compact: boolean; thumbnail?: boolean; onNavigate?: (id: string) => void };
-export function DeveloperHero({ data: { profile, portfolio }, theme, compact }: Props) {
+type Props = { data: PortfolioResponse; theme: ProfileTheme; compact: boolean; thumbnail?: boolean; heroAction?: ReactNode; onNavigate?: (id: string) => void };
+export function DeveloperHero({ data: { profile, portfolio }, theme, compact, heroAction }: Props) {
   const editing = useProfileEditing();
   const headline = portfolio.headline?.trim();
   const bio = profile.bio?.trim() || portfolio.careerObjective?.trim();
   const decoration = compact ? profileMobileDecoration(profile.coverUrl, theme.id) : undefined;
   return <View testID="modern-hero" style={{ backgroundColor: theme.heroBackground }}>
+    {heroAction && <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>{heroAction}</View>}
     <View style={[s.hero, compact && s.compactHero]}>
       <Image testID="modern-hero-cover" source={profileHeroCover(profile.coverUrl, theme.id, compact)} contentFit={decoration ? 'fill' : 'cover'} style={StyleSheet.absoluteFill} accessibilityLabel="Ảnh bìa hồ sơ" />
-      <View style={[s.intro, compact && s.compactIntro]}>
+      <View style={[s.intro, compact && s.compactIntro, compact && !!heroAction && { paddingRight: 40 }]}>
         <EditField overlay field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.fullName, compact && s.compactName, { color: theme.heroText }]}>{profile.fullName.split(' ').slice(0, -1).join(' ')} <Text style={{ color: theme.accent }}>{profile.fullName.split(' ').at(-1)}</Text></Text></EditField>
         {(profile.nickname || editing) && <EditField overlay field="nickname" label="Biệt danh" color={theme.heroMuted}><Text style={[s.nickname, { color: theme.heroMuted }]}>@{profile.nickname || 'Biệt danh'}</Text></EditField>}
         {(headline || editing) && <EditField overlay field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{headline || 'Thêm chức danh'}</Text></EditField>}

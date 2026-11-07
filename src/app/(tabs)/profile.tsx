@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -9,6 +9,7 @@ import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { StudentVerificationModal } from '@/components/settings/StudentVerificationModal';
 import { useStudentVerification } from '@/hooks/useStudentVerification';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
+import { CommunityProfilePosts } from '@/components/community/CommunityProfilePosts';
 import { colors } from '@/constants/colors';
 import { ACCOUNT_ROLE } from '@/constants/roles';
 import { useAuthStore } from '@/store/auth.store';
@@ -24,6 +25,8 @@ export default function ProfileScreen() {
   const [loaded, setLoaded] = useState<{ accountId: string; data: PortfolioResponse } | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [activeTab, setActiveTab] = useState<'profile' | 'posts'>('profile');
+  useEffect(() => { setActiveTab('profile'); }, [account?.id]);
   const [frameWidth, setFrameWidth] = useState(0);
   const [columnWidth, setColumnWidth] = useState(0);
   const [reminderNow, setReminderNow] = useState(Date.now);
@@ -57,12 +60,18 @@ export default function ProfileScreen() {
   const reminder = verificationReminder(account?.createdAt, data?.profile.isVerified ?? account?.profile?.isVerified ?? false, reminderNow);
   const showReminder = isAuthenticated && !!reminder && dismissedReminderAccount !== account?.id;
   const compactHeader = profileWidth < 600 || !student;
-  const header = <View style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }]}>
-    <View style={styles.reminderSlot}>{showReminder && <VerificationBanner compact={compactHeader} onVerify={() => student && account ? setVerificationAccountId(account.id) : router.push('/settings')} onDismiss={() => setDismissedReminderAccount(account?.id ?? null)} />}</View>
+  const reminderBanner = showReminder && <VerificationBanner compact={compactHeader} onVerify={() => student && account ? setVerificationAccountId(account.id) : router.push('/settings')} onDismiss={() => setDismissedReminderAccount(account?.id ?? null)} />;
+  const editAction = <Pressable testID="student-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.profileEdit, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={21} tintColor={colors.primary} /></Pressable>;
+  const header = <View testID="student-profile-header" style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }]}>
+    <View style={styles.headerRow}>
+    {student ? <View role="tablist" aria-label="Nội dung hồ sơ" style={styles.profileTabs}>
+      {([{ id: 'profile', label: 'Hồ sơ', icon: { ios: 'person.crop.rectangle', android: 'badge', web: 'badge' } }, { id: 'posts', label: 'Bài viết', icon: { ios: 'doc.text', android: 'article', web: 'article' } }] as const).map(tab => <Pressable key={tab.id} role="tab" aria-label={tab.label} aria-selected={activeTab === tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.profileTab, activeTab === tab.id && styles.profileTabActive]}><SymbolView name={tab.icon} size={18} tintColor={activeTab === tab.id ? colors.primary : colors.textSecondary} accessible={false} /><Text style={[styles.profileTabText, activeTab === tab.id && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
+    </View> : <View style={styles.reminderSlot}>{reminderBanner}</View>}
     <View style={[styles.headerActions, compactHeader && styles.compactHeaderActions]}>
-      {student && <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
       {(!desktop || !student) && <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
     </View>
+    </View>
+    {student && reminderBanner && <View style={styles.verificationSlot}>{reminderBanner}</View>}
   </View>;
   if (!student) return <ModulePage title="Cá nhân" description="Thông tin và hoạt động của bạn trên UniNet." sections={['Hồ sơ của tôi', 'Bài viết đã lưu', 'Cài đặt']} header={header} />;
   return <SafeAreaView style={styles.safe} edges={['top']}>
@@ -71,10 +80,12 @@ export default function ProfileScreen() {
     {header}
     {error ? <View style={styles.state}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View>
       : !data ? <View style={styles.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ" color={colors.primary} /></View>
-      : <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.saved, desktop && styles.desktopSaved]}>
-          <View testID="profile-template-frame" onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={desktop ? frameWidth || profileWidth : Math.min(frameWidth || width, 1120)} /></View>
-        </View>
+      : <ScrollView key={activeTab} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {activeTab === 'profile' ? <View role="tabpanel" aria-label="Hồ sơ" style={[styles.saved, desktop && styles.desktopSaved]}>
+          <View testID="profile-template-frame" onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={desktop ? frameWidth || profileWidth : Math.min(frameWidth || width, 1120)} heroAction={editAction} /></View>
+        </View> : <View role="tabpanel" aria-label="Bài viết" style={styles.postsPanel}>
+          <CommunityProfilePosts key={account?.id} profileId={data.profile.id} showHeading={false} title="Bài viết của bạn" emptyMessage="Bài viết bạn chia sẻ với cộng đồng sẽ xuất hiện tại đây." communityHref="/(tabs)/community" />
+        </View>}
       </ScrollView>}
     </View>
     {desktop && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded /></View>}
@@ -87,7 +98,16 @@ const styles = StyleSheet.create({
   body: { flex: 1, minHeight: 0 }, desktopBody: { width: '100%', maxWidth: 1800, alignSelf: 'center', flexDirection: 'row', gap: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }, mainColumn: { flex: 1, minWidth: 0, minHeight: 0 }, settingsColumn: { width: 400, overflow: 'hidden', borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' },
   desktopSaved: { alignSelf: 'flex-start', maxWidth: '100%' }, desktopHeader: { maxWidth: '100%', paddingHorizontal: 0 }, desktopMainColumn: { marginTop: -13 },
   safe: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.background }, scrollContent: { paddingBottom: 24 },
-  header: { flexShrink: 0, zIndex: 1, backgroundColor: colors.background, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 8 },
+  header: { flexShrink: 0, zIndex: 1, backgroundColor: colors.background, gap: 8, width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 8 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  profileTabs: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  profileTab: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  profileTabActive: { borderBottomColor: colors.primary },
+  profileTabText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  profileTabTextActive: { color: colors.primary },
+  profileEdit: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: 'rgba(220,231,245,0.6)' },
+  verificationSlot: { width: '100%' },
+  postsPanel: { width: '100%', alignSelf: 'center', paddingTop: 16 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compactHeaderActions: { gap: 4 }, compactSettings: { width: 32, height: 36 },
   reminderSlot: { flex: 1, minWidth: 0, flexDirection: 'row' }, settings: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }, pressed: { opacity: 0.65 },
