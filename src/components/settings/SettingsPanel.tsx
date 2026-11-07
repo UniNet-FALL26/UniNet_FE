@@ -60,7 +60,7 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
     {!embedded && <DetailNavigation title="Cài đặt" backLabel="Quay lại hồ sơ cá nhân" disabled={busy} />}
     <ScrollView showsVerticalScrollIndicator={!embedded} contentContainerStyle={[s.content, !wide && s.mobileContent, embedded && s.embeddedContent]}>
       {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.panel}><Text style={s.sectionTitle}>Chào mừng đến với UniNet</Text><Text style={s.body}>Đăng nhập để quản lý tài khoản và hồ sơ của bạn.</Text><Button style={s.actionButton} textStyle={s.actionButtonText} title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : <View style={[s.columns, wide && s.wideColumns]}>
-        {!embedded && <View style={[s.identity, wide && s.identityRail]}>
+        {wide && <View style={[s.identity, s.identityRail]}>
           <View style={s.avatar}><Text style={s.initials}>{initials}</Text></View>
           <View style={s.identityCopy}><Text style={s.accountName}>{name}</Text><Text selectable style={s.email}>{account?.email}</Text><View style={s.roleBadge}><Text style={s.roleText}>{role}</Text></View></View>
           {wide && <View style={s.railNote}><Text style={s.noteTitle}>Một nơi, mọi tùy chỉnh.</Text><Text style={s.body}>Quản lý cách bạn xuất hiện và giữ tài khoản của mình an toàn.</Text></View>}

@@ -336,7 +336,7 @@ export default function OpportunitiesScreen() {
 
   return <SafeAreaView style={styles.safe} edges={['top']}>
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadJobs(1, false, true)} tintColor={colors.primary} />}>
-      <View style={[styles.heroHeader, isWideWeb && styles.heroHeaderWide]}>
+      {isWideWeb && <View style={[styles.heroHeader, styles.heroHeaderWide]}>
         <View style={styles.heroCopy}><Text accessibilityRole="header" style={styles.title}>Cơ hội</Text><Text style={styles.subtitle}>Khám phá việc làm, thực tập và các cơ hội phát triển phù hợp với bạn.</Text></View>
         {isWideWeb && <Image
           source={require('../../../assets/images/opportunities-hero.png')}
@@ -346,14 +346,14 @@ export default function OpportunitiesScreen() {
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />}
-      </View>
-      <View style={styles.searchFilterRow}>
+      </View>}
+      <View style={[styles.searchFilterRow, !isWideWeb && styles.searchFilterRowMobile]}>
           <View style={styles.searchBox}><SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} tintColor={colors.textMuted} /><TextInput value={searchInput} onChangeText={setSearchInput} onSubmitEditing={() => setKeyword(searchInput)} placeholder="Tìm vị trí, kỹ năng, công ty..." placeholderTextColor={colors.textMuted} returnKeyType="search" style={styles.searchInput} accessibilityLabel="Tìm cơ hội" />{!!searchInput && <Pressable accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm" onPress={() => { setSearchInput(''); setKeyword(''); }} hitSlop={8}><SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} size={18} tintColor={colors.textMuted} /></Pressable>}</View>
           <View style={styles.filterMenuAnchor}>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(current => !current)} style={[styles.filterButton, filtersOpen && styles.filterButtonActive]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Bộ lọc" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(current => !current)} style={[styles.filterButton, !isWideWeb && styles.filterIconButton, (filtersOpen || activeFilterCount > 0) && styles.filterButtonActive]}>
               <SymbolView name={{ ios: 'line.3.horizontal.decrease', android: 'filter_alt', web: 'filter_alt' }} size={18} tintColor={colors.primary} />
-              <Text style={styles.filterButtonText}>Bộ lọc</Text>
-              {!!activeFilterCount && <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeFilterCount}</Text></View>}
+              {isWideWeb && <Text style={styles.filterButtonText}>Bộ lọc</Text>}
+              {isWideWeb && !!activeFilterCount && <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeFilterCount}</Text></View>}
             </Pressable>
             {filtersOpen && <View style={[styles.filterPanel, { width: Math.min(900, screenWidth - 36) }]}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPanelBody}>
@@ -487,6 +487,8 @@ function relativeDate(value: string) { const days = Math.max(0, Math.floor((Date
 function dateLabel(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Chưa xác định' : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date); }
 
 const styles = StyleSheet.create({
+  searchFilterRowMobile: { marginTop: 0, gap: 8 },
+  filterIconButton: { width: 44, minWidth: 44, height: 44, paddingHorizontal: 0, flexShrink: 0 },
   heroHeader: { minHeight: 130, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 20, paddingHorizontal: 24, paddingVertical: 20, backgroundColor: '#EEF4FF' },
   heroHeaderWide: { minHeight: 176, marginBottom: 2, paddingVertical: 0 },
   heroCopy: { flex: 1, minWidth: 0 },

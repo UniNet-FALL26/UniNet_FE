@@ -77,7 +77,7 @@ export default function CompanyJobs() {
   const lastItem = Math.min(page * pageSize, totalItems);
 
   return <CompanyPage><PageScroll contentStyle={[s.pageContent, !isWideWeb && s.pageContentCompact]}>
-    <View style={[s.headingRow, !isWideWeb && s.headingCompact]}>
+    {isWideWeb && <View style={s.headingRow}>
       <View style={s.headingMain}>
         <View style={s.headingIcon}><CompanyIcon name={{ ios: 'briefcase', android: 'work_outline', web: 'work_outline' }} size={23} color={c.blue} /></View>
         <View style={s.headingCopy}>
@@ -89,7 +89,7 @@ export default function CompanyJobs() {
         <CompanyIcon name={{ ios: 'plus', android: 'add', web: 'add' }} color="#FFF" size={18} />
         <Text style={s.addButtonText}>Tạo bài đăng tuyển dụng</Text>
       </Pressable>
-    </View>
+    </View>}
     <Card style={[s.panel, !isWideWeb && s.panelCompact, width < 600 && s.panelPhone]}>
       <View style={[s.toolbar, !isWideWeb && s.toolbarCompact]}>
         <View style={[s.search, !isWideWeb && s.searchCompact]}>
@@ -110,6 +110,9 @@ export default function CompanyJobs() {
             </Pressable>)}
           </View>}
         </View>
+        {!isWideWeb && <Pressable accessibilityRole="button" accessibilityLabel="Tạo bài đăng tuyển dụng" onPress={() => router.push('/(company)/create')} style={[s.addButton, s.addIconButton]}>
+          <CompanyIcon name={{ ios: 'plus', android: 'add', web: 'add' }} color="#FFF" size={22} />
+        </Pressable>}
       </View>
       {isWideWeb && <ScrollView horizontal contentContainerStyle={s.tableScroll}>
         <View style={s.table}>
@@ -181,6 +184,7 @@ const s = StyleSheet.create({
   pageSubtitle: { color: c.muted, fontSize: 12, lineHeight: 18 },
   addButton: { minHeight: 38, paddingHorizontal: 14, borderRadius: 8, backgroundColor: c.blue, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' },
   addButtonText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+  addIconButton: { width: 40, height: 40, paddingHorizontal: 0, flexShrink: 0 },
   panel: { padding: 16, borderRadius: 18, gap: 0, boxShadow: '0px 4px 16px rgba(30, 80, 150, 0.04)' },
   panelCompact: { padding: 14, borderRadius: 18 },
   panelPhone: { padding: 0, borderWidth: 0, borderRadius: 0, backgroundColor: 'transparent', boxShadow: 'none', elevation: 0 },
