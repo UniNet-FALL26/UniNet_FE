@@ -223,36 +223,50 @@ export function CommentModal({
       <Modal
         visible={!!post}
         transparent
-        animationType="fade"
+        animationType={isDesktop ? "fade" : "slide"}
         onRequestClose={onClose}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, !isDesktop && styles.mobileModalContainer]}>
+          {!isDesktop && <Pressable accessibilityRole="button" accessibilityLabel="Đóng bình luận" onPress={onClose} style={StyleSheet.absoluteFill} />}
           {/* Đưa nút X ra ngoài cùng của màn hình */}
-          <Pressable style={styles.globalCloseBtn} onPress={onClose}>
+          {isDesktop && <Pressable accessibilityRole="button" accessibilityLabel="Đóng bình luận" style={styles.globalCloseBtn} onPress={onClose}>
             <SymbolView
               name={{ ios: "xmark", android: "close", web: "close" }}
               size={24}
               tintColor="#FFF"
             />
-          </Pressable>
+          </Pressable>}
 
           <KeyboardAvoidingView
+            testID={!isDesktop ? "community-comments-sheet" : undefined}
+            accessibilityViewIsModal
+            role="dialog"
+            aria-label="Bình luận"
+            aria-modal
             style={[
-              styles.contentWrapper,
+              isDesktop ? styles.contentWrapper : styles.mobileSheet,
               { flexDirection: isDesktop ? "row" : "column" },
             ]}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
             {/* CỘT TRÁI: Media Viewer */}
-            <View
+            {isDesktop && <View
               style={[
                 styles.leftMediaSection,
                 !hasMedia && { display: "none" },
-                !isDesktop && styles.mobileMediaSection,
               ]}
             >
               {hasMedia && (
-                <View style={styles.imageViewer}>
+                <View testID="community-comment-media" style={styles.imageViewer}>
+                  <Image
+                    source={{ uri: post.mediaUrls[mediaIndex] }}
+                    style={styles.imageBackdrop}
+                    resizeMode="cover"
+                    blurRadius={24}
+                    accessible={false}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  />
                   {post.mediaUrls.length > 1 && (
                     <Pressable
                       style={[styles.navArrow, { left: 20 }]}
@@ -302,7 +316,7 @@ export function CommentModal({
                   )}
                 </View>
               )}
-            </View>
+            </View>}
 
             {/* CỘT PHẢI: Thông tin bài viết, Menu Post, Comment */}
             <View
@@ -311,8 +325,17 @@ export function CommentModal({
                 (!hasMedia || !isDesktop) && { flex: 1 },
               ]}
             >
+              {!isDesktop && <View style={styles.sheetHeader}>
+                <View style={styles.sheetHandle} />
+                <View style={styles.sheetTitleRow}>
+                  <Text accessibilityRole="header" style={styles.sheetTitle}>Bình luận</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Đóng bình luận" onPress={onClose} style={styles.sheetClose}>
+                    <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={21} tintColor={colors.textSecondary} />
+                  </Pressable>
+                </View>
+              </View>}
               {/* Header của bài viết (bên phải) */}
-              <View
+              {isDesktop && <View
                 style={[
                   styles.rightHeader,
                   optionsPostOpen && { zIndex: 9999 },
@@ -410,11 +433,11 @@ export function CommentModal({
                     </>
                   )}
                 </View>
-              </View>
+              </View>}
 
               <ScrollView
                 style={styles.scrollArea}
-                contentContainerStyle={{ padding: 16, paddingBottom: 150 }} // Thêm paddingBottom 150 để không bị khuất menu chức năng
+                contentContainerStyle={{ padding: 16, paddingBottom: isDesktop ? 150 : 24 }}
                 keyboardShouldPersistTaps="handled"
                 onScroll={() => {
                   if (optionsPostOpen) setOptionsPostOpen(false);
@@ -422,14 +445,14 @@ export function CommentModal({
                 }}
               >
                 {/* Description */}
-                {post.description ? (
+                {isDesktop && post.description ? (
                   <Text style={styles.postDescriptionText}>
                     {post.description}
                   </Text>
                 ) : null}
 
                 {/* React & Comment Count Bar */}
-                <View style={styles.statsBar}>
+                {isDesktop && <View style={styles.statsBar}>
                   <Pressable
                     style={styles.statBtn}
                     onPress={() => onToggleReaction(post.id)}
@@ -464,7 +487,7 @@ export function CommentModal({
                     />
                     <Text style={styles.statText}>{post.commentCount}</Text>
                   </View>
-                </View>
+                </View>}
 
                 {/* Comment List */}
                 {loading ? (
@@ -539,6 +562,7 @@ export function CommentModal({
               <View style={styles.inputBar}>
                 <TextInput
                   ref={textInputRef}
+                  accessibilityLabel="Viết bình luận"
                   style={styles.input}
                   placeholder="Viết bình luận..."
                   value={inputText}
@@ -547,6 +571,8 @@ export function CommentModal({
                   editable={!sending}
                 />
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Gửi bình luận"
                   onPress={handleSubmitComment}
                   disabled={sending || !inputText.trim()}
                   style={[
@@ -633,6 +659,13 @@ export function CommentModal({
 }
 
 const styles = StyleSheet.create({
+  mobileModalContainer: { justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.45)' },
+  mobileSheet: { width: '100%', alignSelf: 'center', flexShrink: 0, height: '78%', maxHeight: '90%', maxWidth: 700, backgroundColor: '#FFF', borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
+  sheetHeader: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB', paddingTop: 9, paddingHorizontal: 16 },
+  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: '#D3DAE5' },
+  sheetTitleRow: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  sheetClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.9)", // Nền tối ngoài cùng
@@ -650,10 +683,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  mobileMediaSection: {
-    flex: 1, // Trên mobile chia đôi hoặc lấy 1 phần
-    minHeight: 300,
-  },
   globalCloseBtn: {
     position: "absolute",
     top: Platform.OS === "ios" ? 50 : 20,
@@ -668,6 +697,12 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
+  },
+  imageBackdrop: {
+    ...StyleSheet.absoluteFill,
+    transform: [{ scale: 1.15 }],
+    pointerEvents: "none",
   },
   mainImage: {
     width: "100%",

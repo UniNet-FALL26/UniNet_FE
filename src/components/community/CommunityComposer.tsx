@@ -392,6 +392,7 @@ const s = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingBottom: 8,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -439,7 +440,8 @@ const s = StyleSheet.create({
   dividerLine: {
     height: 1,
     backgroundColor: "#F3F4F6",
-    marginVertical: 12,
+    marginTop: 12,
+    marginBottom: 4,
   },
 
   actions: {
@@ -449,13 +451,13 @@ const s = StyleSheet.create({
   },
   actionBtnItem: {
     flex: 1,
-    minHeight: 36,
+    minHeight: 32,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     borderRadius: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   actionIconBadge: {
     width: 28,
