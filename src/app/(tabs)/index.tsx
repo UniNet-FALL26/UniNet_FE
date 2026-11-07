@@ -13,7 +13,7 @@ import {
 import { useAuthStore } from "@/store/auth.store";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -39,6 +39,12 @@ const REPORT_REASONS = [
 ];
 // Cpn xử lý Description xem thêm
 const AD_FREQUENCY = 5;
+function mergeFeedPosts(current: PostResponse[], incoming: PostResponse[]) {
+  const byId = new Map(current.map(post => [post.id, post]));
+  for (const post of incoming) byId.set(post.id, post);
+  return Array.from(byId.values());
+}
+
 export default function CommunityScreen() {
   const phone = useWindowDimensions().width < 600;
   const { isAuthenticated, account } = useAuthStore();
@@ -62,6 +68,8 @@ export default function CommunityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const feedRequest = useRef<AbortController | null>(null);
+  const loadedPage = useRef(0);
 
   const [optionsPostId, setOptionsPostId] = useState<string | null>(null);
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(
@@ -133,6 +141,10 @@ export default function CommunityScreen() {
   }, [posts, adPool]);
 
   const fetchFeed = useCallback(async (pageNum: number, isRefresh = false) => {
+    if (pageNum > 1 && (feedRequest.current || pageNum <= loadedPage.current)) return;
+    feedRequest.current?.abort();
+    const controller = new AbortController();
+    feedRequest.current = controller;
     if (isRefresh) setRefreshing(true);
     else if (pageNum === 1) setLoading(true);
 
@@ -143,30 +155,36 @@ export default function CommunityScreen() {
       const data = await communityService.getPosts({
         page: pageNum,
         pageSize: 10,
-      });
-      const fetchedPosts = Array.isArray(data)
+      }, controller.signal);
+      if (controller.signal.aborted || feedRequest.current !== controller) return;
+      const fetchedPosts: PostResponse[] = Array.isArray(data)
         ? data
         : ((data as any)?.data ?? []);
 
       if (isRefresh || pageNum === 1) setPosts(current => {
         const linkedPost = current.find(post => post.id === requestedPostId);
-        return linkedPost && !fetchedPosts.some((post: PostResponse) => post.id === linkedPost.id) ? [linkedPost, ...fetchedPosts] : fetchedPosts;
+        return mergeFeedPosts(linkedPost ? [linkedPost] : [], fetchedPosts);
       });
-      else setPosts((prev) => [...prev, ...fetchedPosts]);
+      else setPosts(current => mergeFeedPosts(current, fetchedPosts));
 
+      loadedPage.current = pageNum;
       setHasMore(fetchedPosts.length >= 10);
       setPage(pageNum);
     } catch (error) {
-      console.error(error);
+      if (!controller.signal.aborted && feedRequest.current === controller) console.error(error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (feedRequest.current === controller) {
+        feedRequest.current = null;
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [requestedPostId]);
 
   useFocusEffect(
     useCallback(() => {
       fetchFeed(1);
+      return () => { feedRequest.current?.abort(); feedRequest.current = null; };
     }, [fetchFeed]),
   );
 
