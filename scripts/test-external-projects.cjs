@@ -223,3 +223,32 @@ test('completion uses the body-ID status endpoint and propagates failures', asyn
   assert.equal(calls, 1);
  }
 });
+
+test('project date picker uses a date-only calendar and preserves extracted partial dates until selection', () => {
+  const jsx = (type, props) => ({ type, props });
+  const changes = [];
+  const { ProjectDatePicker } = load('src/components/projects/ProjectDatePicker.tsx', {
+    react: { createElement: jsx, useState: value => [value, () => {}] },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { Platform: { OS: 'web' }, Text: 'Text', View: 'View' },
+    '@react-native-community/datetimepicker': {},
+    '@/components/ui/Button': { Button: 'Button' },
+    '@/constants/colors': { colors: {} },
+    '@/utils/external-project-draft': utils,
+  });
+  const render = (value, disabled = false) => ProjectDatePicker({ label: 'Ngày bắt đầu', value, disabled, onChange: value => changes.push(value), error: '' });
+  const partial = render('2024');
+  const input = partial.props.children[1];
+  assert.equal(input.type, 'input');
+  assert.equal(input.props.type, 'date');
+  assert.equal(input.props.value, '');
+  assert.deepEqual(changes, []);
+  input.props.onChange({ target: { value: '2024-02-29' } });
+  assert.deepEqual(changes, ['2024-02-29']);
+  const selected = render(changes[0], true).props.children[1];
+  assert.equal(selected.props.value, '2024-02-29');
+  assert.equal(selected.props.disabled, true);
+  assert.match(selected.props.max, /^\d{4}-\d{2}-\d{2}$/);
+  input.props.onChange({ target: { value: '' } });
+  assert.equal(changes[1], '');
+});
