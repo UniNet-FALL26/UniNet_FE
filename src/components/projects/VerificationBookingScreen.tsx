@@ -18,7 +18,6 @@ import { level2Label } from '@/utils/project-verification';
 const errorMessage = (cause: unknown) => {
   const code = cause instanceof ApiError ? cause.code : '';
   if (code === 'MEETING_SLOT_UNAVAILABLE') return 'Khung giờ vừa hết chỗ hoặc trùng lịch. Vui lòng chọn khung giờ khác.';
-  if (code === 'LEVEL1_REQUIRED' || code === 'LEVEL1_STALE') return 'Cấp 1 chưa đạt hoặc không còn hiện hành. Hãy quay lại kiểm tra cấp 1.';
   if (code === 'PAYMENT_PENDING') return 'Giao dịch đang chờ xử lý. Chưa thể đổi hoặc giữ lại lịch.';
   if (code === 'BOOKING_ALREADY_PAID') return 'Hồ sơ đã thanh toán, không thể đổi lịch.';
   if (code === 'MEETING_CONFLICT' || code === 'VERIFICATION_CONFLICT') return 'Hồ sơ vừa thay đổi. Vui lòng kiểm tra trạng thái mới trước khi tiếp tục.';
@@ -68,8 +67,6 @@ export function VerificationBookingScreen() {
         slotDate(new Date().toISOString(), VERIFICATION_TIME_ZONE);
         if (!controller.signal.aborted) { setSlots(result); setDay(previous => result.slots.some(s => slotDate(s.startAt, VERIFICATION_TIME_ZONE) === previous) ? previous : result.slots[0] ? slotDate(result.slots[0].startAt, VERIFICATION_TIME_ZONE) : ''); }
       } else {
-        const level1 = await service.getLevel1(project.id, controller.signal);
-        if (level1.status !== 2 || !level1.isCurrent) throw new Error('Cần kết quả cấp 1 đạt và còn hiện hành trước khi chọn gói.');
         const result = await service.packages(packagePage, controller.signal);
         if (!controller.signal.aborted) { setPackages(result.packages.filter(p => p.isActive && p.type === 0 && p.role === 0)); setPackagePages(result.totalPages); }
       }
@@ -113,7 +110,7 @@ export function VerificationBookingScreen() {
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}><Text style={s.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text><Text style={s.title}>{detail ? 'Hẹn gặp chuyên viên' : 'Thêm sự tin cậy cho dự án'}</Text><Text style={s.heroText}>{title || 'Dự án đã hoàn thành'}</Text><Text style={s.heroText}>{detail ? '02  Chọn lịch hẹn' : '01  Chọn gói dịch vụ'}  →  Thanh toán  →  Xác minh</Text></View>
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}
-      {error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Tải lại trạng thái" onPress={reload} /><Button title="Xem cấp 1" variant="outline" onPress={() => router.push({ pathname: '/group/level1/[id]', params: { id } } as never)} /></View>}
+      {error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Tải lại trạng thái" onPress={reload} /></View>}
       {loading && <Text accessibilityRole="progressbar" style={s.body}>Đang tải dữ liệu mới nhất…</Text>}
       {!loading && !error && !detail && <>
         <Text style={s.heading}>Gói dành cho sinh viên</Text><Text style={s.body}>Chọn gói để tạo hồ sơ. Bước này chưa thu phí; bạn sẽ chọn lịch trước khi thanh toán.</Text>
@@ -122,7 +119,7 @@ export function VerificationBookingScreen() {
           <Text style={s.kickerDark}>{selectedPackage === p.id ? '● ĐÃ CHỌN' : '○ CHỌN GÓI'}</Text><Text style={s.heading}>{p.name}</Text><Text style={s.price}>{p.price.toLocaleString('vi-VN')} ₫</Text><Text style={s.body}>Xác minh dự án với chuyên viên</Text>{p.durationInDays != null && <Text style={s.small}>Thời hạn gói: {p.durationInDays} ngày</Text>}
         </Pressable>)}
         <View style={s.row}><Button title="Trang trước" variant="outline" disabled={packagePage <= 1} onPress={() => { setSelectedPackage(null); setPackagePage(v => v - 1); }} /><Text style={s.small}>{packagePage} / {Math.max(1, packagePages)}</Text><Button title="Trang sau" variant="outline" disabled={packagePage >= packagePages} onPress={() => { setSelectedPackage(null); setPackagePage(v => v + 1); }} /></View>
-        <View style={s.card}><Text style={s.heading}>Điều kiện đăng ký</Text><Text style={s.body}>✓ Bạn là người tạo dự án đã hoàn thành.{ '\n' }✓ Kết quả cấp 1 đạt và còn hiện hành.</Text><Text style={s.small}>Kết quả thẩm định do chuyên viên kết luận sau buổi xác minh. Đăng ký gói không bảo đảm dự án sẽ đạt.</Text></View>
+        <View style={s.card}><Text style={s.heading}>Điều kiện đăng ký</Text><Text style={s.body}>✓ Bạn là người tạo dự án đã hoàn thành.</Text><Text style={s.small}>Kết quả thẩm định do chuyên viên kết luận sau buổi xác minh. Đăng ký gói không bảo đảm dự án sẽ đạt.</Text></View>
       </>}
       {!loading && !error && detail && <>
         <View style={s.card}><Text style={s.heading}>{level2Label(detail, true)}</Text>{detail.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {verificationDate(detail.verification.scheduledStartAt)}{'\n'}{VERIFICATION_TIME_LABEL}</Text>}

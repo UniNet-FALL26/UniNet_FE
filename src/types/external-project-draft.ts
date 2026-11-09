@@ -23,4 +23,4 @@ export type DraftResponse = {
   errorCode: string | null; confirmedProjectId: string | null; data: DraftData; extraction: DraftExtraction | null;
   missingFields: string[]; files: DraftFile[];
 };
-export type ConfirmDraftResponse = { draftId: string; projectId: string; evidenceModerationId: string; version: number; origin: number; status: number };
+export type ConfirmDraftResponse = { draftId: string; projectId: string; version: number; origin: number; status: number };

@@ -1,22 +1,5 @@
-import type { EvidenceModeration, VerificationDetail } from '@/types/project-verification';
+import type { VerificationDetail } from '@/types/project-verification';
 
-export const level1Labels = ['Đang chờ kiểm tra', 'Đang kiểm tra', 'Đã đạt cấp 1', 'Nội dung không đạt', 'Thiếu minh chứng', 'Lỗi dịch vụ kiểm tra'];
-export function level1Message(review: EvidenceModeration | null) {
-  if (!review) return 'Chưa có kết quả kiểm tra tự động. Người tạo có thể yêu cầu kiểm tra cấp 1.';
-  if (!review.isCurrent) return 'Dữ liệu hoặc chính sách đã thay đổi. Cần kiểm tra dữ liệu hiện tại trước khi đăng ký thẩm định.';
-  switch (review.status) {
-    case 0: case 1: return 'Hệ thống đang xử lý văn bản báo cáo và độ an toàn URL. Bạn có thể làm mới để xem kết quả.';
-    case 2: return 'Đã vượt qua kiểm tra văn bản và URL. Xem trạng thái thẩm định để biết bước tiếp theo.';
-    case 3: return 'Có nội dung báo cáo hoặc URL không đạt chính sách. Xem lý do theo từng báo cáo trước khi sửa.';
-    case 4: return 'Cần bổ sung báo cáo hoặc minh chứng cho các công việc bên dưới.';
-    default: {
-      const last = [...review.attempts].sort((a, b) => b.number - a.number)[0];
-      return last?.transient && last.number < 5
-        ? 'Dịch vụ kiểm tra gặp lỗi tạm thời. Hệ thống có thể thử lại; hãy làm mới trạng thái.'
-        : 'Chưa thể hoàn tất kiểm tra. Cần hỗ trợ vận hành hoặc cập nhật dữ liệu/chính sách trước khi chạy lại.';
-    }
-  }
-}
 export function level2Label(detail: VerificationDetail | null, eligible: boolean) {
   if (!detail) return eligible ? 'Có thể đăng ký thẩm định' : 'Chưa đủ điều kiện thẩm định';
   const v = detail.verification;
