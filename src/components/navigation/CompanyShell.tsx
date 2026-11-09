@@ -15,7 +15,7 @@ export function CompanyShell({ children }: { children?: ReactNode } = {}) {
   const desktop = width >= 1024;
   return <SafeAreaView edges={['top']} style={styles.root}>
     {desktop && <View testID="company-header" style={styles.header}><View style={[styles.headerInner, width < 1200 && styles.compactHeader]}>
-      <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => { dismissDetail?.(); router.navigate('/(company)'); }} style={({ pressed }) => [styles.brand, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="link" accessibilityLabel="UniNet - Trang chủ" onPress={() => { dismissDetail?.(); router.replace('/(company)/company-community'); }} style={({ pressed }) => [styles.brand, pressed && styles.pressed]}>
         <Image source={require('@/assets/images/uninet-mark.png')} resizeMode="contain" accessibilityLabel="Logo UniNet" style={styles.logo} />
         <Text style={styles.brandName}>UniNet</Text>
       </Pressable>

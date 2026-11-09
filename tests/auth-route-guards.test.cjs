@@ -14,7 +14,7 @@ function renderLayout(group, state) {
     if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
     if (name === '@/store/auth.store') return { useAuthStore: () => state };
     if (name === '@/constants/roles') return { ACCOUNT_ROLE: { STUDENT: 0, PARTNER: 1, ASSESSOR: 2 } };
-    if (name === '@/utils/role-navigation') return { accountHome: role => role === 2 ? '/(assessor)/assessor-community' : role === 1 ? '/(company)' : '/(tabs)' };
+    if (name === '@/utils/role-navigation') return { accountHome: role => role === 2 ? '/(assessor)/assessor-community' : role === 1 ? '/(company)/company-community' : '/(tabs)' };
     if (name === '@/components/assessor/AssessorShell') return { AssessorShell: 'AssessorShell' };
     if (name === '@/components/company/CompanyHeaderActions') return { CompanyHeaderActions: 'CompanyHeaderActions' };
     if (name === 'expo-router') return { Redirect: 'Redirect', Slot: 'Slot' };
@@ -50,6 +50,6 @@ test('signed-in users reach the layout for their own role', () => {
   assert.equal(renderLayout('company', state(2)).props.href, '/(assessor)/assessor-community');
   assert.equal(renderLayout('assessor', state(0)).props.href, '/(tabs)');
   assert.equal(renderLayout('company', state(1)).type, 'SafeAreaView');
-  assert.equal(renderLayout('tabs', state(1)).props.href, '/(company)');
+  assert.equal(renderLayout('tabs', state(1)).props.href, '/(company)/company-community');
   assert.equal(renderLayout('company', state(0)).props.href, '/(tabs)');
 });

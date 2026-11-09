@@ -1,6 +1,5 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import CompanyDashboard from './(company)/index';
+import { Redirect } from 'expo-router';
 
 export default function CompanyPreviewRoute() {
-  return <SafeAreaView edges={['top']} style={{ flex: 1 }}><CompanyDashboard /></SafeAreaView>;
+  return <Redirect href="/(company)/company-community" />;
 }
