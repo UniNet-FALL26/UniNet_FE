@@ -13,7 +13,7 @@ function load(file) {
 }
 test('Assessor has an independent app home without changing existing user homes', () => {
   const { accountHome } = load('src/utils/role-navigation.ts');
-  assert.equal(accountHome(0), '/(tabs)'); assert.equal(accountHome(1), '/(company)');
+  assert.equal(accountHome(0), '/(tabs)'); assert.equal(accountHome(1), '/(company)/company-community');
   assert.equal(accountHome(2), '/(assessor)/assessor-community');
 });
 test('five Assessor destinations keep their order and detail pages select assessments', () => {
