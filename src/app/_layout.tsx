@@ -1,6 +1,6 @@
 import '@/global.css';
 import { useEffect, type ComponentProps } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { authStore, useAuthStore } from '@/store/auth.store';
 import { NotificationsProvider } from '@/components/notifications/NotificationsProvider';
@@ -13,6 +13,8 @@ const screenLayout: NonNullable<ComponentProps<typeof Stack>['screenLayout']> = 
 
 export default function RootLayout() {
   const { account, isAuthenticated } = useAuthStore();
+  // Restoring an existing account must not remount the public screen after its fragment was removed.
+  const publicOnboarding = useSegments()[0] === 'assessor-onboarding';
   useEffect(() => { void authStore.restoreSession(); }, []);
-  return <SafeAreaProvider><View style={{ flex: 1 }}><NotificationsProvider key={isAuthenticated ? `${account?.id}:${tokenStorage.getSession()?.generation}` : 'anonymous'}><Stack key={isAuthenticated ? account?.id : 'anonymous'} screenOptions={{ headerShown: false }} screenLayout={screenLayout} /></NotificationsProvider><ToastHost /></View></SafeAreaProvider>;
+  return <SafeAreaProvider><View style={{ flex: 1 }}><NotificationsProvider key={publicOnboarding ? 'onboarding-public' : isAuthenticated ? `${account?.id}:${tokenStorage.getSession()?.generation}` : 'anonymous'}><Stack key={publicOnboarding ? 'onboarding-public' : isAuthenticated ? account?.id : 'anonymous'} screenOptions={{ headerShown: false }} screenLayout={screenLayout} /></NotificationsProvider><ToastHost /></View></SafeAreaProvider>;
 }

@@ -10,7 +10,7 @@ module.exports = ({ config }) => {
     ios: { ...config.ios, associatedDomains: [...(config.ios?.associatedDomains || []), `applinks:${url.hostname}`] },
     android: { ...config.android, intentFilters: [...(config.android?.intentFilters || []), {
       action: 'VIEW', autoVerify: true, category: ['BROWSABLE', 'DEFAULT'],
-      data: [{ scheme: 'https', host: url.hostname, pathPrefix: '/payment/result' }],
+      data: [{ scheme: 'https', host: url.hostname, pathPrefix: '/payment/result' }, { scheme: 'https', host: url.hostname, pathPrefix: '/assessor-onboarding/' }],
     }] },
   };
 };

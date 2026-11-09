@@ -10,7 +10,7 @@ export function AccountShell({ children, force = false, onNavigate, routeName }:
   const { account, isAuthenticated } = useAuthStore();
   const segments = useSegments();
   const group = routeName?.split('/')[0] || segments[0];
-  if (!isAuthenticated || !account || group === '(auth)' || (!force && ['(tabs)', '(company)', '(assessor)'].includes(group))) return children;
+  if (!isAuthenticated || !account || group === '(auth)' || group === 'assessor-onboarding' || (!force && ['(tabs)', '(company)', '(assessor)'].includes(group))) return children;
   const content = account.role === 1 ? <CompanyShell>{children}</CompanyShell> : account.role === 2 ? <AssessorShell>{children}</AssessorShell> : account.role === 0 ? <AppTabs>{children}</AppTabs> : children;
   return <NavigationDismissContext.Provider value={onNavigate}>{content}</NavigationDismissContext.Provider>;
 }
