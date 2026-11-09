@@ -34,7 +34,7 @@ export const externalProjectDraftService = {
   update: async (id: string, version: number, data: DraftData) => draftResponse(await apiRequest<unknown>(path(id), { method: 'PATCH', body: JSON.stringify({ version, data }), feedback: false })),
   confirm: async (id: string, version: number): Promise<ConfirmDraftResponse> => {
     const result = await apiRequest<unknown>(`${path(id)}/confirm`, { method: 'POST', body: JSON.stringify({ version, confirmSharingRights: true }), feedback: false });
-    if (!object(result) || !isFileId(result.projectId) || !isFileId(result.draftId) || !isFileId(result.evidenceModerationId) || !Number.isInteger(result.version) || result.origin !== 1 || result.status !== 2) throw new ApiError('Chưa xác định được kết quả xác nhận. Vui lòng tải lại trạng thái.', 502);
+    if (!object(result) || !isFileId(result.projectId) || !isFileId(result.draftId) || !Number.isInteger(result.version) || result.origin !== 1 || result.status !== 2) throw new ApiError('Chưa xác định được kết quả xác nhận. Vui lòng tải lại trạng thái.', 502);
     return result as unknown as ConfirmDraftResponse;
   },
 };

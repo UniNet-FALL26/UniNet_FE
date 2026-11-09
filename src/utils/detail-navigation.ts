@@ -43,7 +43,7 @@ export function detailNavigation(pathname: string, role = 0, params: { id?: stri
     if (section === 'recommendations') return make([projects, crumb('Tạo dự án', '/group/create'), crumb('Gợi ý thành viên')]);
     if (section === 'import') return make([projects, crumb('Thêm dự án có sẵn')]);
     if (section === 'external-draft') return make([projects, crumb('Thêm dự án có sẵn', '/group/import'), crumb('Xem lại hồ sơ')]);
-    const labels: Record<string, string> = { level1: 'Kết quả kiểm tra cấp 1', verification: 'Chọn lịch xác minh', checkout: 'Thanh toán xác minh', 'verification-dossier': 'Hồ sơ thẩm định', 'verification-meeting': 'Phòng thẩm định', 'verification-result': 'Kết quả thẩm định' };
+    const labels: Record<string, string> = { level1: 'Chi tiết dự án', verification: 'Chọn lịch xác minh', checkout: 'Thanh toán xác minh', 'verification-dossier': 'Hồ sơ thẩm định', 'verification-meeting': 'Phòng thẩm định', 'verification-result': 'Kết quả thẩm định' };
     if (labels[section]) {
       const parent = crumb('Hồ sơ thẩm định', `/group/verification-dossier/${encodeURIComponent(params.id || pathname.split('/')[3] || '')}`);
       return make([projects, project, ...(['verification-meeting', 'verification-result'].includes(section) ? [parent] : []), crumb(labels[section])]);

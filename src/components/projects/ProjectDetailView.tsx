@@ -1,3 +1,5 @@
+import { ACCOUNT_ROLE } from '@/constants/roles';
+import { toast } from '@/store/toast.store';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ProjectOverview } from '@/components/projects/ProjectOverview';
 import { ToastHost } from '@/components/ui/ToastHost';
@@ -24,7 +26,6 @@ import {
   Image,
   Modal,
   Pressable,
-  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -44,8 +45,8 @@ export function ProjectDetailScreen() {
   const [joinRole, setJoinRole] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const { account } = useAuthStore();
-  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; deleted?: boolean } | null>(null);
+  const { account, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const [confirmation, setConfirmation] = useState<{ title: string; message: string; operation: () => Promise<unknown>; deleted?: boolean; completion?: boolean } | null>(null);
   const [acting, setActing] = useState(false);
   const actingRef = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -105,6 +106,7 @@ export function ProjectDetailScreen() {
   const isCreator = project?.isCreator === true;
   const isMember = project?.isMember === true;
   const isActive = project?.status === ApiProjectStatus.Active;
+  const canComplete = isAuthenticated && !authLoading && account?.role === ACCOUNT_ROLE.STUDENT && isActive && isCreator && !loading;
   const canRecruit = isActive && project?.recruitmentStatus === ApiRecruitmentStatus.Open && project?.visibility === ProjectVisibility.Public;
   const invitations = project?.invitations ?? [];
   const joinRequests = project?.joinRequests ?? [];
@@ -145,17 +147,25 @@ export function ProjectDetailScreen() {
   };
   const confirmAction = async () => {
     if (!confirmation || actingRef.current) return;
+    if (confirmation.completion && !canComplete) { setConfirmation(null); return; }
     actingRef.current = true;
     setActing(true);
     setError(null);
     try {
       await confirmation.operation();
       setConfirmation(null);
-      setNotice("Thao tác thành công.");
+      setNotice(confirmation.completion ? 'Hoàn thành dự án thành công.' : 'Thao tác thành công.');
+      if (confirmation.completion) toast.success('Hoàn thành dự án thành công.');
       if (confirmation.deleted) router.replace("/(tabs)/groups" as never);
       else setRetry((value) => value + 1);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể thực hiện thao tác. Vui lòng thử lại.");
+      const message = cause instanceof Error ? cause.message : 'Không thể thực hiện thao tác. Vui lòng thử lại.';
+      setError(message);
+      if (confirmation.completion) {
+        toast.error(message);
+        setConfirmation(null);
+        setRetry(value => value + 1);
+      }
     } finally {
       actingRef.current = false;
       setActing(false);
@@ -166,14 +176,6 @@ export function ProjectDetailScreen() {
     if (!role) { setError("Bạn cần chọn một vai trò để gửi yêu cầu tham gia."); return; }
     setJoinRole(role);
     askConfirmation("Gửi yêu cầu tham gia", `Bạn muốn tham gia dự án với vai trò ${role}?`, () => projectService.submitJoinRequest({ projectId: project.id, role, message: joinMessage.trim() || undefined }));
-  };
-  const shareProject = async () => {
-    try {
-      await Share.share({ message: `${project?.title ?? ""}\n${project?.description ?? ""}`.trim() });
-      setOptionsVisible(false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Không thể chia sẻ dự án.");
-    }
   };
   const openMemberActions = (member: ProjectDetail["members"][number]) => setSelectedMember(member);
   const removeSelectedMember = () => {
@@ -213,7 +215,7 @@ export function ProjectDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <DetailNavigation title="Chi tiết dự án" backLabel="Quay lại danh sách dự án" onBack={() => router.dismissTo('/(tabs)/groups' as never)} actions={<>        <Pressable accessibilityRole="button" accessibilityLabel="Chia sẻ dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => void shareProject()} style={styles.headerIcon}><Text style={styles.headerIconText}>↗</Text></Pressable>
+      <DetailNavigation title="Chi tiết dự án" backLabel="Quay lại danh sách dự án" onBack={() => router.dismissTo('/(tabs)/groups' as never)} actions={<>
         <Pressable accessibilityRole="button" accessibilityLabel="Tùy chọn dự án" android_ripple={{ color: "#E2E8F0", borderless: true }} onPress={() => setOptionsVisible(true)} style={styles.headerIcon}><Text style={styles.headerIconText}>⋮</Text></Pressable></>} />
       <ScrollView
         style={styles.container}
@@ -226,6 +228,15 @@ export function ProjectDetailScreen() {
         <View style={styles.headerTitleWrap}><Text style={styles.overviewEyebrow}>CHI TIẾT DỰ ÁN</Text><Text role="heading" aria-level={1} numberOfLines={2} style={styles.overviewTitle}>{project.title}</Text><Text style={[styles.statusHeaderBadge, project.status === ApiProjectStatus.Active ? styles.activeHeaderBadge : styles.inactiveHeaderBadge]}>{project.status === ApiProjectStatus.Active ? "Đang hoạt động" : project.status === ApiProjectStatus.Rejected ? "Bị từ chối" : "Chờ duyệt"}</Text></View>
 
       </View>
+      {canComplete && <Button title="Hoàn thành dự án" disabled={acting} onPress={() => {
+        if (!canComplete || actingRef.current) return;
+        setError(null);
+        setConfirmation({title: 'Hoàn thành dự án?', message: 'Thao tác này sẽ đánh dấu dự án đã hoàn thành và mở đánh giá đóng góp. Bạn có muốn tiếp tục?', completion: true, operation: async () => {
+          if (!canComplete) throw new Error('Bạn không có quyền hoàn thành dự án.');
+          const result = await projectService.completeProject(project.id);
+          setProject(current => current?.id === result.projectId ? {...current, status: result.status, updatedAt: result.updatedAt, completedAt: result.completedAt} : current);
+        }});
+      }} />}
       <ProjectOverview
         project={project}
         showMembers={false}
@@ -441,8 +452,8 @@ export function ProjectDetailScreen() {
             <Text style={styles.descriptionText}>{confirmation?.message}</Text>
             {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
             <View style={styles.managementActions}>
-              <Button title="Quay lại" style={{ flex: 1 }} variant="outline" disabled={acting} onPress={() => setConfirmation(null)} />
-              <Button title="Xác nhận" style={{ flex: 1 }} loading={acting} onPress={confirmAction} />
+              <Button title={confirmation?.completion ? "Hủy" : "Quay lại"} style={{ flex: 1 }} variant="outline" disabled={acting} onPress={() => setConfirmation(null)} />
+              <Button title={confirmation?.completion ? "Xác nhận hoàn thành" : "Xác nhận"} style={{ flex: 1 }} loading={acting} onPress={confirmAction} />
             </View>
           </View>
         </View>
@@ -452,7 +463,6 @@ export function ProjectDetailScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="Đóng tùy chọn" android_ripple={{ color: "#E2E8F0" }} style={styles.menuBackdrop} onPress={() => setOptionsVisible(false)} />
           <View style={styles.menuCard}>
             <Text style={styles.actionCardTitle}>Tùy chọn dự án</Text>
-            <Pressable accessibilityRole="button" android_ripple={{ color: "#E2E8F0" }} onPress={() => void shareProject()} style={styles.menuItem}><Text style={styles.menuItemText}>Chia sẻ dự án</Text></Pressable>
             <Pressable accessibilityRole="button" android_ripple={{ color: "#E2E8F0" }} onPress={() => { setOptionsVisible(false); setRetry((value) => value + 1); }} style={styles.menuItem}><Text style={styles.menuItemText}>Làm mới thông tin</Text></Pressable>
             <Button title="Đóng" variant="outline" onPress={() => setOptionsVisible(false)} />
           </View>

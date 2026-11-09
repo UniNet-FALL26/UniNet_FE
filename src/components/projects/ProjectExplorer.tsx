@@ -535,7 +535,7 @@ export function ProjectExplorerScreen() {
                         </Text>
 
                         <Text style={styles.progressText}>
-                          Hạn: {project.recruitmentDeadline ? formatDate(project.recruitmentDeadline) : "Không áp dụng"}
+                          Hạn tuyển thành viên: {project.recruitmentDeadline ? formatDate(project.recruitmentDeadline) : "Không áp dụng"}
                         </Text>
                       </View>
                       <View style={styles.progressTrack}>

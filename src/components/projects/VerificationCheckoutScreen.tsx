@@ -25,7 +25,6 @@ function errorText(cause: unknown) {
   if (code === 'RESERVATION_REQUIRED') return 'Lịch giữ đã hết hạn hoặc chưa được xác nhận. Vui lòng kiểm tra lại hồ sơ và chọn lịch.';
   if (code === 'VERIFICATION_ALREADY_PAID') return 'Hồ sơ đã có thanh toán thành công. Đang tải lại trạng thái.';
   if (code === 'PAYMENT_RECONCILIATION_REQUIRED') return 'Giao dịch cũ cần đối soát trước khi thanh toán tiếp.';
-  if (code === 'LEVEL1_REQUIRED' || code === 'LEVEL1_STALE') return 'Kết quả cấp 1 chưa đủ điều kiện hoặc đã thay đổi. Vui lòng kiểm tra lại cấp 1.';
   if (code === 'PAYMENT_NOT_CONFIGURED' || code === 'PAYOS_NOT_CONFIGURED') return 'Dịch vụ thanh toán chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
   if (code === 'INVALID_VERIFICATION_PACKAGE' || code === 'INVALID_PAYMENT_AMOUNT') return 'Gói hiện chưa thể thanh toán. Vui lòng kiểm tra lại hồ sơ hoặc liên hệ hỗ trợ.';
   return cause instanceof Error ? cause.message : 'Không thể tải trạng thái thanh toán. Vui lòng thử lại.';

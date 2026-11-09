@@ -179,35 +179,47 @@ test('expired drafts cannot be saved and provide an expiry state even for HTTP 4
   const h = hookHarness(); h.api.get = async () => { throw new ApiError('Expired', 410, 'DRAFT_EXPIRED'); };
   h.render(); await settle(); h.render(); assert.equal(h.result.expired, true); assert.equal(await h.result.save(), null); assert.equal(h.timers.size, 0); h.cleanup();
 });
-test('external projects skip the internal contribution endpoint', async () => {
-  for (const external of [true, false]) {
-    let contributions = 0, cleanup;
-    const { useProjectVerification } = load('src/hooks/useProjectVerification.ts', {
-      react: { useCallback: fn => fn, useState: value => [typeof value === 'function' ? value() : value, () => {}], useRef: value => ({ current: value }) },
-      'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
-      'expo-router': { useFocusEffect: callback => { cleanup = callback(); } }, '@/services/api': { ApiError },
-      '@/services/project-verification.service': { projectVerificationService: { getLevel1: async () => ({ status: 2 }), contribution: async () => { contributions++; return { status: 0 }; } } },
-    });
-    useProjectVerification(projectId, true, true, external); await settle(); assert.equal(contributions, external ? 0 : 1); cleanup();
-  }
+test('verification loads paid dossiers without L1 or contribution requests', async () => {
+ let cleanup, calls = [];
+ const {useProjectVerification} = load('src/hooks/useProjectVerification.ts', {
+  react: {useCallback: fn => fn, useState: value => [value, () => {}]},
+  'expo-router': {useFocusEffect: callback => {cleanup = callback();}},
+  '@/services/project-verification.service': {projectVerificationService: {list: async (id, pending) => {calls.push(pending); return {verifications: []};}}},
+ });
+ useProjectVerification(projectId, true); await settle(); assert.deepEqual(calls, [true, false]); cleanup();
 });
-test('direct project documents and their checks render when tasks are empty and task IDs are null', () => {
-  const React = require('react');
-  const { renderToStaticMarkup } = require('react-dom/server');
-  const host = ({ children }) => React.createElement('div', null, children);
-  const review = { version: 1, status: 2, isCurrent: true, policy: {}, source: { tasks: [], projectEvidence: { content: 'Mô tả minh chứng trực tiếp', documents: [{ id: fileId, fileName: 'BaoCaoDuAn.pdf', fileUrl: files[0].url, sizeBytes: 1024 }] } }, attempts: [{ number: 1, results: [{ projectTaskId: null, taskReportId: null, projectEvidenceDocumentId: fileId, kind: 'Url', status: 0, reason: 'URL đã kiểm tra', checkedAt: '2026-11-04T00:00:00Z' }] }] };
-  let hookArgs;
-  const { CompletedDetailView } = load('src/components/projects/CompletedDetailView.tsx', {
-    'react/jsx-runtime': require('react/jsx-runtime'), react: { useState: initial => [initial, () => {}] },
-    'react-native': { ActivityIndicator: host, Pressable: host, ScrollView: host, Text: host, View: host, useWindowDimensions: () => ({ width: 1200 }), StyleSheet: { create: value => value } },
-    'react-native-safe-area-context': { SafeAreaView: host }, 'expo-router': { router: {} },
-    '@/components/projects/ProjectOverview': { ProjectOverview: host }, '@/components/assessor/AssignmentDetailContent': { openEvidence() {} },
-    '@/store/toast.store': { toast: {} }, '@/utils/verification-date': { verificationDate: value => value || '' },
-    '@/components/ui/Button': { Button: ({ title }) => React.createElement('button', null, title) }, '@/constants/colors': { colors: {} },
-    '@/hooks/useProjectVerification': { useProjectVerification: (...args) => { hookArgs = args; return { level1: { data: review }, level2: { data: null }, cycle: {}, refresh() {}, retry() {} }; } },
-    '@/utils/project-verification': { level1Labels: { 2: 'Đạt' }, level1Message: () => '', level2Label: () => '' },
+test('completed project offers paid verification without evidence tabs', () => {
+ const React = require('react');
+ const {renderToStaticMarkup} = require('react-dom/server');
+ const host = ({children}) => React.createElement('div', null, children);
+ const {CompletedDetailView} = load('src/components/projects/CompletedDetailView.tsx', {
+  'react/jsx-runtime': require('react/jsx-runtime'), react: {useState: initial => [initial, () => {}], useEffect: () => {}},
+  'react-native': {Pressable: host, ScrollView: host, Text: host, View: host, StyleSheet: {create: value => value}},
+  'react-native-safe-area-context': {SafeAreaView: host}, 'expo-router': {router: {}},
+  '@/components/navigation/DetailNavigation': {DetailNavigation: host},
+  '@/components/projects/ProjectOverview': {ProjectOverview: host},
+  '@/components/ui/Button': {Button: ({title}) => React.createElement('button', null, title)}, '@/constants/colors': {colors: {}},
+  '@/hooks/useProjectVerification': {useProjectVerification: () => ({level2: {data: null, loading: false}, refresh() {}})},
+  '@/utils/project-verification': {level2Label: () => 'Có thể đăng ký thẩm định'},
+ });
+ const html = renderToStaticMarkup(React.createElement(CompletedDetailView, {project: {id: projectId, isCreator: true, title: 'Dự án'}, initialTab: 'Minh chứng'}));
+ assert.ok(html.includes('Đăng kí thẩm định')); assert.ok(!html.includes('Minh chứng')); assert.ok(!html.includes('cấp 1'));
+});
+
+test('completion uses the body-ID status endpoint and propagates failures', async () => {
+ for (const failure of [null, 403, 404, 409, 500, 'network']) {
+  let calls = 0;
+  const {projectService} = load('src/services/project.service.ts', {
+   '@/constants/config': {API_URL: 'https://example.test/api'},
+   '@/services/api': {apiRequest: async (url, options) => {
+    calls++; assert.equal(url, '/projects/status'); assert.equal(options.method, 'PATCH');
+    assert.deepEqual(JSON.parse(options.body), {projectId, status: 2});
+    if (failure) throw new Error(String(failure));
+    return {projectId, status: 2, updatedAt: '2026-11-09T08:00:00Z', completedAt: '2026-11-09T08:00:00Z'};
+   }},
   });
-  const html = renderToStaticMarkup(React.createElement(CompletedDetailView, { project: { id: projectId, origin: 1, isCreator: true, title: 'Dự án' }, level1Only: true }));
-  assert.ok(html.includes('BaoCaoDuAn.pdf')); assert.ok(html.includes('URL đã kiểm tra')); assert.ok(!html.includes('Chưa có công việc'));
-  assert.ok(html.includes('Không áp dụng')); assert.equal(hookArgs[3], true);
+  if (failure) await assert.rejects(projectService.completeProject(projectId), new RegExp(String(failure)));
+  else assert.equal((await projectService.completeProject(projectId)).status, 2);
+  assert.equal(calls, 1);
+ }
 });

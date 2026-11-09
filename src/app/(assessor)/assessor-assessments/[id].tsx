@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Linking, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { assessorService, type AssignmentDetail, type AssessorMeeting } from '@/services/assessor.service';
 import { AssessorState, assessorDate, assessorStyles as s } from '@/components/assessor/assessor-ui';
-import { DetailHeader, AssessmentResults, ProjectInformation, EvidenceDetails, AssignmentHistory, detailTabs, type DetailTab } from '@/components/assessor/AssignmentDetailContent';
+import { DetailHeader, AssessmentResults, ProjectInformation, AssignmentHistory, detailTabs, type DetailTab } from '@/components/assessor/AssignmentDetailContent';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/auth.store';
 import { ApiError } from '@/services/api';
@@ -12,7 +12,8 @@ import { AssessmentForm, emptyAssessment, assessmentError } from '@/components/a
 import { assessorReportDrafts, emptyAssessorDraft, type AssessorReportDraft } from '@/store/assessor-report-drafts';
 
 export default function AssessorAssignmentDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>(); const { account } = useAuthStore(); const narrow = useWindowDimensions().width < 700;
+  const { id, tab: requestedTab } = useLocalSearchParams<{ id: string; tab?: string }>(); const { account } = useAuthStore(); const narrow = useWindowDimensions().width < 700;
+  useEffect(() => { if (requestedTab === 'evidence' || requestedTab === 'Minh chứng') router.setParams({tab: 'info'}); }, [requestedTab]);
   const key = `${account?.id}:${id}`;
   const [room, setRoom] = useState<{ key: string; data: AssessorMeeting } | null>(null);
   const [loaded, setLoaded] = useState<{ key: string; data: AssignmentDetail } | null>(null), [error, setError] = useState(''), [actionError, setActionError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0);
@@ -57,7 +58,6 @@ export default function AssessorAssignmentDetailScreen() {
       {!!actionError && <Text accessibilityRole="alert" style={s.error}>{actionError}</Text>}
       {tab === 'results' && <AssessmentResults key={`results:${key}`} data={data} />}
       {tab === 'info' && <ProjectInformation data={data} onLinkError={setActionError} />}
-      {tab === 'evidence' && <EvidenceDetails data={data} onLinkError={setActionError} />}
       {tab === 'history' && <AssignmentHistory data={data} />}
       {tab === 'schedule' && <View style={s.detailMeetingCard}><SectionHeading number="03" title="Lịch và phòng thẩm định" caption="Trao đổi, xác minh và hoàn tất buổi thẩm định" /><Text style={s.muted}>{room?.key === key ? room.data.meetingEndAt ? 'Phòng họp đã kết thúc' : room.data.joinUrl ? 'Phòng họp đã sẵn sàng' : 'Chưa có đường dẫn tham gia' : 'Tạo / lấy phòng để chuẩn bị buổi thẩm định.'}</Text>{assignment.scheduledStartAt && <Text style={s.body}>Bắt đầu: {assessorDate(assignment.scheduledStartAt)}</Text>}{assignment.scheduledEndAt && <Text style={s.muted}>Kết thúc dự kiến: {assessorDate(assignment.scheduledEndAt)}</Text>}<Text style={s.muted}>Lịch dự kiến không phải thời lượng tối thiểu. Thoát phòng họp không tự kết thúc buổi thẩm định; hãy bấm “Kết thúc buổi thẩm định” để mở bước lập báo cáo.</Text>{meetingStartAt && <Text style={s.muted}>Đã bắt đầu: {assessorDate(meetingStartAt)}</Text>}{meetingEndAt && <Text style={s.muted}>Đã kết thúc: {assessorDate(meetingEndAt)}</Text>}
         {active && !meetingEndAt && <View style={s.actions}><Button title="Tạo / lấy phòng họp" variant="outline" disabled={busy} onPress={() => void mutate(() => assessorService.createMeeting(id))} /><Button title="Tham gia phòng họp" disabled={busy} onPress={() => void join()} />{!meetingStartAt && <Button title="Bắt đầu buổi thẩm định" disabled={busy} onPress={() => void mutate(() => assessorService.meetingAction(id, 'start'))} />}<Button title="Kết thúc buổi thẩm định" variant="outline" disabled={busy || !meetingStartAt} onPress={() => void mutate(() => assessorService.meetingAction(id, 'end'))} /></View>}
