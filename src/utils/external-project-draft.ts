@@ -2,6 +2,7 @@ import type { DraftData, DraftFile } from '@/types/external-project-draft';
 
 export const isFileId = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) && !/^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(value);
 export const draftFieldLabels: Record<string, string> = {
+  specializationId: 'Chuyên ngành',
   title: 'Tên dự án', description: 'Mô tả dự án', projectField: 'Lĩnh vực', startDate: 'Thời gian bắt đầu', endDate: 'Thời gian kết thúc',
   submitterRole: 'Vai trò của bạn', submitterContribution: 'Đóng góp của bạn', submitterIsLeader: 'Bạn có phải trưởng nhóm?', leaderName: 'Họ tên trưởng nhóm', skillIds: 'Kỹ năng / công nghệ', evidenceFileIds: 'Minh chứng',
 };
@@ -21,6 +22,7 @@ export function validateDraft(data: DraftData, files: DraftFile[], skillIds: str
   const required = ['title', 'description', 'projectField', 'startDate', 'endDate', 'submitterRole', 'submitterContribution'] as const;
   const limits = { title: 255, description: 2000, projectField: 150, submitterRole: 255, submitterContribution: 4000, leaderName: 255, repositoryUrl: 2048, demoUrl: 2048 } as const;
   if (complete) {
+    if (!data.specializationId) errors.specializationId = 'Vui lòng chọn chuyên ngành dự án.';
     for (const key of required) if (!data[key]?.trim()) errors[key] = 'Vui lòng bổ sung trường này.';
     if (data.submitterIsLeader === null) errors.submitterIsLeader = 'Vui lòng chọn Có hoặc Không.';
     if (data.submitterIsLeader === false && !data.leaderName?.trim()) errors.leaderName = 'Vui lòng nhập tên trưởng nhóm.';
@@ -28,6 +30,7 @@ export function validateDraft(data: DraftData, files: DraftFile[], skillIds: str
     if (!data.evidenceFileIds.length) errors.evidenceFileIds = 'Chọn ít nhất một tài liệu minh chứng.';
   }
   for (const [key, limit] of Object.entries(limits)) if ((data[key as keyof typeof limits]?.trim().length ?? 0) > limit) errors[key] = `Tối đa ${limit} ký tự.`;
+  if (data.specializationId != null && !isFileId(data.specializationId)) errors.specializationId = 'Vui lòng chọn chuyên ngành hợp lệ.';
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   for (const key of ['startDate', 'endDate'] as const) {
     if (!data[key]?.trim()) continue;

@@ -40,6 +40,7 @@ export function ProjectCreateScreen() {
   const [importConfirmation, setImportConfirmation] = useState(false);
   const compact = useWindowDimensions().width < 600;
   const [title, setTitle] = useState("");
+  const [specializationId, setSpecializationId] = useState("");
   const [projectField, setProjectField] = useState("");
   const [customProjectField, setCustomProjectField] = useState("");
   const [description, setDescription] = useState("");
@@ -201,6 +202,7 @@ export function ProjectCreateScreen() {
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
+    if (!specializationId) nextErrors.specializationId = "Vui lòng chọn chuyên ngành dự án.";
 
     if (!title.trim()) {
       nextErrors.title = "Tên dự án là bắt buộc.";
@@ -283,6 +285,7 @@ export function ProjectCreateScreen() {
       projectField === "Khác" ? customProjectField.trim() : projectField;
 
     const payload: CreateProjectRequest = {
+      specializationId,
       title: title.trim(),
       projectField: finalProjectField,
       description: description.trim(),
@@ -403,6 +406,7 @@ export function ProjectCreateScreen() {
           </View>
 
           <View style={styles.card}><ProjectInformationFields
+            specializationId={specializationId} onSpecialization={value => { setSpecializationId(value); setErrors(previous => ({ ...previous, specializationId: '' })); }}
             title={title} projectField={projectField === 'Khác' ? customProjectField : projectField} description={description}
             skillIds={skillCatalog.filter(skill => technologies.includes(skill.name)).map(skill => skill.id)}
             onTitle={setTitle} onField={value => { if (projectFields.includes(value)) { setProjectField(value); setCustomProjectField(''); } else { setProjectField('Khác'); setCustomProjectField(value); } }} onDescription={setDescription}
@@ -693,7 +697,7 @@ export function ProjectCreateScreen() {
           Sau khi tạo, dự án sẽ được tạo và chuyển sang bước đề xuất thành viên.
         </Text>
         {account?.role === ACCOUNT_ROLE.STUDENT && <View style={[styles.card, { borderTopWidth: 1, marginTop: 8 }]}><Text style={styles.sectionTitle}>Bạn đã có dự án hoàn thành bên ngoài UniNet?</Text><Text style={styles.sectionDescription}>Tải tài liệu để điền nhanh hồ sơ và gửi thẩm định.</Text><Button title="Thêm dự án có sẵn" variant="outline" disabled={submitting} onPress={() => {
-          const dirty = !!(title || projectField || customProjectField || description || technologies.length || memberTarget || minimumQuantity || recruitmentDeadline || expectedOutputDate || isPrivate || roles.some(role => role.role || role.requirements || role.quantity !== 1));
+          const dirty = !!(specializationId || title || projectField || customProjectField || description || technologies.length || memberTarget || minimumQuantity || recruitmentDeadline || expectedOutputDate || isPrivate || roles.some(role => role.role || role.requirements || role.quantity !== 1));
           if (dirty) setImportConfirmation(true); else router.push('/group/import' as never);
         }} /></View>}
       </ScrollView>
