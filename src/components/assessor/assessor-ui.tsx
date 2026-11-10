@@ -27,7 +27,7 @@ export const assessorStyles = StyleSheet.create({
   detailReportIntro: { padding: 20, borderRadius: 16, backgroundColor: colors.primaryLight, gap: 12 },
   detailProgressTrack: { height: 6, borderRadius: 3, backgroundColor: '#D4E4FA', overflow: 'hidden' },
   detailProgressFill: { height: 6, borderRadius: 3, backgroundColor: colors.primary },
-  detailCriterion: { padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 12 },
+  detailCriterion: { padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, gap: 12 },
 
   page: { flex: 1, minHeight: 0, backgroundColor: colors.background }, content: { flexGrow: 1, width: '100%', maxWidth: 1280, alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 24, gap: 20, paddingBottom: 40 }, mobileContent: { paddingHorizontal: 16, paddingVertical: 18, gap: 16 },
   heading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16 }, headingCopy: { flex: 1, minWidth: 220, gap: 7 }, eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 }, title: { fontSize: 27, lineHeight: 35, fontWeight: '800', color: colors.navy }, sectionTitle: { color: colors.navy, fontSize: 18, lineHeight: 25, fontWeight: '700' }, muted: { color: colors.textSecondary, fontSize: 13, lineHeight: 21 }, body: { color: colors.textPrimary, fontSize: 14, lineHeight: 23 },

@@ -24,6 +24,10 @@ const server = http.createServer((req, res) => {
     const account = { id: 'user', email: 'fixture@example.com', role: 2, status: 1, profileComplete: true, profile };
     const rubric = { code: 'project', version: '1', passingScore: 65, criteria: Array.from({ length: 4 }, (_, i) => ({ code: `c${i}`, name: ['Vấn đề và yêu cầu', 'Kiến trúc và thiết kế', 'Chất lượng mã nguồn', 'Khả năng triển khai'][i], weight: 25 })), conditions: [{ code: 'demo', description: 'Có demo, sản phẩm hoặc tài liệu để kiểm tra' }] };
     const data = { project: { id: 'project', title: 'GreenSpace - Sustainable Living App', projectField: 'Environmental Technology', description: 'Ứng dụng giúp người dùng xây dựng thói quen sống xanh, theo dõi tác động môi trường và tham gia các hoạt động cộng đồng.', status: 2 }, assignment: { id: 'fixture', status: 1, assignedAt: '2026-11-02T06:19:00Z', scheduledStartAt: '2026-11-02T08:00:00Z', meetingStartAt: '2026-11-02T08:00:00Z', meetingEndAt: '2026-11-02T09:00:00Z', completedAt: '2026-11-04T08:36:00Z' }, report: { summary: 'Dự án đáp ứng yêu cầu đánh giá.', recommendations: 'Bổ sung kiểm thử phân quyền và xử lý lỗi.', submittedAt: '2026-11-04T08:36:00Z', outcome: 1, assessment: { rubric, totalScore: 72, outcome: 1, scores: rubric.criteria.map(c => ({ code: c.code, score: 72, reason: 'Đã kiểm tra theo tài liệu dự án.', evidence: 'Báo cáo thử nghiệm.' })), conditions: [{ code: 'demo', passed: true, reason: 'Đã kiểm tra bản demo.' }] } }, evidenceModeration: null };
+    for (let i = 2; i <= 4; i++) {
+      rubric.conditions.push({ code: `condition-${i}`, description: `Required condition ${i}` });
+      data.report.assessment.conditions.push({ code: `condition-${i}`, passed: true, reason: `Verified condition ${i}` });
+    }
     await page.addInitScript(() => sessionStorage.setItem('uninet.session.v1', JSON.stringify({ accessToken: 'fixture', refreshToken: 'fixture', expiresAt: '2099-01-01T00:00:00Z' })));
     await page.routeWebSocket('**/hubs/notifications**', socket => socket.onMessage(v => { if (String(v).includes('protocol')) socket.send('{}\x1e'); }));
     await page.route('**/api/**', async route => {
@@ -41,9 +45,11 @@ const server = http.createServer((req, res) => {
       await page.goto(origin + '/assessor-assessments/fixture');
       await page.getByRole('heading', { name: 'Tổng quan kết quả', exact: true }).waitFor();
       assert.equal(await page.getByRole('tab', { name: 'Minh chứng', exact: true }).count(), 0);
+      await page.getByText('Required condition 4', { exact: true }).waitFor();
+      await page.getByText('Verified condition 4', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Chi tiết tiêu chí Vấn đề và yêu cầu', exact: true }).click();
       await page.getByText('Đã kiểm tra theo tài liệu dự án.', { exact: true }).waitFor();
-      await page.getByRole('button', { name: 'Xem tất cả (4) →', exact: true }).click();
+      assert.equal(await page.getByRole('button', { name: /Xem tất cả|Thu gọn/ }).count(), 0, 'All result rows appear without a show-all control');
       await page.getByText('Khả năng triển khai', { exact: true }).waitFor();
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${width}`);
       await page.screenshot({ path: path.join(output, `results-${width}.png`), fullPage: true });

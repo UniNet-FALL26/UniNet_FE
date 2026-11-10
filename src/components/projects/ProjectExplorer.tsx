@@ -451,6 +451,7 @@ export function ProjectExplorerScreen() {
                 variant="primary"
                 onPress={() => router.navigate("/group/create" as never)}
                 style={styles.emptyCta}
+                textStyle={styles.emptyCtaText}
               />
             </View>
           ) : (
@@ -953,9 +954,9 @@ const styles = StyleSheet.create({
 
   ctaButton: {
     backgroundColor: "#287AF0",
-    minWidth: 96,
-    minHeight: 38,
-    paddingHorizontal: 12,
+    minWidth: 88,
+    minHeight: 34,
+    paddingHorizontal: 10,
     flexShrink: 0,
     borderRadius: 8,
   },
@@ -1030,9 +1031,9 @@ const styles = StyleSheet.create({
   },
 
   filterButton: {
-    minWidth: 72,
-    height: 40,
-    paddingHorizontal: 10,
+    minWidth: 64,
+    height: 34,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1051,7 +1052,7 @@ const styles = StyleSheet.create({
 
   filterButtonLabel: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
   },
 
@@ -1121,10 +1122,10 @@ const styles = StyleSheet.create({
   },
 
   tabButton: {
-    minHeight: 44,
+    minHeight: 36,
     flexShrink: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -1144,7 +1145,7 @@ const styles = StyleSheet.create({
 
   tabText: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
     includeFontPadding: false,
@@ -1553,8 +1554,11 @@ const styles = StyleSheet.create({
 
   emptyCta: {
     marginTop: 18,
-    minWidth: 160,
+    minWidth: 136,
+    minHeight: 38,
+    paddingHorizontal: 16,
   },
+  emptyCtaText: { fontSize: 13, fontWeight: "700" },
 
   // =========================
   // ERROR MESSAGE
