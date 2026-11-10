@@ -1,5 +1,6 @@
 export enum ExternalDraftStatus { Processing, Ready, Failed, Confirmed, Expired }
 export type DraftData = {
+  specializationId?: string | null;
   title: string | null; description: string | null; projectField: string | null;
   startDate: string | null; endDate: string | null; repositoryUrl: string | null; demoUrl: string | null;
   submitterRole: string | null; submitterContribution: string | null; submitterIsLeader: boolean | null;

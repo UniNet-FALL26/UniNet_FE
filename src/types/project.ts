@@ -196,6 +196,7 @@ export type Project = {
 
 export type CreateProjectRequest = {
   title: string;
+  specializationId: string;
   projectField: string;
   description: string;
   memberTarget: number;

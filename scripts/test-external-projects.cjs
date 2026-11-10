@@ -21,9 +21,17 @@ const skillId = '22222222-2222-4222-8222-222222222222';
 const draftId = '33333333-3333-4333-8333-333333333333';
 const projectId = '44444444-4444-4444-8444-444444444444';
 const files = [{ fileId, fileName: 'report.pdf', url: 'https://example.com/report.pdf', format: 'pdf', resourceType: 'raw', sizeBytes: 1024 }];
-const validData = () => ({ title: 'Dự án thử nghiệm', description: 'Mô tả', projectField: 'Công nghệ', startDate: '2024', endDate: '2024-06', repositoryUrl: null, demoUrl: null, submitterRole: 'Developer', submitterContribution: 'Thiết kế API', submitterIsLeader: false, leaderName: 'Nguyễn Văn A', skillIds: [skillId], evidenceFileIds: [fileId], features: ['Quản lý dữ liệu'], members: [{ name: 'Thành viên', role: null }] });
+const validData = () => ({ specializationId: projectId, title: 'Dự án thử nghiệm', description: 'Mô tả', projectField: 'Công nghệ', startDate: '2024', endDate: '2024-06', repositoryUrl: null, demoUrl: null, submitterRole: 'Developer', submitterContribution: 'Thiết kế API', submitterIsLeader: false, leaderName: 'Nguyễn Văn A', skillIds: [skillId], evidenceFileIds: [fileId], features: ['Quản lý dữ liệu'], members: [{ name: 'Thành viên', role: null }] });
 const response = (overrides = {}) => ({ draftId, status: 1, version: 3, createdAt: '2026-11-04T00:00:00Z', updatedAt: '2026-11-04T00:00:00Z', expiresAt: '2026-11-11T00:00:00Z', errorCode: null, confirmedProjectId: null, data: validData(), extraction: null, missingFields: [], files, ...overrides });
 const validate = (data, complete = true) => utils.validateDraft(data, files, [skillId], complete, new Date('2026-11-04T00:00:00Z'));
+test('specialization is required on confirmation while old drafts can still be saved', () => {
+  const data = validData(); delete data.specializationId;
+  assert.ok(validate(data).specializationId);
+  assert.deepEqual(validate(data, false), {});
+  assert.ok(validate({ ...data, specializationId: 'invalid' }, false).specializationId);
+  assert.ok(validate({ ...data, specializationId: '00000000-0000-0000-0000-000000000000' }, false).specializationId);
+  assert.deepEqual(validate({ ...data, specializationId: projectId }), {});
+});
 class ApiError extends Error { constructor(message, status, code) { super(message); this.status = status; this.code = code; } }
 
 test('accepts valid complete data and preserves partial date precision', () => {
