@@ -12,9 +12,9 @@ import { toast } from "@/store/toast.store";
 import { pickProfileImage } from "@/utils/profile-image-picker";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -63,6 +63,14 @@ const getStatusConfig = (status: number) => {
 };
 
 export default function CompanyAdvertisementScreen() {
+  const params = useLocalSearchParams<{
+    orderCode?: string;
+    status?: string;
+    cancel?: string;
+  }>();
+  const incomingUrl = Linking.useURL();
+  const processedOrderRef = useRef<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<"campaigns" | "payments">(
     "campaigns",
   );
@@ -79,6 +87,20 @@ export default function CompanyAdvertisementScreen() {
 
   // modalStep: 0 (Đóng), 1 (Form điền chiến dịch), 2 (Chọn gói)
   const [modalStep, setModalStep] = useState<0 | 1 | 2>(0);
+
+  // State cho Pop-up kết quả thanh toán từ PayOS
+  const [paymentPopup, setPaymentPopup] = useState<{
+    visible: boolean;
+    success: boolean;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    success: false,
+    title: "",
+    message: "",
+  });
+  const [syncingPayment, setSyncingPayment] = useState(false);
 
   const [selectedPackage, setSelectedPackage] = useState<AdPackage | null>(
     null,
@@ -135,6 +157,79 @@ export default function CompanyAdvertisementScreen() {
     }, [fetchData]),
   );
 
+  // Bắt kết quả PayOS trả về qua URL (hỗ trợ cả Web query params & Mobile Deep Link)
+  useEffect(() => {
+    let orderCode = params.orderCode;
+    let status = params.status;
+    let cancel = params.cancel;
+
+    if (!orderCode && incomingUrl) {
+      const parsed = Linking.parse(incomingUrl);
+      orderCode = parsed.queryParams?.orderCode as string | undefined;
+      status = parsed.queryParams?.status as string | undefined;
+      cancel = parsed.queryParams?.cancel as string | undefined;
+    }
+
+    if (!orderCode || processedOrderRef.current === orderCode) return;
+    processedOrderRef.current = orderCode;
+
+    const handlePayOSReturn = async () => {
+      setSyncingPayment(true);
+      try {
+        // Gọi API sync để Backend kiểm tra với PayOS và chạy AI Review
+        await advertisementService.syncPayment(orderCode!);
+
+        const isCancelled =
+          cancel === "true" || status?.toUpperCase() === "CANCELLED";
+        const isPaid = status?.toUpperCase() === "PAID" && !isCancelled;
+
+        setActiveTab("campaigns");
+        await fetchData(true);
+
+        if (isPaid) {
+          setPaymentPopup({
+            visible: true,
+            success: true,
+            title: "Thanh toán thành công!",
+            message:
+              "Hệ thống đã ghi nhận thanh toán và đang tiến hành duyệt tự động để khởi chạy chiến dịch của bạn.",
+          });
+        } else {
+          setPaymentPopup({
+            visible: true,
+            success: false,
+            title: "Thanh toán chưa hoàn tất",
+            message:
+              "Giao dịch đã bị hủy hoặc thất bại. Bạn có thể bấm 'Thanh toán ngay' trên thẻ chiến dịch để thử lại.",
+          });
+        }
+      } catch (cause) {
+        console.error("Lỗi đồng bộ thanh toán:", cause);
+        setPaymentPopup({
+          visible: true,
+          success: false,
+          title: "Không thể xác minh giao dịch",
+          message:
+            "Đã xảy ra lỗi khi đồng bộ trạng thái thanh toán. Vui lòng kiểm tra lại danh sách chiến dịch.",
+        });
+      } finally {
+        setSyncingPayment(false);
+        // Xóa query params trên Web để tránh bật lại pop-up khi F5
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          window.history.replaceState({}, "", window.location.pathname);
+        } else {
+          router.setParams({
+            orderCode: undefined,
+            status: undefined,
+            cancel: undefined,
+          });
+        }
+      }
+    };
+
+    void handlePayOSReturn();
+  }, [params.orderCode, params.status, params.cancel, incomingUrl, fetchData]);
+
   const handleCloseModal = () => {
     setModalStep(0);
     setCurrentCampaignId(null);
@@ -144,12 +239,11 @@ export default function CompanyAdvertisementScreen() {
     setSelectedFiles([]);
   };
 
-  // Hàm chọn file ảnh/video theo chuẩn pickProfileImage
+  // Chỉ cho phép chọn 1 ảnh
   async function attach() {
     try {
       const asset = await pickProfileImage();
       if (!asset) return;
-      // Chỉ lưu duy nhất 1 file vào mảng (hoặc thay thế file cũ)
       setSelectedFiles([asset]);
     } catch (cause) {
       toast.error(
@@ -164,7 +258,7 @@ export default function CompanyAdvertisementScreen() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Xử lý nút "Tiếp tục" ở Bước 1: Đóng gói FormData và gọi API tạo bản nháp (Draft)
+  // Bước 1: Tạo bản nháp (Draft) qua FormData với key mediaFile
   const handleNextToStep2 = async () => {
     if (!form.title.trim() || !form.content.trim()) {
       toast.error("Vui lòng nhập đầy đủ tiêu đề và nội dung.");
@@ -177,15 +271,16 @@ export default function CompanyAdvertisementScreen() {
         setModalStep(2);
       } else {
         const formData = new FormData();
-        formData.append("Title", form.title.trim());
-        formData.append("Content", form.content.trim());
+        formData.append("title", form.title.trim());
+        formData.append("content", form.content.trim());
 
         if (form.destinationUrl.trim()) {
-          formData.append("DestinationUrl", form.destinationUrl.trim());
+          formData.append("destinationUrl", form.destinationUrl.trim());
         }
 
-        // Đính kèm các file ảnh/video vào FormData
-        selectedFiles.forEach((file) => {
+        // Chỉ đính kèm 1 file duy nhất với key "mediaFile"
+        if (selectedFiles.length > 0) {
+          const file = selectedFiles[0];
           if (Platform.OS === "web" && file.file) {
             formData.append("MediaFiles", file.file);
           } else {
@@ -198,9 +293,8 @@ export default function CompanyAdvertisementScreen() {
               type: file.mimeType || "image/jpeg",
             } as any);
           }
-        });
+        }
 
-        // Gọi API tạo chiến dịch dạng FormData
         const newCampaign = await advertisementService.createCampaign(formData);
 
         if (newCampaign?.id) {
@@ -219,7 +313,7 @@ export default function CompanyAdvertisementScreen() {
     }
   };
 
-  // Flow bước 2: Gán gói vào chiến dịch Draft đang có sẵn (currentCampaignId)
+  // Bước 2: Gán gói -> chuyển thẳng sang PendingPayment -> lấy link PayOS
   const handleAssignPackageAndPay = async () => {
     if (!selectedPackage || !agreedTerms || !currentCampaignId) {
       toast.error("Vui lòng chọn gói quảng cáo và đồng ý điều khoản.");
@@ -235,33 +329,26 @@ export default function CompanyAdvertisementScreen() {
         },
       );
 
-      if (Number(assignedCampaign.status) === CampaignStatus.PendingPayment) {
-        const paymentData = await advertisementService.createPayment(
-          assignedCampaign.id,
-        );
-        if (paymentData?.checkoutUrl) {
-          handleCloseModal();
-          await Linking.openURL(paymentData.checkoutUrl);
-        } else {
-          toast.error(
-            "Chiến dịch đã được duyệt nhưng không tạo được link thanh toán. Vui lòng thanh toán lại trong danh sách.",
-          );
-          handleCloseModal();
-        }
-      } else if (
-        Number(assignedCampaign.status) === CampaignStatus.PendingModeration
-      ) {
-        toast.success(
-          assignedCampaign.rejectionReason ||
-            "Chiến dịch có chứa từ khóa nhạy cảm và đã được chuyển sang bộ phận kiểm duyệt thủ công.",
-        );
-        handleCloseModal();
-      } else {
-        toast.success("Thao tác thành công.");
-        handleCloseModal();
-      }
+      // Luồng mới: Chọn gói xong sẽ chuyển thẳng sang PendingPayment
+      const paymentData = await advertisementService.createPayment(
+        assignedCampaign.id || currentCampaignId,
+      );
 
-      fetchData(true);
+      if (paymentData?.checkoutUrl) {
+        handleCloseModal();
+        await fetchData(true);
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          window.location.href = paymentData.checkoutUrl;
+        } else {
+          await Linking.openURL(paymentData.checkoutUrl);
+        }
+      } else {
+        toast.error(
+          "Không tạo được link thanh toán. Vui lòng thanh toán lại trong danh sách chiến dịch.",
+        );
+        handleCloseModal();
+        fetchData(true);
+      }
     } catch (cause) {
       console.error("Lỗi:", cause);
       reportApiFailure(cause, "Không thể xử lý yêu cầu. Vui lòng thử lại.");
@@ -270,12 +357,17 @@ export default function CompanyAdvertisementScreen() {
     }
   };
 
+  // Thanh toán lại cho chiến dịch đang ở trạng thái PendingPayment
   const handlePayExistingCampaign = async (campaignId: string) => {
     setPayingCampaignId(campaignId);
     try {
       const paymentData = await advertisementService.createPayment(campaignId);
       if (paymentData?.checkoutUrl) {
-        await Linking.openURL(paymentData.checkoutUrl);
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          window.location.href = paymentData.checkoutUrl;
+        } else {
+          await Linking.openURL(paymentData.checkoutUrl);
+        }
       } else {
         toast.error("Không nhận được đường dẫn thanh toán.");
       }
@@ -509,9 +601,14 @@ export default function CompanyAdvertisementScreen() {
           </View>
         )}
 
-        {loading ? (
+        {loading || syncingPayment ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
+            {syncingPayment && (
+              <Text style={{ marginTop: 12, color: colors.textSecondary }}>
+                Đang đồng bộ kết quả thanh toán...
+              </Text>
+            )}
           </View>
         ) : (
           <FlatList
@@ -543,6 +640,7 @@ export default function CompanyAdvertisementScreen() {
         )}
       </View>
 
+      {/* --- MODAL TẠO CHIẾN DỊCH & CHỌN GÓI --- */}
       <Modal
         visible={modalStep > 0}
         transparent
@@ -554,7 +652,6 @@ export default function CompanyAdvertisementScreen() {
           <View
             style={[styles.modalContent, modalStep === 2 && { height: "80%" }]}
           >
-            {/* --- BƯỚC 1: NHẬP THÔNG TIN CHIẾN DỊCH --- */}
             {modalStep === 1 && (
               <>
                 <View style={styles.modalHeader}>
@@ -599,8 +696,7 @@ export default function CompanyAdvertisementScreen() {
                     />
                   </View>
 
-                  {/* Chỉ hiển thị nút chọn ảnh khi chưa có ảnh nào được chọn */}
-                  {/* 1. Phần hiển thị ảnh (Preview) */}
+                  {/* Hiển thị 1 ảnh đã chọn */}
                   {selectedFiles.length > 0 && (
                     <View style={styles.previewContainer}>
                       <View style={styles.previewGrid}>
@@ -608,7 +704,7 @@ export default function CompanyAdvertisementScreen() {
                           <View key={index} style={styles.previewItem}>
                             <Image
                               source={{ uri: file.uri }}
-                              resizeMode="cover"
+                              contentFit="cover"
                               style={styles.previewImage}
                             />
                             <Pressable
@@ -632,7 +728,7 @@ export default function CompanyAdvertisementScreen() {
                     </View>
                   )}
 
-                  {/* 2. Nút Thêm/Đổi ảnh */}
+                  {/* Nút Thêm/Đổi 1 ảnh */}
                   {selectedFiles.length === 0 ? (
                     <Pressable
                       style={styles.attachMediaBar}
@@ -649,14 +745,19 @@ export default function CompanyAdvertisementScreen() {
                         tintColor={colors.primary}
                       />
                       <Text style={styles.attachMediaText}>
-                        Thêm ảnh hoặc video
+                        Thêm ảnh banner
                       </Text>
                     </Pressable>
                   ) : (
                     <Pressable
                       style={[
                         styles.attachMediaBar,
-                        { backgroundColor: "#F3F4F6", borderColor: "#D1D5DB" },
+                        {
+                          backgroundColor: "#F3F4F6",
+                          borderColor: "#F59E0B",
+                          borderStyle: "solid",
+                          borderWidth: 1.5,
+                        },
                       ]}
                       onPress={() => void attach()}
                       disabled={submitting}
@@ -673,10 +774,11 @@ export default function CompanyAdvertisementScreen() {
                       <Text
                         style={[styles.attachMediaText, { color: "#4B5563" }]}
                       >
-                        Đổi ảnh hoặc video khác
+                        Đổi ảnh khác
                       </Text>
                     </Pressable>
                   )}
+
                   <View style={styles.formGroup}>
                     <Text style={styles.inputLabel}>
                       URL đích khi click (Tùy chọn)
@@ -714,7 +816,6 @@ export default function CompanyAdvertisementScreen() {
               </>
             )}
 
-            {/* --- BƯỚC 2: CHỌN GÓI & XÁC NHẬN --- */}
             {modalStep === 2 && (
               <>
                 <View style={[styles.modalHeader, { alignItems: "center" }]}>
@@ -837,6 +938,59 @@ export default function CompanyAdvertisementScreen() {
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- POP-UP KẾT QUẢ THANH TOÁN PAYOS --- */}
+      <Modal
+        visible={paymentPopup.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setPaymentPopup((prev) => ({ ...prev, visible: false }))
+        }
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.resultPopupCard}>
+            <View
+              style={[
+                styles.resultIconCircle,
+                {
+                  backgroundColor: paymentPopup.success ? "#D1FAE5" : "#FEE2E2",
+                },
+              ]}
+            >
+              <SymbolView
+                name={
+                  paymentPopup.success
+                    ? {
+                        ios: "checkmark.circle.fill",
+                        android: "check_circle",
+                        web: "check_circle",
+                      }
+                    : {
+                        ios: "xmark.circle.fill",
+                        android: "cancel",
+                        web: "cancel",
+                      }
+                }
+                size={44}
+                tintColor={paymentPopup.success ? "#059669" : "#DC2626"}
+              />
+            </View>
+
+            <Text style={styles.resultTitle}>{paymentPopup.title}</Text>
+            <Text style={styles.resultMessage}>{paymentPopup.message}</Text>
+
+            <View style={{ width: "100%", marginTop: 8 }}>
+              <Button
+                title="Đóng"
+                onPress={() =>
+                  setPaymentPopup((prev) => ({ ...prev, visible: false }))
+                }
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -1106,4 +1260,39 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   termsText: { flex: 1, fontSize: 13, color: "#4B5563", lineHeight: 20 },
+  resultPopupCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    maxWidth: 400,
+    alignSelf: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  resultIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  resultTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    textAlign: "center",
+  },
+  resultMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
 });
