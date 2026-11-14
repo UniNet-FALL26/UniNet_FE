@@ -184,4 +184,13 @@ export const advertisementService = {
       },
     );
   },
+  /**
+   * 5. Đồng bộ trạng thái thanh toán từ PayOS về hệ thống
+   * POST /advertisements/payments/{orderCode}/sync
+   */
+  syncPayment: (orderCode: string | number) => {
+    return apiRequest<any>(`/advertisements/payments/${orderCode}/sync`, {
+      method: "POST",
+    });
+  },
 };
