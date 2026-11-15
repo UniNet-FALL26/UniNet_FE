@@ -40,7 +40,7 @@ export function detailNavigation(pathname: string, role = 0, params: { id?: stri
   if (pathname.startsWith('/group/')) {
     const section = pathname.split('/')[2];
     if (section === 'create') return make([projects, crumb('Tạo dự án')]);
-    if (section === 'recommendations') return make([projects, crumb('Tạo dự án', '/group/create'), crumb('Gợi ý thành viên')]);
+    if (section === 'recommendations') return make([projects, crumb('Tạo dự án', '/group/create'), crumb('Kiểm tra thông tin')]);
     if (section === 'import') return make([projects, crumb('Thêm dự án có sẵn')]);
     if (section === 'external-draft') return make([projects, crumb('Thêm dự án có sẵn', '/group/import'), crumb('Xem lại hồ sơ')]);
     const labels: Record<string, string> = { level1: 'Chi tiết dự án', verification: 'Chọn lịch xác minh', checkout: 'Thanh toán xác minh', 'verification-dossier': 'Hồ sơ thẩm định', 'verification-meeting': 'Phòng thẩm định', 'verification-result': 'Kết quả thẩm định' };

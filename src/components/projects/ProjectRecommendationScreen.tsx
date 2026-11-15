@@ -1,3 +1,4 @@
+import { ProjectCreationReview } from "./ProjectCreationReview";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { colors } from "@/constants/colors";
@@ -91,30 +92,7 @@ export function ProjectRecommendationScreen() {
   };
 
   if (draft && !effectiveId) {
-    return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>UNINET</Text>
-        <Text style={styles.title}>Xác nhận tạo dự án</Text>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{draft.title}</Text>
-          <Text>{draft.projectField}</Text>
-          <Text>{draft.description}</Text>
-          <Text>Số thành viên: {draft.memberTarget}</Text>
-          <Text>Số thành viên tối thiểu: {draft.minimumQuantity}</Text>
-          <Text>Hạn tuyển: {new Date(draft.recruitmentDeadline).toLocaleString("vi-VN")}</Text>
-          <Text>Dự kiến hoàn thành: {new Date(draft.expectedOutput).toLocaleDateString("vi-VN")}</Text>
-          <Text>{draft.visibility === 0 ? "Riêng tư" : "Công khai"}</Text>
-          {draft.roleRequirements.map((role, index) => <View key={index} style={styles.roleRow}>
-            <View style={{ flex: 1 }}><Text style={styles.roleName}>{role.role}</Text><Text>{role.requirements}</Text></View>
-            <Text style={styles.roleMeta}>{role.quantity} chỗ</Text>
-          </View>)}
-        </View>
-        <Text style={styles.subtitle}>Đề xuất thành viên sẽ được tải sau khi dự án được tạo.</Text>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <Button title="Tạo dự án" loading={creating} disabled={creating} onPress={handleCreate} />
-        <Button title="Quay lại chỉnh sửa" variant="outline" disabled={creating} onPress={() => router.canGoBack() ? router.back() : router.replace("/group/create" as never)} />
-      </ScrollView>
-    );
+    return <ProjectCreationReview draft={draft} creating={creating} error={error} onCreate={handleCreate} onEdit={() => router.canGoBack() ? router.back() : router.replace("/group/create" as never)} />;
   }
 
   if (loading) return <Loading />;
@@ -125,8 +103,8 @@ export function ProjectRecommendationScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.kicker}>UNINET</Text>
-      <Text style={styles.title}>Đề xuất thành viên</Text>
+      <View style={styles.pageHeading}>
+      <Text accessibilityRole="header" style={styles.title}>Gợi ý thành viên</Text>
       <Text style={styles.subtitle}>
         {project?.title ?? "Dự án"} ·{" "}
         {project
@@ -134,18 +112,22 @@ export function ProjectRecommendationScreen() {
           : 0}{" "}
         thành viên còn thiếu
       </Text>
+      </View>
 
+      <View style={styles.layout}>
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Các vai trò đang tuyển</Text>
+        <Text style={styles.rolesLabel}>Đang tuyển</Text>
         {project?.roleRequirements.map((role) => (
           <View key={role.id} style={styles.roleRow}>
             <Text style={styles.roleName}>{role.roleName}</Text>
-            <Text style={styles.roleMeta}>Còn {role.quantity} chỗ</Text>
+            <Text style={styles.roleMeta}>{role.quantity}</Text>
           </View>
         ))}
       </View>
 
-      {error ? <View><Text style={styles.errorText}>{error}</Text><Button title="Thử lại" onPress={() => setRetry((value) => value + 1)} /></View> : null}
+      <View style={styles.memberColumn}>
+      <View style={styles.memberHeading}><Text style={styles.resultLabel}>Gợi ý cho dự án</Text><Text style={styles.memberCount}>{recommendations.length} thành viên</Text></View>
+      {error ? <View style={styles.emptyCard}><Text style={styles.errorText}>{error}</Text><Button title="Thử lại" style={styles.retryButton} textStyle={styles.buttonText} onPress={() => setRetry((value) => value + 1)} /></View> : null}
 
       {error ? null : recommendations.length === 0 ? (
         <View style={styles.emptyCard}>
@@ -159,12 +141,15 @@ export function ProjectRecommendationScreen() {
           <RecommendedMemberCard key={recommendation.userId} member={recommendation} roles={project?.roleRequirements ?? []} invited={invitedIds.includes(recommendation.userId)} onInvite={handleInvite} />
         ))
       )}
+      </View>
+      </View>
 
       <Button
         title="Bỏ qua"
         variant="outline"
         onPress={() => router.dismissTo("/(tabs)/groups" as never)}
         style={styles.skipButton}
+        textStyle={styles.buttonText}
       />
     </ScrollView>
   );
@@ -186,7 +171,7 @@ const styles = StyleSheet.create({
     paddingTop: 26,
     paddingBottom: 32,
     gap: 18,
-    maxWidth: 760,
+    maxWidth: 920,
     width: "100%",
     alignSelf: "center",
   },
@@ -196,28 +181,27 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 2.2,
   },
-  title: { color: colors.navy, fontSize: 28, fontWeight: "800" },
-  subtitle: { color: colors.textSecondary, fontSize: 14 },
-  summaryCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 16,
-    gap: 10,
-  },
-  summaryTitle: { color: colors.navy, fontSize: 16, fontWeight: "700" },
+  pageHeading: { gap: 8, paddingBottom: 4 },
+  title: { color: colors.navy, fontSize: 26, lineHeight: 34, fontWeight: "600" },
+  subtitle: { color: colors.textSecondary, fontSize: 13, lineHeight: 21 },
+  layout: { gap: 20 }, wideLayout: { flexDirection: 'row', alignItems: 'flex-start' }, roleSidebar: { width: 250 }, memberColumn: { flex: 1, minWidth: 0, gap: 16 }, memberHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, memberCount: { fontSize: 11, color: colors.textMuted }, roleDivider: { borderTopWidth: 1, borderTopColor: colors.border }, retryButton: { minHeight: 38, marginTop: 12, alignSelf: 'flex-start' }, buttonText: { fontSize: 12, fontWeight: '600' },
+  summaryCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: colors.border },
+  rolesLabel: { fontSize: 12, color: colors.textSecondary, marginRight: 4 }, resultLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  summaryTitle: { color: colors.navy, fontSize: 14, lineHeight: 21, fontWeight: "600" },
   roleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: colors.primaryLight,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    gap: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
   },
-  roleName: { color: colors.textPrimary, fontWeight: "700" },
-  roleMeta: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+  roleName: { flexShrink: 1, color: colors.textPrimary, fontSize: 12, lineHeight: 18, fontWeight: "500" },
+  roleMeta: { color: colors.textMuted, fontSize: 11, lineHeight: 18 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -268,5 +252,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   errorText: { color: colors.error, fontSize: 13, fontWeight: "600" },
-  skipButton: { marginTop: 8 },
+  skipButton: { marginTop: 2, alignSelf: 'flex-end', minHeight: 38, paddingHorizontal: 18, borderColor: colors.border, backgroundColor: colors.background },
 });
