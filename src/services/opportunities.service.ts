@@ -48,13 +48,14 @@ export type PublicPartnerJob = { id: string; title: string; workType: Opportunit
 export type PublicPartnerProfile = { introduction?: import('@/types/partner-introduction').PartnerIntroduction | null; id: string; organizationName: string; partnerType: OpportunityPartnerType | null; avatarUrl: string | null; coverUrl: string | null; isVerified: boolean; industry: string | null; bio: string | null; address: string | null; contactEmail: string | null; phone: string | null; websites: string[]; openJobs: PublicPartnerJob[] };
 
 export const opportunitiesService = {
-  list: (params: { view?: OpportunityView; keyword?: string; workType?: OpportunityWorkType; page?: number; pageSize?: number }, signal?: AbortSignal) => {
+  list: (params: { view?: OpportunityView; keyword?: string; workType?: OpportunityWorkType; page?: number; pageSize?: number; sort?: 'newest' | 'deadline' }, signal?: AbortSignal) => {
     const query = new URLSearchParams();
     query.set('view', params.view ?? 'all');
     if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
     if (params.workType !== undefined) query.set('workType', String(params.workType));
     query.set('page', String(params.page ?? 1));
     query.set('pageSize', String(params.pageSize ?? 20));
+    if (params.sort) query.set('sort', params.sort);
     return apiRequest<OpportunityJobsPage>(`/opportunities?${query.toString()}`, { signal });
   },
   get: (jobId: string, signal?: AbortSignal) => apiRequest<OpportunityJob>(`/opportunities/${encodeURIComponent(jobId)}`, { signal }),

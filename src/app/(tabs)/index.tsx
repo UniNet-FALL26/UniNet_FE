@@ -1,4 +1,6 @@
 import { CommentModal } from "@/components/community/CommentModal";
+import { CommunityOpportunitiesCard } from "@/components/community/CommunityOpportunitiesCard";
+import { ACCOUNT_ROLE } from "@/constants/roles";
 import { CommunityComposer } from "@/components/community/CommunityComposer";
 import { CommunityPostCard, CommunityPostDescription as ExpandableDescription } from "@/components/community/CommunityPostCard";
 import { CommunityMediaLightbox } from "@/components/community/CommunityMediaLightbox";
@@ -46,8 +48,11 @@ function mergeFeedPosts(current: PostResponse[], incoming: PostResponse[]) {
 }
 
 export default function CommunityScreen() {
-  const phone = useWindowDimensions().width < 600;
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const wideFeed = width >= 1280;
   const { isAuthenticated, account } = useAuthStore();
+  const showOpportunities = isAuthenticated && account?.role === ACCOUNT_ROLE.STUDENT;
   const [detailPostId, setDetailPostId] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<PostResponse[]>([]);
@@ -393,6 +398,8 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.feedLayout}>
+      <View testID="community-feed-column" style={styles.feedColumn}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} size="large" />
@@ -409,9 +416,10 @@ export default function CommunityScreen() {
             if (optionsPostId) setOptionsPostId(null);
           }}
           ListHeaderComponent={
-            isAuthenticated ? (
-              <CommunityComposer onCreated={() => fetchFeed(1, true)} />
-            ) : null
+            <View style={styles.feedHeader}>
+              {isAuthenticated && <CommunityComposer onCreated={() => fetchFeed(1, true)} />}
+              {showOpportunities && !wideFeed && <CommunityOpportunitiesCard key={account.id} />}
+            </View>
           }
           contentContainerStyle={[styles.listContent, phone && styles.phoneListContent]}
           refreshControl={
@@ -425,6 +433,9 @@ export default function CommunityScreen() {
           }}
         />
       )}
+      </View>
+      {showOpportunities && wideFeed && <View testID="community-opportunities-sidebar" style={[styles.opportunitiesSidebar, { width: Math.min(350, (width - 650) / 2 - 24) }]}><CommunityOpportunitiesCard key={account.id} /></View>}
+      </View>
 
       <CommentModal
         post={detailPost as any}
@@ -573,6 +584,10 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
+  feedLayout: { flex: 1, width: "100%", alignSelf: "center" },
+  feedColumn: { flex: 1, minWidth: 0 },
+  feedHeader: { gap: 12 },
+  opportunitiesSidebar: { position: "absolute", top: 12, left: "50%", marginLeft: 337 },
   phoneListContent: { paddingHorizontal: 0 },
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
