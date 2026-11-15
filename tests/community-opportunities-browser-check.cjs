@@ -10,7 +10,7 @@ const { chromium } = require(process.env.CODEX_PLAYWRIGHT_PATH || path.join(proc
     const errors = [], listQueries = [], saved = new Set();
     let mode = 'jobs', saveCalls = 0;
     const account = { id: 'student', email: 'student@example.test', role: 0, profileComplete: true, profile: { id: 'profile', fullName: 'Sinh viên UniNet', nickname: 'student', isVerified: false } };
-    const jobs = ['Frontend Intern', 'Backend Developer (Junior)', 'Fullstack Intern'].map((title, index) => ({ id: `job-${index}`, title, companyName: ['FPT Software', 'VNG Corporation', 'Tiki'][index], companyAvatarUrl: null, location: ['Hà Nội', 'TP. HCM', 'TP. HCM'][index], workType: index % 3, employmentType: 0, createdAt: new Date(Date.now() - (index + 1) * 3600000).toISOString(), skills: [], benefits: [], responsibilities: [], requiredQualifications: [], preferredQualifications: [], projectAreas: [], description: 'Mô tả công việc', isApplied: false, companyWebsites: [], isSaved: false }));
+    const jobs = ['Frontend Intern', 'Backend Developer (Junior)', 'Fullstack Intern'].map((title, index) => ({ id: `job-${index}`, title, companyName: ['FPT Software', 'VNG Corporation', 'Tiki'][index], companyAvatarUrl: null, location: ['Hà Nội', 'TP. HCM', 'TP. HCM'][index], workType: index % 3, employmentType: 0, createdAt: new Date(Date.now() - (index + 11) * 86400000).toISOString(), skills: [], benefits: [], responsibilities: [], requiredQualifications: [], preferredQualifications: [], projectAreas: [], description: 'Mô tả công việc', isApplied: false, companyWebsites: [], isSaved: false }));
     const posts = Array.from({ length: 10 }, (_, index) => ({ id: `post-${index}`, authorUserId: 'author', authorName: 'Sinh viên UniNet', authorNickname: 'author', authorActorType: 0, description: `Bài viết cộng đồng ${index + 1}.\nChia sẻ tiến độ dự án và kinh nghiệm làm việc nhóm.\nNội dung trao đổi dành cho thành viên cộng đồng.`, mediaUrls: [], favoriteCount: 0, commentCount: 0, isFavorited: false, isSaved: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => sessionStorage.setItem('uninet.session.v1', JSON.stringify({ accessToken: 'fixture', refreshToken: 'fixture', expiresAt: '2099-01-01T00:00:00Z' })));
@@ -42,6 +42,9 @@ const { chromium } = require(process.env.CODEX_PLAYWRIGHT_PATH || path.join(proc
       assert.ok(listQueries.every(query => query.sort === 'newest' && query.pageSize === '3' && query.page === '1'));
       const bounds = await card.boundingBox();
       assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1);
+      const age = card.getByText('11 ngày trước', { exact: true });
+      assert.ok((await age.boundingBox()).height <= 16, 'Posting age must stay on one line');
+      if (width === 1920) assert.equal(bounds.width, 400, 'Wide screens should use the wider card');
       if (width >= 1280) {
         const feed = page.getByTestId('community-feed-column');
         const feedBounds = await feed.boundingBox();

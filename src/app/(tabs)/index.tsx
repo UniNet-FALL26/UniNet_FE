@@ -434,7 +434,7 @@ export default function CommunityScreen() {
         />
       )}
       </View>
-      {showOpportunities && wideFeed && <View testID="community-opportunities-sidebar" style={[styles.opportunitiesSidebar, { width: Math.min(350, (width - 650) / 2 - 24) }]}><CommunityOpportunitiesCard key={account.id} /></View>}
+      {showOpportunities && wideFeed && <View testID="community-opportunities-sidebar" style={[styles.opportunitiesSidebar, { width: Math.min(400, (width - 650) / 2 - 24) }]}><CommunityOpportunitiesCard key={account.id} /></View>}
       </View>
 
       <CommentModal
