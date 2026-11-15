@@ -1,5 +1,6 @@
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ProjectInformationFields } from "./ProjectInformationFields";
+import { ProjectDateTimeModal } from "./ProjectDateTimeModal";
 import { useAuthStore } from "@/store/auth.store";
 import { ACCOUNT_ROLE } from "@/constants/roles";
 import { Modal } from "react-native";
@@ -325,6 +326,13 @@ export function ProjectCreateScreen() {
     if (!datePickerTarget || Platform.OS === "android") return null;
 
     const isOutputDate = datePickerTarget === "expectedOutput";
+    if (Platform.OS === "web") {
+      return <ProjectDateTimeModal title={isOutputDate ? "Ngày dự kiến bàn giao sản phẩm" : "Hạn chót nộp đơn tham gia"} initialValue={tempDate} onClose={closeDatePicker} onConfirm={selectedDate => {
+        if (isOutputDate) setExpectedOutputDate(selectedDate); else setRecruitmentDeadline(selectedDate);
+        setErrors(previous => ({ ...previous, [isOutputDate ? 'expectedOutput' : 'recruitmentDeadline']: '' }));
+        closeDatePicker();
+      }} />;
+    }
     const mode = datePickerStep;
 
     return (
@@ -464,7 +472,7 @@ export function ProjectCreateScreen() {
                   <View style={styles.roleIndex}>
                     <Text style={styles.roleIndexText}>{index + 1}</Text>
                   </View>
-                  <Text style={styles.roleCardTitle}>Vai trò {index + 1}</Text>
+                  <Text style={styles.roleCardTitle}>{role.role.trim() || `Vai trò ${index + 1}`}</Text>
 
                   {roles.length > 1 ? (
                     <Pressable
@@ -524,16 +532,6 @@ export function ProjectCreateScreen() {
               <Text style={styles.errorText}>{errors.roles}</Text>
             ) : null}
 
-            <View style={styles.roleSummary}>
-              <Text style={styles.roleSummaryLabel}>
-                Tổng số lượng cần tuyển
-              </Text>
-              <Text style={styles.roleSummaryValue}>
-                {totalRoleQuantity}
-                {" / "}
-                {Math.max(Number(memberTarget || 0) - 1, 0)}
-              </Text>
-            </View>
           </View>
         </View>
 
@@ -1072,28 +1070,6 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
 
-  roleSummary: {
-    minHeight: 44,
-    borderRadius: 12,
-    backgroundColor: "#F4F7FB",
-    paddingHorizontal: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  roleSummaryLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  roleSummaryValue: {
-    color: colors.navy,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
   /* DATE */
   dateButton: {
     minHeight: 56,
@@ -1111,6 +1087,7 @@ const styles = StyleSheet.create({
   dateButtonError: {
     borderColor: colors.error,
   },
+
 
   dateIcon: {
     width: 32,
