@@ -9,6 +9,7 @@ import { SymbolView } from 'expo-symbols';
 import { Button } from '@/components/ui/Button';
 import { ProfileEditableTemplate } from '@/components/profile/ProfileEditableTemplate';
 import { ProfileEntryForm } from '@/components/profile/ProfileEntryForm';
+import { ProfileProjectPicker } from '@/components/profile/ProfileProjectPicker';
 import { ProfileFieldForm } from '@/components/profile/ProfileFieldForm';
 import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
 import type { ImagePickerAsset } from 'expo-image-picker';
@@ -40,6 +41,7 @@ export default function ProfileEditorScreen() {
   const dirty = !!data && !!baseline && isProfileDraftDirty(data, baseline);
   const [message, setMessage] = useState('');
   const [section, setSection] = useState<ProfileEditorSection | null>(null);
+  const [manualProject, setManualProject] = useState(false);
   const [field, setField] = useState<ProfileEditField | null>(null);
   const [photo, setPhoto] = useState<{ target: ProfileImageTarget | 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null);
   const [choosingPhoto, setChoosingPhoto] = useState(false);
@@ -55,7 +57,7 @@ export default function ProfileEditorScreen() {
   const width = Math.min(frameWidth || windowWidth, 1120);
   useEffect(() => {
     pickerVersion.current++; setChoosingPhoto(false);
-    setLoaded(null); setBaseline(null); setError(''); setSection(null); setField(null); setPhoto(null); setMessage(''); setSaving(false); setLeaving(null);
+    setLoaded(null); setBaseline(null); setError(''); setSection(null); setManualProject(false); setField(null); setPhoto(null); setMessage(''); setSaving(false); setLeaving(null);
     if (isLoading || !isAuthenticated || !account?.id) return;
     const controller = new AbortController();
     portfolioService.getMine(controller.signal).then(result => {
@@ -104,7 +106,7 @@ export default function ProfileEditorScreen() {
   const add = (content: PortfolioContent) => {
     if (!data || saving) return;
     setLoaded({ accountId: account!.id, data: { ...data, portfolio: content } });
-    setMessage(''); setSection(null);
+    setMessage(''); setSection(null); setManualProject(false);
   };
   const save = async () => {
     if (!data || !dirty || saveController.current || !account?.id) return;
@@ -137,7 +139,10 @@ export default function ProfileEditorScreen() {
         <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={setSection} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} />
       </View>
     </ScrollView>}
-    {section && data && <ProfileEntryForm key={`${account?.id}-${section.id}`} section={section} data={data} onAdd={add} onClose={() => setSection(null)} />}
+    {section && data && (section.id === 'projects' && !manualProject
+      ? <ProfileProjectPicker key={account?.id} projects={data.portfolio.projects} limit={section.limit ?? 50}
+          onApply={projects => add({ ...data.portfolio, projects })} onManual={() => setManualProject(true)} onClose={() => setSection(null)} />
+      : <ProfileEntryForm key={`${account?.id}-${section.id}`} section={section} data={data} onAdd={add} onClose={() => { setSection(null); setManualProject(false); }} />)}
     {field && data && <ProfileFieldForm key={`${account?.id}-${field}`} data={data} field={field} onClose={() => setField(null)} onConfirm={next => { if (!saving && account) { setLoaded({ accountId: account.id, data: next }); setMessage(''); setField(null); } }} />}
     {photo && data && <ProfilePhotoForm portrait={photo.target === 'avatarUrl' && account?.role === ACCOUNT_ROLE.STUDENT} key={`${account?.id}-${typeof photo.target === 'string' ? photo.target : `${photo.target.section}-${photo.target.index}`}`} initialAsset={photo.asset} onClose={() => setPhoto(null)} onConfirm={url => { if (!saving && account) { const next = typeof photo.target === 'string' ? updateProfileField(data, photo.target, url) : updateProfileImage(data, photo.target, url); setLoaded({ accountId: account.id, data: next }); setMessage(''); setPhoto(null); } }} />}
     <Modal visible={!!leaving} transparent animationType="fade" onRequestClose={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }}><View style={s.overlay}><View style={s.confirm}><Text style={s.stateTitle}>Thay đổi chưa được lưu</Text><Text style={s.hint}>Rời trang sẽ bỏ các thông tin bạn vừa thêm.</Text><Button title="Tiếp tục chỉnh sửa" onPress={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }} /><Button title={leaving === 'templates' ? 'Bỏ thay đổi và chọn mẫu khác' : 'Bỏ thay đổi và quay lại'} variant="outline" onPress={() => { if (baseline && account) setLoaded({ accountId: account.id, data: createProfileDraft(baseline) }); setPendingDestination(leaving); setLeaving(null); }} /></View></View></Modal>

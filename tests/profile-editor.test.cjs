@@ -127,9 +127,14 @@ test('remaining forms append correctly to each corresponding content array', () 
 });
 test('service submits only owner content to the existing endpoint and forwards cancellation', async () => {
   const exports = {}; const requests = [];
+  const draft = {};
+  const draftSource = fs.readFileSync(path.join(__dirname, '../src/utils/profile-draft.ts'), 'utf8');
+  vm.runInNewContext(ts.transpileModule(draftSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+    exports: draft, require: () => ({}),
+  });
   const source = fs.readFileSync(path.join(__dirname, '../src/services/portfolio.service.ts'), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
-    exports, require: () => ({ apiRequest: async (url, options) => { requests.push({ url, options }); return real(); } }),
+    exports, require: name => name === '@/utils/profile-draft' ? draft : { apiRequest: async (url, options) => { requests.push({ url, options }); return real(); } },
   });
   const controller = new AbortController(); const data = real();
   await exports.portfolioService.getMine(controller.signal);
@@ -139,4 +144,15 @@ test('service submits only owner content to the existing endpoint and forwards c
   assert.equal(requests[1].options.signal, controller.signal);
   assert.deepEqual(JSON.parse(requests[1].options.body), data.portfolio);
   assert.equal(JSON.parse(requests[1].options.body).profile, undefined);
+
+  const manual = { title: 'Manual project', technologies: ['React'], featured: false };
+  const linked = { projectId: 'project-id', title: 'Source project', technologies: [], featured: true, personalContribution: 'Built the UI', verification: { status: 1 } };
+  data.portfolio.projects = [linked, manual];
+  await exports.portfolioService.getEligibleProjects(controller.signal);
+  await exports.portfolioService.saveEditor(data, controller.signal);
+  assert.equal(requests[2].url, '/profile/portfolio/me/eligible-projects');
+  assert.equal(requests[2].options.signal, controller.signal);
+  assert.deepEqual(JSON.parse(requests[3].options.body).portfolio.projects, [
+    { projectId: 'project-id', personalContribution: 'Built the UI', featured: true }, manual,
+  ]);
 });

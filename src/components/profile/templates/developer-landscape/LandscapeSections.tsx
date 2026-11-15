@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { Image } from 'expo-image';
+import { PortfolioProjectDetails, PortfolioProjectTitle } from '@/components/profile/PortfolioProjectDetails';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject } from '@/types/portfolio';
 import { profileMedia, isSampleLink } from '@/components/profile/profile-media';
@@ -23,7 +24,8 @@ export function LandscapeProjects({ projects, title, theme, width, thumbnail }: 
       <View style={[s.cover, { backgroundColor: theme.accentSoft }]}>{profileMedia(project.coverUrl) ? <Image source={profileMedia(project.coverUrl)} contentFit="cover" loading={thumbnail ? 'eager' : 'lazy'} priority="low" style={StyleSheet.absoluteFill} accessibilityLabel={`Ảnh dự án ${project.title}`} /> : <View style={s.fallback}><PortfolioIcon name="project" color={theme.accentStrong} size={36} /></View>}
         <EditPhoto color={theme.accentStrong} right={8} bottom={8} size={28} entry={{ section: 'projects', item: project, label: `dự án ${project.title}` }} />
       </View>
-      <View style={s.projectBody}><Text role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]}>{project.title}</Text>{!!project.description && <Text numberOfLines={3} style={[s.body, { color: theme.muted }]}>{project.description}</Text>}
+      <View style={s.projectBody}><PortfolioProjectTitle project={project} role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]} />{!!project.description && <Text numberOfLines={3} style={[s.body, { color: theme.muted }]}>{project.description}</Text>}
+        <PortfolioProjectDetails project={project} color={theme.muted} />
         {!!project.technologies.length && <View role="group" accessibilityLabel="Công nghệ sử dụng" style={s.technologies}>{project.technologies.map((technology, technologyIndex) => <Text key={`${technology}-${technologyIndex}`} style={[s.technology, { color: theme.accentStrong, backgroundColor: theme.accentSoft }]}>{technology}</Text>)}</View>}
         <View style={s.links}>{!isSampleLink(project.githubUrl) && <PortfolioLink label="GitHub" url={project.githubUrl} theme={theme} thumbnail={thumbnail} />}{!isSampleLink(project.url) && <PortfolioLink label={`Xem dự án ${project.title}`} url={project.url} theme={theme} thumbnail={thumbnail} />}</View>
       </View>

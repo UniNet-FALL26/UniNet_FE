@@ -44,6 +44,7 @@ let real = {
       const body = req.postDataJSON(); assert.equal(body.profile.isVerified, undefined); assert.equal(body.profile.id, undefined);
       real = { ...real, profile: { ...real.profile, ...body.profile }, portfolio: body.portfolio }; return reply(real);
     }
+    if (url.pathname.endsWith('/profile/portfolio/me/eligible-projects')) return reply([]);
     if (url.pathname.endsWith('/profile/portfolio/me')) { gets++; if (failLoad) return route.fulfill({ status: 500, json: { message: 'Lỗi tải kiểm thử' } }); return reply(real); }
     if (url.pathname.startsWith('/api/')) return reply([]);
     return route.continue();
@@ -95,8 +96,11 @@ let real = {
       await page.getByRole('button', { name, exact: true }).first().click(); await page.getByRole('textbox', { name: label, exact: true }).fill(value);
       await page.getByRole('button', { name: 'Xác nhận', exact: true }).click(); await page.getByRole('textbox', { name: label, exact: true }).waitFor({ state: 'hidden' });
     };
-    await page.getByRole('button', { name: 'Thêm dự án', exact: true }).click(); await page.getByRole('button', { name: 'Xác nhận', exact: true }).click(); await page.getByRole('alert').waitFor(); await page.getByRole('button', { name: 'Hủy', exact: true }).click();
-    await add('Thêm dự án', { 'Tên / tiêu đề *': 'Dự án thật của An', 'Công nghệ (phân cách bằng dấu phẩy)': 'React, TypeScript' });
+    await page.getByRole('button', { name: 'Thêm dự án', exact: true }).click();
+    await page.getByRole('button', { name: 'Nhập dự án thủ công', exact: true }).click();
+    await page.getByRole('button', { name: 'Xác nhận', exact: true }).click(); await page.getByRole('alert').waitFor(); await page.getByRole('button', { name: 'Hủy', exact: true }).click();
+    await page.getByRole('button', { name: 'Thêm dự án', exact: true }).click();
+    await add('Nhập dự án thủ công', { 'Tên / tiêu đề *': 'Dự án thật của An', 'Công nghệ (phân cách bằng dấu phẩy)': 'React, TypeScript' });
     assert.equal(await page.locator('[data-testid="landscape-project"]:visible').getByRole('heading', { name: 'Dự án thật của An', exact: true }).count(), 1);
     assert.ok((await page.locator('[data-testid="landscape-stats"]:visible').innerText()).includes('1\nDự án đã xây dựng'));
     await page.getByRole('button', { name: 'Thêm kỹ năng', exact: true }).click(); await page.getByRole('button', { name: 'React', exact: true }).click(); await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();

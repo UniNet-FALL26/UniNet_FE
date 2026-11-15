@@ -1,8 +1,14 @@
-import type { PortfolioResponse } from '@/types/portfolio';
+import type { PortfolioContent, PortfolioResponse } from '@/types/portfolio';
 import { getProfileTemplate, getProfileTheme } from '@/data/profile-templates';
 
+export function portfolioSavePayload(content: PortfolioContent) {
+  return { ...content, projects: content.projects.map(project => project.projectId
+    ? { projectId: project.projectId, personalContribution: project.personalContribution ?? null, featured: project.featured }
+    : project) };
+}
+
 export function profileEditorPayload(data: PortfolioResponse) {
-  return { profile: { fullName: data.profile.fullName, nickname: data.profile.nickname, avatarUrl: data.profile.avatarUrl, coverUrl: data.profile.coverUrl, bio: data.profile.bio }, portfolio: data.portfolio };
+  return { profile: { fullName: data.profile.fullName, nickname: data.profile.nickname, avatarUrl: data.profile.avatarUrl, coverUrl: data.profile.coverUrl, bio: data.profile.bio }, portfolio: portfolioSavePayload(data.portfolio) };
 }
 
 export function updateProfileAppearance(data: PortfolioResponse, templateId: string, themeId?: string): PortfolioResponse {

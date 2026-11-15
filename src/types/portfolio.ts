@@ -5,7 +5,14 @@ export type PortfolioIdentity = {
   universityName: string | null; major: string | null; organizationName: string | null; isVerified: boolean;
 };
 export type PortfolioSkill = { skillId?: string | null; level?: number | null; yearsOfExperience?: number | null; name: string; category: string; iconUrl?: string | null };
-export type PortfolioProject = { title: string; description?: string | null; type?: string | null; coverUrl?: string | null; technologies: string[]; url?: string | null; githubUrl?: string | null; featured: boolean };
+export type PortfolioProjectVerification = { id: string; status: number | string; finalizedAt: string | null };
+export type PortfolioProject = {
+  projectId?: string | null; title: string; description?: string | null; type?: string | null;
+  coverUrl?: string | null; technologies: string[]; url?: string | null; githubUrl?: string | null; featured: boolean;
+  role?: string | number | null; completedAt?: string | null; personalContribution?: string | null;
+  verification?: PortfolioProjectVerification | null;
+};
+export type EligiblePortfolioProject = Omit<PortfolioProject, 'featured'> & { id?: string };
 export type PortfolioMilestone = { title: string; organization?: string | null; period?: string | null; description?: string | null; startDate?: string | null; endDate?: string | null; gpa?: string | null };
 export type PortfolioCertificate = { title: string; issuer: string; year?: string | null; logoUrl?: string | null; url?: string | null };
 export type PortfolioArticle = { title: string; date?: string | null; coverUrl?: string | null; url: string };

@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { PortfolioProjectDetails, PortfolioProjectTitle } from '@/components/profile/PortfolioProjectDetails';
 import { EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
@@ -21,7 +22,8 @@ export function ShowcaseProjects({ projects, theme, width, thumbnail }: Omit<Sho
       <View style={[s.projectCover, { backgroundColor: theme.accentSoft }]}>{profileMedia(project.coverUrl) ? <Image source={profileMedia(project.coverUrl)} contentFit="cover" priority="low" loading={thumbnail ? 'eager' : 'lazy'} style={StyleSheet.absoluteFill} accessibilityLabel={`Ảnh dự án ${project.title}`} /> : <View style={s.coverFallback}><PortfolioIcon name="project" size={40} color={theme.accentStrong} /></View>}
         <EditPhoto color={theme.accentStrong} right={8} bottom={8} size={28} entry={{ section: 'projects', item: project, label: `dự án ${project.title}` }} />
       </View>
-      <View style={s.projectBody}><Text role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]}>{project.title}</Text>{!!project.description && <Text numberOfLines={3} style={[s.body, { color: theme.muted }]}>{project.description}</Text>}
+      <View style={s.projectBody}><PortfolioProjectTitle project={project} role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]} />{!!project.description && <Text numberOfLines={3} style={[s.body, { color: theme.muted }]}>{project.description}</Text>}
+        <PortfolioProjectDetails project={project} color={theme.muted} />
         <View style={ui.chips}>{project.technologies.map(technology => <Chip key={technology} theme={theme}>{technology}</Chip>)}</View>
         <View style={s.links}>{!isSampleLink(project.url) && <PortfolioLink label="Xem chi tiết →" url={project.url} theme={theme} thumbnail={thumbnail} subtle />}{!isSampleLink(project.githubUrl) && <PortfolioLink label="GitHub" url={project.githubUrl} theme={theme} thumbnail={thumbnail} subtle />}</View>
       </View>

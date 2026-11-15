@@ -15,7 +15,7 @@ export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = 
   const appearance = data.portfolio.appearance?.profile;
   const sections: Record<string, React.ReactNode> = {
     stats: <Statistics {...props} />, skills: <SkillSection {...props} />, journey: <JourneySection {...props} />,
-    'other-projects': <ProjectSection projects={data.portfolio.projects.filter(project => !project.featured)} title="Dự án bản thân" {...props} />,
+    'other-projects': <ProjectSection projects={data.portfolio.projects.filter(project => project.projectId || !project.featured)} title="Dự án bản thân" {...props} />,
     certificates: <CertificateSection {...props} />, articles: <ArticleSection {...props} />,
     activities: <ExtraSection section="activities" {...props} />,
   };
