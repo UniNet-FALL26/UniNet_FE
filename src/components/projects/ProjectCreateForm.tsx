@@ -13,6 +13,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { useEffect, useMemo, useState } from "react";
 import {
   useWindowDimensions,
@@ -378,34 +379,18 @@ export function ProjectCreateScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* HEADER */}
-        <View style={styles.header}>
-
-
-          <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>KHỞI TẠO DỰ ÁN</Text>
-            <Text style={styles.title}>Tạo dự án</Text>
-            <Text style={styles.description}>
-              Tạo một dự án và tìm những thành viên phù hợp để cùng phát triển.
-            </Text>
-          </View>
-        </View>
-
         {/* THÔNG TIN DỰ ÁN */}
         <View style={styles.section}>
           <View style={styles.sectionHeading}>
-            <View style={styles.sectionNumber}>
-              <Text style={styles.sectionNumberText}>01</Text>
-            </View>
             <View style={styles.sectionHeadingText}>
               <Text style={styles.sectionTitle}>Thông tin dự án</Text>
               <Text style={styles.sectionDescription}>
-                Giới thiệu những thông tin cơ bản về dự án.
+                Tên, mô tả và kỹ năng cần có.
               </Text>
             </View>
           </View>
 
-          <View style={styles.card}><ProjectInformationFields
+          <View style={styles.card}><ProjectInformationFields compact
             specializationId={specializationId} onSpecialization={value => { setSpecializationId(value); setErrors(previous => ({ ...previous, specializationId: '' })); }}
             title={title} projectField={projectField === 'Khác' ? customProjectField : projectField} description={description}
             skillIds={skillCatalog.filter(skill => technologies.includes(skill.name)).map(skill => skill.id)}
@@ -419,20 +404,18 @@ export function ProjectCreateScreen() {
         {/* QUY MÔ */}
         <View style={styles.section}>
           <View style={styles.sectionHeading}>
-            <View style={styles.sectionNumber}>
-              <Text style={styles.sectionNumberText}>02</Text>
-            </View>
             <View style={styles.sectionHeadingText}>
-              <Text style={styles.sectionTitle}>Quy mô nhóm</Text>
+              <Text style={styles.sectionTitle}>Thành viên</Text>
               <Text style={styles.sectionDescription}>
-                Xác định số thành viên và các vị trí cần tuyển.
+                Số người và vai trò cần tuyển.
               </Text>
             </View>
           </View>
 
           <View style={styles.card}>
-            <Input appearance="project"
-
+            <View style={[styles.fieldRow, compact && styles.stackedRow]}>
+            <View style={styles.fieldColumn}>
+            <Input appearance="project" compact
               label="Số thành viên mục tiêu *"
               value={memberTarget}
               onChangeText={setMemberTarget}
@@ -445,7 +428,9 @@ export function ProjectCreateScreen() {
               Số này bao gồm cả người tạo dự án.
             </Text>
 
-            <Input appearance="project"
+            </View>
+            <View style={styles.fieldColumn}>
+            <Input appearance="project" compact
               label="Số thành viên tối thiểu *"
               value={minimumQuantity}
               onChangeText={setMinimumQuantity}
@@ -456,6 +441,8 @@ export function ProjectCreateScreen() {
             <Text style={styles.helperText}>
               Bao gồm người tạo và không vượt quá số thành viên mục tiêu.
             </Text>
+            </View>
+            </View>
 
             <View style={styles.roleSectionHeader}>
               <View>
@@ -466,7 +453,7 @@ export function ProjectCreateScreen() {
                 </Text>
               </View>
 
-              <Pressable onPress={addRole} style={styles.addRoleButton}>
+              <Pressable accessibilityRole="button" hitSlop={6} onPress={addRole} style={styles.addRoleButton}>
                 <Text style={styles.addRoleText}>+ Thêm vai trò</Text>
               </Pressable>
             </View>
@@ -481,6 +468,9 @@ export function ProjectCreateScreen() {
 
                   {roles.length > 1 ? (
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa vai trò ${index + 1}`}
+                      hitSlop={6}
                       onPress={() => removeRole(index)}
                       style={styles.deleteRoleButton}
                     >
@@ -491,7 +481,7 @@ export function ProjectCreateScreen() {
 
                 <View style={[styles.roleRow, compact && { flexDirection: "column" }]}>
                   <View style={styles.roleNameWrapper}>
-                    <Input appearance="project"
+                    <Input appearance="project" compact
 
                       label="Tên vai trò *"
                       value={role.role}
@@ -501,7 +491,7 @@ export function ProjectCreateScreen() {
                   </View>
 
                   <View style={[styles.quantityWrapper, compact && { width: "100%" }]}>
-                    <Input appearance="project"
+                    <Input appearance="project" compact
 
                       label="Số lượng *"
                       value={String(role.quantity)}
@@ -514,7 +504,7 @@ export function ProjectCreateScreen() {
                   </View>
                 </View>
 
-                <Input appearance="project"
+                <Input appearance="project" compact
 
                   label="Yêu cầu của vai trò *"
                   value={role.requirements}
@@ -550,22 +540,21 @@ export function ProjectCreateScreen() {
         {/* THỜI GIAN */}
         <View style={styles.section}>
           <View style={styles.sectionHeading}>
-            <View style={styles.sectionNumber}>
-              <Text style={styles.sectionNumberText}>03</Text>
-            </View>
             <View style={styles.sectionHeadingText}>
-              <Text style={styles.sectionTitle}>Thời gian & Mục tiêu</Text>
+              <Text style={styles.sectionTitle}>Thời hạn</Text>
               <Text style={styles.sectionDescription}>
-                Thiết lập thời hạn tuyển thành viên và mốc bàn giao sản phẩm.
+                Hạn tuyển thành viên và ngày bàn giao dự kiến.
               </Text>
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card, styles.fieldRow, compact && styles.stackedRow]}>
             {/* DEADLINE */}
-            <View style={styles.fieldContainer}>
+            <View style={[styles.fieldContainer, styles.fieldColumn]}>
               <Text style={styles.inputLabel}>Hạn chót nộp đơn tham gia *</Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Chọn hạn chót nộp đơn tham gia"
                 onPress={openDeadlinePicker}
                 style={[
                   styles.dateButton,
@@ -573,7 +562,7 @@ export function ProjectCreateScreen() {
                 ]}
               >
                 <View style={styles.dateIcon}>
-                  <Text style={styles.dateIconText}>📅</Text>
+                  <SymbolView name={{ ios: "calendar", android: "calendar_today", web: "calendar_today" }} size={19} tintColor={colors.primary} />
                 </View>
 
                 <View style={styles.dateButtonContent}>
@@ -603,16 +592,18 @@ export function ProjectCreateScreen() {
             </View>
 
             {/* EXPECTED OUTPUT DATE AND TIME */}
-            <View style={styles.fieldContainer}>
+            <View style={[styles.fieldContainer, styles.fieldColumn]}>
               <Text style={styles.inputLabel}>
                 Ngày dự kiến bàn giao sản phẩm *
               </Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Chọn ngày dự kiến bàn giao sản phẩm"
                 onPress={openExpectedOutputDatePicker}
                 style={[styles.dateButton, errors.expectedOutput && styles.dateButtonError]}
               >
-                <View style={[styles.dateIcon, { backgroundColor: "#E6FBF2" }]}>
-                  <Text style={styles.dateIconText}>🎯</Text>
+                <View style={styles.dateIcon}>
+                  <SymbolView name={{ ios: "flag", android: "outlined_flag", web: "outlined_flag" }} size={19} tintColor={colors.primary} />
                 </View>
 
                 <View style={styles.dateButtonContent}>
@@ -631,18 +622,15 @@ export function ProjectCreateScreen() {
 
                 <Text style={styles.dateArrow}>›</Text>
               </Pressable>
+              {errors.expectedOutput ? <Text style={styles.errorText}>{errors.expectedOutput}</Text> : null}
             </View>
           </View>
         </View>
 
-        {errors.expectedOutput ? (
-          <Text style={{ color: colors.error }}>{errors.expectedOutput}</Text>
-        ) : null}
-
         {/* PRIVATE PROJECT */}
         <View style={styles.privateCard}>
           <View style={styles.privateIcon}>
-            <Text style={styles.privateIconText}>🔒</Text>
+            <SymbolView name={isPrivate ? { ios: "lock", android: "lock_outline", web: "lock_outline" } : { ios: "globe", android: "public", web: "public" }} size={21} tintColor={colors.primary} />
           </View>
 
           <View style={styles.privateContent}>
@@ -676,12 +664,13 @@ export function ProjectCreateScreen() {
         ) : null}
 
         {/* ACTIONS */}
-        <View style={[styles.actions, compact && { flexDirection: "column" }]}>
+        <View style={styles.actions}>
           <Button
             title="Hủy bỏ"
             variant="outline"
             onPress={() => router.dismissTo("/(tabs)/groups" as never)}
             style={styles.cancelButton}
+            textStyle={styles.actionText}
           />
 
           <Button
@@ -690,13 +679,19 @@ export function ProjectCreateScreen() {
             loading={submitting}
             onPress={handleSubmit}
             style={styles.submitButton}
+            textStyle={styles.actionText}
           />
         </View>
 
         <Text style={styles.footerHint}>
-          Sau khi tạo, dự án sẽ được tạo và chuyển sang bước đề xuất thành viên.
+          Tiếp theo: tạo dự án và nhận đề xuất thành viên phù hợp.
         </Text>
-        {account?.role === ACCOUNT_ROLE.STUDENT && <View style={[styles.card, { borderTopWidth: 1, marginTop: 8 }]}><Text style={styles.sectionTitle}>Bạn đã có dự án hoàn thành bên ngoài UniNet?</Text><Text style={styles.sectionDescription}>Tải tài liệu để điền nhanh hồ sơ và gửi thẩm định.</Text><Button title="Thêm dự án có sẵn" variant="outline" disabled={submitting} onPress={() => {
+        {account?.role === ACCOUNT_ROLE.STUDENT && <View style={[styles.importCard, compact && styles.importCardCompact]}>
+          <View style={styles.importIntro}>
+            <View style={styles.importIcon}><SymbolView name={{ ios: 'doc.text', android: 'description', web: 'description' }} size={21} tintColor={colors.primary} /></View>
+            <View style={styles.importCopy}><Text style={styles.importTitle}>Bạn có dự án đã hoàn thành?</Text><Text style={styles.sectionDescription}>Thêm dự án ngoài UniNet để gửi thẩm định.</Text></View>
+          </View>
+          <Button title="Thêm dự án có sẵn" variant="outline" style={styles.importButton} textStyle={styles.actionText} disabled={submitting} onPress={() => {
           const dirty = !!(specializationId || title || projectField || customProjectField || description || technologies.length || memberTarget || minimumQuantity || recruitmentDeadline || expectedOutputDate || isPrivate || roles.some(role => role.role || role.requirements || role.quantity !== 1));
           if (dirty) setImportConfirmation(true); else router.push('/group/import' as never);
         }} /></View>}
@@ -719,7 +714,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 48,
     gap: 24,
-    maxWidth: 1080,
+    maxWidth: 960,
     width: "100%",
     alignSelf: "center",
   },
@@ -759,19 +754,11 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 
-  eyebrow: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    marginBottom: 4,
-  },
-
   title: {
     color: colors.navy,
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: "800",
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "700",
   },
 
   description: {
@@ -792,29 +779,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  sectionNumber: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  sectionNumberText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-
   sectionHeadingText: {
     flex: 1,
   },
 
   sectionTitle: {
     color: colors.navy,
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "600",
   },
 
   sectionDescription: {
@@ -828,9 +800,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
-    gap: 24,
+    gap: 16,
   },
 
   /* INPUT */
@@ -1020,9 +992,9 @@ const styles = StyleSheet.create({
   },
 
   addRoleButton: {
-    minHeight: 38,
+    minHeight: 34,
     paddingHorizontal: 12,
-    borderRadius: 19,
+    borderRadius: 8,
     backgroundColor: "#EEF5FF",
     alignItems: "center",
     justifyContent: "center",
@@ -1124,7 +1096,7 @@ const styles = StyleSheet.create({
 
   /* DATE */
   dateButton: {
-    minHeight: 66,
+    minHeight: 56,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1141,16 +1113,12 @@ const styles = StyleSheet.create({
   },
 
   dateIcon: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: 11,
     backgroundColor: "#EAF2FF",
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  dateIconText: {
-    fontSize: 17,
   },
 
   dateButtonContent: {
@@ -1202,10 +1170,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  privateIconText: {
-    fontSize: 18,
-  },
-
   privateContent: {
     flex: 1,
   },
@@ -1248,21 +1212,41 @@ const styles = StyleSheet.create({
   /* ACTION */
   actions: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 2,
+    gap: 10,
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
 
   cancelButton: {
-    flex: 1,
+    minHeight: 40,
+    minWidth: 88,
+    paddingHorizontal: 16,
   },
 
   submitButton: {
-    flex: 1,
+    minHeight: 40,
+    minWidth: 112,
+    paddingHorizontal: 20,
   },
+
+  actionText: { fontSize: 14 },
+  importCard: { flexDirection: "row", alignItems: "center", gap: 16, padding: 16, marginTop: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
+  importCardCompact: { flexDirection: "column", alignItems: "stretch" },
+  importIntro: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 12 },
+  importIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" },
+  importCopy: { flex: 1, minWidth: 0, gap: 2 },
+  importTitle: { color: colors.navy, fontSize: 15, lineHeight: 21, fontWeight: "600" },
+  importButton: { minHeight: 40, alignSelf: "flex-start", paddingHorizontal: 14 },
+  fieldRow: { flexDirection: "row", alignItems: "flex-start", gap: 16 },
+  stackedRow: { flexDirection: "column", alignItems: "stretch" },
+  fieldColumn: { flex: 1, minWidth: 0, gap: 6 },
 
   footerHint: {
     color: colors.textSecondary,
-    textAlign: "center",
+    textAlign: "right",
     fontSize: 11,
     lineHeight: 17,
     paddingHorizontal: 20,

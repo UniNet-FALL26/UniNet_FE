@@ -5,18 +5,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
 import { useAuthStore } from '@/store/auth.store';
 import { ACCOUNT_ROLE } from '@/constants/roles';
+import { SymbolView } from 'expo-symbols';
 
-export function ExternalProjectLayout({ step, children, onBack, scrollRef }: { step: 1 | 2; children: ReactNode; onBack?: () => void; scrollRef?: React.RefObject<ScrollView | null> }) {
+export function ExternalProjectLayout({ step, children, onBack, scrollRef, compact = false }: { step: 1 | 2; children: ReactNode; onBack?: () => void; scrollRef?: React.RefObject<ScrollView | null>; compact?: boolean }) {
   const { account, isLoading } = useAuthStore();
   return <SafeAreaView style={externalStyles.safe}><KeyboardAvoidingView style={externalStyles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <DetailNavigation title="Thêm dự án có sẵn" onBack={onBack} />
-    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={externalStyles.content}>
-      <Text style={externalStyles.progress}>{step === 2 ? '✓' : '1.'} Tải tài liệu  →  2. Xem lại hồ sơ</Text>
+    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={[externalStyles.content, compact && { maxWidth: 800 }]}>
+      <View style={externalStyles.steps} accessibilityLabel={`Bước ${step} trên 2: ${step === 1 ? 'Tải tài liệu' : 'Xem lại hồ sơ'}`}>
+        <View style={externalStyles.step}><View style={[externalStyles.stepNumber, externalStyles.stepActive]}>{step === 2 ? <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={14} tintColor={colors.primary} /> : <Text style={externalStyles.stepActiveText}>1</Text>}</View><Text style={[externalStyles.stepText, step === 1 && externalStyles.stepActiveText]}>Tải tài liệu</Text></View>
+        <View style={externalStyles.stepLine} />
+        <View style={externalStyles.step}><View style={[externalStyles.stepNumber, step === 2 && externalStyles.stepActive]}><Text style={step === 2 ? externalStyles.stepActiveText : externalStyles.stepText}>2</Text></View><Text style={[externalStyles.stepText, step === 2 && externalStyles.stepActiveText]}>Xem lại hồ sơ</Text></View>
+      </View>
       {isLoading ? <Text>Đang kiểm tra phiên đăng nhập…</Text> : account?.role === ACCOUNT_ROLE.STUDENT ? children : <Text style={externalStyles.error}>Vui lòng đăng nhập bằng tài khoản sinh viên để thêm dự án có sẵn.</Text>}
     </ScrollView>
   </KeyboardAvoidingView></SafeAreaView>;
 }
 export const externalStyles = StyleSheet.create({
+  steps: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
+  stepNumber: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  stepActive: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight },
+  stepText: { fontSize: 12, lineHeight: 18, color: colors.textSecondary, flexShrink: 1 },
+  stepActiveText: { fontSize: 12, lineHeight: 18, fontWeight: '600', color: colors.primary },
+  stepLine: { height: 1, backgroundColor: colors.border, flex: 1, maxWidth: 64, minWidth: 12 },
   safe: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }, backText: { fontSize: 30, color: colors.navy },
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: 20, paddingBottom: 50, gap: 20 },

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 import * as DocumentPicker from 'expo-document-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +14,7 @@ import { ACCOUNT_ROLE } from '@/constants/roles';
 import { isFileId } from '@/utils/external-project-draft';
 import { toast } from '@/store/toast.store';
 import { ApiError } from '@/services/api';
+import { colors } from '@/constants/colors';
 
 type Upload = { key: string; asset: DocumentPicker.DocumentPickerAsset; state: 'pending' | 'uploading' | 'done' | 'error'; fileId?: string; error?: string };
 const mimeTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
@@ -83,12 +85,41 @@ function UploadScreen() {
     }
     finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
-  return <ExternalProjectLayout step={1} onBack={() => { if (!busy) router.back(); }}>
+  return <ExternalProjectLayout step={1} compact onBack={() => { if (!busy) router.back(); }}>
     {!!saved.length && <View style={s.card}><Text style={s.heading}>Tiếp tục bản nháp</Text><Text style={s.small}>Chỉ hiển thị bản nháp đã lưu trên thiết bị này, theo tài khoản hiện tại. Bản nháp chưa xác nhận có hạn lưu 7 ngày.</Text>{saved.map(item => <Button key={item.draftId} variant="outline" disabled={busy} title={`Tiếp tục bản nháp · ${new Date(item.createdAt).toLocaleDateString('vi-VN')}`} onPress={() => openDraft(item.draftId)} />)}</View>}
-    <View style={s.card}><Text style={s.heading}>Tải tài liệu mô tả dự án</Text><Text style={s.body}>Hệ thống sẽ điền trước thông tin để bạn kiểm tra và bổ sung.</Text><Text style={s.small}>Chọn 1–10 tài liệu PDF có văn bản, DOCX hoặc TXT UTF-8; tối đa 10 MB/tài liệu. PDF scan và ảnh chụp chưa có OCR; một số tài liệu có thể không đọc được.</Text><Button title="Chọn tài liệu" variant="outline" onPress={() => void choose()} disabled={busy || files.length >= 10} />
-      {files.map(file => <View key={file.key} style={s.file}><Text style={s.body}>{file.asset.name}</Text><Text style={s.small}>{((file.asset.size || 0) / 1024 / 1024).toFixed(2)} MB · {{ pending: 'Chưa tải', uploading: 'Đang tải', done: 'Đã tải', error: 'Lỗi' }[file.state]}</Text>{file.error && <Text style={s.error}>{file.error}</Text>}<View style={s.row}>{file.state === 'error' && <Button title="Tải lại" variant="outline" disabled={busy} onPress={() => void proceed(file)} />}<Pressable accessibilityRole="button" disabled={busy} onPress={() => { setFiles(previous => previous.filter(item => item.key !== file.key)); createdDraft.current = null; }}><Text style={s.link}>Loại khỏi danh sách</Text></Pressable></View></View>)}
+    <View style={styles.card}>
+      <View style={styles.intro}><Text accessibilityRole="header" style={styles.title}>Tài liệu dự án</Text><Text style={styles.description}>Tải tài liệu để điền trước hồ sơ. Bạn có thể kiểm tra và sửa ở bước tiếp theo.</Text></View>
+      <View style={styles.uploadArea}>
+        <View style={styles.uploadIcon}><SymbolView name={{ ios: 'arrow.up.doc', android: 'upload_file', web: 'upload_file' }} size={26} tintColor={colors.primary} /></View>
+        <Text style={styles.uploadTitle}>Chọn tài liệu mô tả dự án</Text>
+        <Text style={styles.uploadHint}>PDF, DOCX hoặc TXT · Tối đa 10 tệp, 10 MB mỗi tệp</Text>
+        <Button title={files.length ? 'Chọn thêm tài liệu' : 'Chọn tài liệu'} variant="outline" onPress={() => void choose()} disabled={busy || files.length >= 10} style={styles.chooseButton} textStyle={styles.buttonText} />
+      </View>
+      <View style={styles.note}><SymbolView name={{ ios: 'info.circle', android: 'info', web: 'info' }} size={16} tintColor={colors.textSecondary} /><Text style={styles.noteText}>PDF cần có văn bản; TXT dùng mã UTF-8. Chưa hỗ trợ PDF scan và ảnh chụp.</Text></View>
+      {!!files.length && <View style={styles.fileList}><Text style={styles.fileListTitle}>Đã chọn {files.length}/10 tài liệu</Text>{files.map(file => <View key={file.key} style={styles.file}>
+        <View style={styles.fileHeader}><SymbolView name={{ ios: 'doc.text', android: 'description', web: 'description' }} size={20} tintColor={colors.textSecondary} /><View style={styles.fileCopy}><Text style={styles.fileName}>{file.asset.name}</Text><Text style={s.small}>{((file.asset.size || 0) / 1024 / 1024).toFixed(2)} MB · {{ pending: 'Chưa tải', uploading: 'Đang tải', done: 'Đã tải', error: 'Lỗi' }[file.state]}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Bỏ tài liệu ${file.asset.name}`} disabled={busy} onPress={() => { setFiles(previous => previous.filter(item => item.key !== file.key)); createdDraft.current = null; }} style={styles.removeButton}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor={colors.textSecondary} /></Pressable></View>
+        {file.error && <Text style={s.error}>{file.error}</Text>}{file.state === 'error' && <Button title="Tải lại" variant="outline" disabled={busy} onPress={() => void proceed(file)} style={styles.retryButton} textStyle={styles.buttonText} />}
+      </View>)}</View>}
     </View>
     {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{storageWarning && <Text style={s.error}>Thiết bị không lưu được lối tắt bản nháp. Giữ đường dẫn màn hình xem lại để tiếp tục.</Text>}
-    <View style={s.row}><Button title="Quay lại" variant="outline" disabled={busy} onPress={() => router.back()} /><Button title="Tiếp tục" loading={busy} disabled={!files.length || files.length > 10} onPress={() => void proceed()} style={s.grow} /></View>
+    <View style={styles.actions}><Button title="Quay lại" variant="outline" disabled={busy} onPress={() => router.back()} style={styles.actionButton} textStyle={styles.buttonText} /><Button title="Tiếp tục" loading={busy} disabled={!files.length || files.length > 10} onPress={() => void proceed()} style={styles.nextButton} textStyle={styles.buttonText} /></View>
   </ExternalProjectLayout>;
 }
+
+const styles = StyleSheet.create({
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 20, gap: 20 },
+  intro: { gap: 6 }, title: { fontSize: 18, lineHeight: 25, fontWeight: '600', color: colors.navy },
+  description: { fontSize: 13, lineHeight: 21, color: colors.textSecondary },
+  uploadArea: { alignItems: 'center', gap: 10, paddingVertical: 28, paddingHorizontal: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, borderRadius: 12, backgroundColor: colors.background },
+  uploadIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight, marginBottom: 2 },
+  uploadTitle: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  uploadHint: { fontSize: 12, lineHeight: 19, color: colors.textSecondary, textAlign: 'center' },
+  chooseButton: { minHeight: 40, paddingHorizontal: 18, marginTop: 4 }, buttonText: { fontSize: 13, fontWeight: '600' },
+  note: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, noteText: { flex: 1, fontSize: 12, lineHeight: 19, color: colors.textSecondary },
+  fileList: { gap: 10 }, fileListTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  file: { gap: 8, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 10 }, fileHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  fileCopy: { flex: 1, minWidth: 0 }, fileName: { fontSize: 13, lineHeight: 20, color: colors.textPrimary, flexShrink: 1 },
+  removeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 }, retryButton: { minHeight: 36, alignSelf: 'flex-start' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 10, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  actionButton: { minHeight: 40, paddingHorizontal: 16 }, nextButton: { minHeight: 40, minWidth: 112, paddingHorizontal: 20 },
+});

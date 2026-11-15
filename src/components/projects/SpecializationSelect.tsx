@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { specializationService, type Specialization } from '@/services/specialization.service';
 import { externalStyles as s } from './ExternalProjectLayout';
+import { ProjectSelectModal } from './ProjectSelectModal';
 
-export function SpecializationSelect({ value, onChange, disabled = false, error }: {
-  value: string; onChange: (id: string) => void; disabled?: boolean; error?: string;
+export function SpecializationSelect({ value, onChange, disabled = false, error, compact = false }: {
+  value: string; onChange: (id: string) => void; disabled?: boolean; error?: string; compact?: boolean;
 }) {
   const [items, setItems] = useState<Specialization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,13 +22,15 @@ export function SpecializationSelect({ value, onChange, disabled = false, error 
     return () => controller.abort();
   }, [revision]);
   const selected = items.find(item => item.id === value);
+  const buttonStyle = compact ? { minHeight: 40, paddingHorizontal: 12 } : undefined;
+  const buttonTextStyle = compact ? { fontSize: 14 } : undefined;
   return <View style={{ gap: 8 }}>
     <Text style={s.body}>Chuyên ngành dự án *</Text>
-    <Button title={loading ? 'Đang tải chuyên ngành…' : selected?.name || 'Chọn chuyên ngành dự án ▾'} variant="outline" disabled={disabled || loading || !!loadError || !items.length} onPress={() => setOpen(previous => !previous)} />
-    {open && !disabled && !loading && !loadError && <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled><View style={{ gap: 8 }}>{items.map(item => <Button key={item.id} title={`${item.id === value ? '✓ ' : ''}${item.name}`} variant="outline" onPress={() => { onChange(item.id); setOpen(false); }} />)}</View></ScrollView>}
+    <Button title={loading ? 'Đang tải chuyên ngành…' : selected?.name || 'Chọn chuyên ngành dự án ▾'} style={buttonStyle} textStyle={buttonTextStyle} variant="outline" disabled={disabled || loading || !!loadError || !items.length} onPress={() => setOpen(previous => !previous)} />
+    <ProjectSelectModal title="Chọn chuyên ngành dự án" visible={open && !disabled && !loading && !loadError} value={value} options={items.map(item => ({ value: item.id, label: item.name }))} onSelect={onChange} onClose={() => setOpen(false)} />
     {!!loadError && <Text style={s.error}>{loadError}</Text>}
     {!loading && !loadError && !items.length && <Text style={s.error}>Chưa có chuyên ngành đang hoạt động.</Text>}
-    {!loading && (loadError || !items.length) && <Button title="Tải lại chuyên ngành" variant="outline" disabled={disabled} onPress={() => { setLoading(true); setLoadError(null); setRevision(previous => previous + 1); }} />}
+    {!loading && (loadError || !items.length) && <Button title="Tải lại chuyên ngành" style={buttonStyle} textStyle={buttonTextStyle} variant="outline" disabled={disabled} onPress={() => { setLoading(true); setLoadError(null); setRevision(previous => previous + 1); }} />}
     {!!error && <Text style={s.error}>{error}</Text>}
   </View>;
 }
