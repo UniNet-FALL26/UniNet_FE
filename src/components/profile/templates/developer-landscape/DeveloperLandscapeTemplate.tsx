@@ -21,7 +21,7 @@ export function DeveloperLandscapeTemplate(props: DeveloperLandscapeTemplateProp
   const contentWidth = Math.max(0, width - padding * 2);
   const appearance = data.portfolio.appearance.profile;
   const visible = (id: string) => !!editing || !appearance.hiddenSections.includes(id);
-  const remaining = data.portfolio.projects.filter(project => !project.featured);
+  const remaining = data.portfolio.projects.filter(project => project.projectId || !project.featured);
   const shared = { portfolio: data.portfolio, theme, width: contentWidth, thumbnail, demo: props.demo };
   const sections: Record<string, React.ReactNode> = {
     skills: editing || data.portfolio.skills.length ? <LandscapeSkills {...shared} mobile={width < 768} /> : null,
