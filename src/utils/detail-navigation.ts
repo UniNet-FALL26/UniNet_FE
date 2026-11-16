@@ -3,9 +3,10 @@ export type DetailRoute = { crumbs: NavigationCrumb[]; fallback: string };
 const crumb = (label: string, href?: string): NavigationCrumb => ({ label, href });
 
 export function detailNavigation(pathname: string, role = 0, params: { id?: string; projectId?: string; jobId?: string; template?: string; theme?: string } = {}): DetailRoute | null {
+  if (pathname === '/profile/projects') return null;
   const profile = role === 1 ? '/(company)/profile' : role === 2 ? '/(assessor)/assessor-profile' : '/(tabs)/profile';
   const personal = crumb(role === 0 ? 'Cá nhân' : 'Hồ sơ', profile);
-  const projects = crumb('Dự án', '/(tabs)/groups');
+  const projects = crumb('Dự án của tôi', '/profile/projects');
   const verificationRecord = /^\/group\/(checkout|verification-dossier|verification-meeting|verification-result)\//.test(pathname);
   const projectId = params.projectId || (!verificationRecord ? params.id || pathname.split('/').pop() : undefined);
   const project = crumb('Chi tiết dự án', projectId ? `/group/${encodeURIComponent(projectId)}` : undefined);
@@ -36,7 +37,7 @@ export function detailNavigation(pathname: string, role = 0, params: { id?: stri
     const label = pathname === '/cv/templates' ? 'Mẫu CV' : pathname === '/cv/manage' ? 'Quản lý CV' : 'Chi tiết CV';
     return make(pathname === '/cv' ? [personal, crumb('CV')] : [personal, crumb('CV', '/cv'), crumb(label)]);
   }
-  if (pathname === '/payment/result') return make([projects, crumb('Kết quả thanh toán')], '/(tabs)/groups');
+  if (pathname === '/payment/result') return make([projects, crumb('Kết quả thanh toán')], '/profile/projects');
   if (pathname.startsWith('/group/')) {
     const section = pathname.split('/')[2];
     if (section === 'create') return make([projects, crumb('Tạo dự án')]);

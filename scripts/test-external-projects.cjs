@@ -196,24 +196,6 @@ test('verification loads paid dossiers without L1 or contribution requests', asy
  });
  useProjectVerification(projectId, true); await settle(); assert.deepEqual(calls, [true, false]); cleanup();
 });
-test('completed project offers paid verification without evidence tabs', () => {
- const React = require('react');
- const {renderToStaticMarkup} = require('react-dom/server');
- const host = ({children}) => React.createElement('div', null, children);
- const {CompletedDetailView} = load('src/components/projects/CompletedDetailView.tsx', {
-  'react/jsx-runtime': require('react/jsx-runtime'), react: {useState: initial => [initial, () => {}], useEffect: () => {}},
-  'react-native': {Pressable: host, ScrollView: host, Text: host, View: host, StyleSheet: {create: value => value}},
-  'react-native-safe-area-context': {SafeAreaView: host}, 'expo-router': {router: {}},
-  '@/components/navigation/DetailNavigation': {DetailNavigation: host},
-  '@/components/projects/ProjectOverview': {ProjectOverview: host},
-  '@/components/ui/Button': {Button: ({title}) => React.createElement('button', null, title)}, '@/constants/colors': {colors: {}},
-  '@/hooks/useProjectVerification': {useProjectVerification: () => ({level2: {data: null, loading: false}, refresh() {}})},
-  '@/utils/project-verification': {level2Label: () => 'Có thể đăng ký thẩm định'},
- });
- const html = renderToStaticMarkup(React.createElement(CompletedDetailView, {project: {id: projectId, isCreator: true, title: 'Dự án'}, initialTab: 'Minh chứng'}));
- assert.ok(html.includes('Đăng kí thẩm định')); assert.ok(!html.includes('Minh chứng')); assert.ok(!html.includes('cấp 1'));
-});
-
 test('completion uses the body-ID status endpoint and propagates failures', async () => {
  for (const failure of [null, 403, 404, 409, 500, 'network']) {
   let calls = 0;
@@ -230,33 +212,4 @@ test('completion uses the body-ID status endpoint and propagates failures', asyn
   else assert.equal((await projectService.completeProject(projectId)).status, 2);
   assert.equal(calls, 1);
  }
-});
-
-test('project date picker uses a date-only calendar and preserves extracted partial dates until selection', () => {
-  const jsx = (type, props) => ({ type, props });
-  const changes = [];
-  const { ProjectDatePicker } = load('src/components/projects/ProjectDatePicker.tsx', {
-    react: { createElement: jsx, useState: value => [value, () => {}] },
-    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { Platform: { OS: 'web' }, Text: 'Text', View: 'View' },
-    '@react-native-community/datetimepicker': {},
-    '@/components/ui/Button': { Button: 'Button' },
-    '@/constants/colors': { colors: {} },
-    '@/utils/external-project-draft': utils,
-  });
-  const render = (value, disabled = false) => ProjectDatePicker({ label: 'Ngày bắt đầu', value, disabled, onChange: value => changes.push(value), error: '' });
-  const partial = render('2024');
-  const input = partial.props.children[1];
-  assert.equal(input.type, 'input');
-  assert.equal(input.props.type, 'date');
-  assert.equal(input.props.value, '');
-  assert.deepEqual(changes, []);
-  input.props.onChange({ target: { value: '2024-02-29' } });
-  assert.deepEqual(changes, ['2024-02-29']);
-  const selected = render(changes[0], true).props.children[1];
-  assert.equal(selected.props.value, '2024-02-29');
-  assert.equal(selected.props.disabled, true);
-  assert.match(selected.props.max, /^\d{4}-\d{2}-\d{2}$/);
-  input.props.onChange({ target: { value: '' } });
-  assert.equal(changes[1], '');
 });

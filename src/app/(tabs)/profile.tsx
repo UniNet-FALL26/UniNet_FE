@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { StudentVerificationModal } from '@/components/settings/StudentVerificat
 import { useStudentVerification } from '@/hooks/useStudentVerification';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { CommunityProfilePosts } from '@/components/community/CommunityProfilePosts';
+import { ProfileProjectsPanel } from '@/components/projects/hub/ProfileProjectsPanel';
 import { colors } from '@/constants/colors';
 import { ACCOUNT_ROLE } from '@/constants/roles';
 import { useAuthStore } from '@/store/auth.store';
@@ -19,14 +20,16 @@ import { verificationReminder } from '@/utils/verification-reminder';
 import { VerificationBanner } from '@/components/profile/VerificationBanner';
 import type { PortfolioResponse } from '@/types/portfolio';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ initialTab = 'profile' }: { initialTab?: 'profile' | 'posts' | 'projects' } = {}) {
   const { account, isAuthenticated } = useAuthStore();
+  const params = useLocalSearchParams<{ tab?: string; new?: string }>();
   const student = account?.role === ACCOUNT_ROLE.STUDENT;
   const [loaded, setLoaded] = useState<{ accountId: string; data: PortfolioResponse } | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const [activeTab, setActiveTab] = useState<'profile' | 'posts'>('profile');
-  useEffect(() => { setActiveTab('profile'); }, [account?.id]);
+  const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'projects'>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [account?.id, initialTab]);
+  useEffect(() => { if (params.tab === 'projects' || params.tab === 'posts' || params.tab === 'profile') setActiveTab(params.tab); }, [params.tab, account?.id]);
   const [frameWidth, setFrameWidth] = useState(0);
   const [columnWidth, setColumnWidth] = useState(0);
   const [reminderNow, setReminderNow] = useState(Date.now);
@@ -65,7 +68,7 @@ export default function ProfileScreen() {
   const header = <View testID="student-profile-header" style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }]}>
     <View style={styles.headerRow}>
     {student ? <View role="tablist" aria-label="Nội dung hồ sơ" style={styles.profileTabs}>
-      {([{ id: 'profile', label: 'Hồ sơ', icon: { ios: 'person.crop.rectangle', android: 'badge', web: 'badge' } }, { id: 'posts', label: 'Bài viết', icon: { ios: 'doc.text', android: 'article', web: 'article' } }] as const).map(tab => <Pressable key={tab.id} role="tab" aria-label={tab.label} aria-selected={activeTab === tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.profileTab, activeTab === tab.id && styles.profileTabActive]}><SymbolView name={tab.icon} size={18} tintColor={activeTab === tab.id ? colors.primary : colors.textSecondary} accessible={false} /><Text style={[styles.profileTabText, activeTab === tab.id && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
+      {([{ id: 'profile', label: 'Hồ sơ', icon: { ios: 'person.crop.rectangle', android: 'badge', web: 'badge' } }, { id: 'posts', label: 'Bài viết', icon: { ios: 'doc.text', android: 'article', web: 'article' } }, { id: 'projects', label: 'Dự án', icon: { ios: 'folder', android: 'folder', web: 'folder' } }] as const).map(tab => <Pressable key={tab.id} role="tab" aria-label={tab.label} aria-selected={activeTab === tab.id} onPress={() => { if (tab.id === 'projects') { router.push('/profile/projects'); return; } if (initialTab === 'projects') { router.replace({ pathname: '/(tabs)/profile', params: { tab: tab.id } }); return; } setActiveTab(tab.id); router.setParams({ tab: tab.id, new: undefined }); }} style={[styles.profileTab, activeTab === tab.id && styles.profileTabActive]}><SymbolView name={tab.icon} size={18} tintColor={activeTab === tab.id ? colors.primary : colors.textSecondary} accessible={false} /><Text style={[styles.profileTabText, activeTab === tab.id && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
     </View> : <View style={styles.reminderSlot}>{reminderBanner}</View>}
     <View style={[styles.headerActions, compactHeader && styles.compactHeaderActions]}>
       {(!desktop || !student) && <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
@@ -78,7 +81,7 @@ export default function ProfileScreen() {
     <View style={[styles.body, desktop && styles.desktopBody]}>
     <View testID="profile-main-column" style={[styles.mainColumn, desktop && styles.desktopMainColumn]} onLayout={event => { if (desktop) setColumnWidth(event.nativeEvent.layout.width); }}>
     {header}
-    {error ? <View style={styles.state}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View>
+    {activeTab === 'projects' ? <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}><ProfileProjectsPanel key={account?.id} initialCreate={params.new === '1'} /></ScrollView> : error ? <View style={styles.state}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View>
       : !data ? <View style={styles.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ" color={colors.primary} /></View>
       : <ScrollView key={activeTab} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {activeTab === 'profile' ? <View role="tabpanel" aria-label="Hồ sơ" style={[styles.saved, desktop && styles.desktopSaved]}>
@@ -88,7 +91,7 @@ export default function ProfileScreen() {
         </View>}
       </ScrollView>}
     </View>
-    {desktop && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded /></View>}
+    {desktop && activeTab !== 'projects' && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded /></View>}
     </View>
     {showVerification && <StudentVerificationModal key={account.id} account={account} name={account.profile?.displayName || account.profile?.fullName || account.email.split('@')[0]} schoolName={data?.profile.universityName} value={verification.value} loading={verification.loading} error={verification.error} onRefresh={verification.refresh} onSubmitted={verification.submitted} onClose={() => setVerificationAccountId(null)} />}
   </SafeAreaView>;

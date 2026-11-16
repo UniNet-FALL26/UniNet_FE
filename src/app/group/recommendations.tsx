@@ -1,5 +1,5 @@
-import { ProjectRecommendationScreen } from "@/components/projects/ProjectRecommendationScreen";
+import { Redirect } from 'expo-router';
 
-export default function ProjectRecommendationsRoute() {
-  return <ProjectRecommendationScreen />;
+export default function RetiredProjectRecommendationsScreen() {
+  return <Redirect href={{ pathname: '/profile/projects' }} />;
 }

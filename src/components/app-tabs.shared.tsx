@@ -25,9 +25,7 @@ const tabs: TabItem[] = [
 ];
 
 const shortcuts: Shortcut[] = [
-  { label: 'Không gian\nlàm việc', href: '/(tabs)/workspace', icon: { ios: 'briefcase.fill', android: 'work', web: 'work' }, tint: '#1476DA', background: '#E8F3FF' },
   { label: 'Cơ hội', href: '/(tabs)/opportunities', icon: { ios: 'briefcase', android: 'business_center', web: 'business_center' }, tint: '#E34B66', background: '#FFF0F3' },
-  { label: 'Dự án', href: '/(tabs)/projects', icon: { ios: 'square.grid.2x2.fill', android: 'grid_view', web: 'grid_view' }, tint: '#8054D9', background: '#F2EBFF' },
 ];
 
 export function badgeLabel(count: number | undefined) {
@@ -89,9 +87,7 @@ export default function AppTabs({ children }: { children?: ReactNode } = {}) {
   const desktopShortcuts: TabItem[] = shortcuts.map(item => ({ ...item, label: item.label.replace('\n', ' '), paths: [String(item.href).replace('/(tabs)', '')], activeIcon: item.icon }));
   const desktopItems: TabItem[] = [
     tabs[0],
-    desktopShortcuts[0],
-    { label: 'Dự án', href: '/(tabs)/projects', paths: ['/projects'], icon: { ios: 'square.grid.2x2', android: 'grid_view', web: 'grid_view' }, activeIcon: { ios: 'square.grid.2x2.fill', android: 'grid_view', web: 'grid_view' } },
-    desktopShortcuts[1],
+    ...desktopShortcuts,
     tabs[1],
   ];
   return <View style={[styles.root, !desktop && { paddingTop: insets.top }]}>

@@ -1,5 +1,5 @@
-import { ProjectExplorerScreen } from "@/components/projects/ProjectExplorer";
+import { Redirect } from 'expo-router';
 
-export default function GroupsScreen() {
-  return <ProjectExplorerScreen />;
+export default function RetiredRecruitmentScreen() {
+  return <Redirect href={{ pathname: '/profile/projects' }} />;
 }

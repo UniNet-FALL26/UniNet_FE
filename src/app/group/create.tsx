@@ -1,5 +1,5 @@
-import { ProjectCreateScreen } from "@/components/projects/ProjectCreateForm";
+import { Redirect } from 'expo-router';
 
-export default function CreateProjectRoute() {
-  return <ProjectCreateScreen />;
+export default function RetiredProjectCreateScreen() {
+  return <Redirect href={{ pathname: '/profile/projects', params: { new: '1' } }} />;
 }

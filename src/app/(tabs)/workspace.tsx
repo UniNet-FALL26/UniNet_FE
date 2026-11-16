@@ -1,5 +1,5 @@
-import { ModulePage } from '@/components/ui/ModulePage';
+import { Redirect } from 'expo-router';
 
-export default function WorkspaceScreen() {
-  return <ModulePage title="Không gian làm việc" description="Theo dõi công việc và các hoạt động đang tham gia." sections={['Không gian của tôi', 'Dự án', 'Công việc']} />;
+export default function RetiredWorkspaceScreen() {
+  return <Redirect href={{ pathname: '/profile/projects' }} />;
 }
