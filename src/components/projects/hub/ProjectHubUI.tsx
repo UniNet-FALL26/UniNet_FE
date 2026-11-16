@@ -1,12 +1,14 @@
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { colors } from '@/constants/colors';
+import { FullProjectImage } from './FullProjectImage';
+const modalStack: object[] = [];
 
 export const hubColors = { ...colors, ink: '#111A36', canvas: '#F8FAFE', line: '#E2E8F3', blueWash: '#EAF1FF' };
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 const names = {
-  folder: ['folder', 'folder'], plus: ['plus', 'add'], close: ['xmark', 'close'], edit: ['pencil', 'edit'],
+  folder: ['folder', 'folder'], settings: ['gearshape', 'settings'], camera: ['camera', 'photo_camera'], plus: ['plus', 'add'], close: ['xmark', 'close'], edit: ['pencil', 'edit'],
   back: ['chevron.left', 'chevron_left'], next: ['chevron.right', 'chevron_right'], search: ['magnifyingglass', 'search'],
   person: ['person', 'person_outline'], people: ['person.2', 'groups'], calendar: ['calendar', 'calendar_today'],
   check: ['checkmark.circle', 'check_circle'], clock: ['clock', 'schedule'], document: ['doc.text', 'description'],
@@ -22,34 +24,34 @@ export function HubIcon({ name, size = 20, color = colors.primary }: { name: Hub
   const [ios, web] = names[name];
   return <SymbolView name={{ ios, android: web, web } as SymbolName} size={size} tintColor={color} accessible={false} />;
 }
-export function HubAction({ title, onPress, icon, variant = 'secondary', busy, disabled, testID }: {
-  title: string; onPress: () => void; icon?: HubIconName; variant?: 'primary' | 'secondary' | 'quiet' | 'danger'; busy?: boolean; disabled?: boolean; testID?: string;
+export function HubAction({ title, onPress, icon, variant = 'secondary', busy, disabled, testID, compact = false }: {
+  title: string; onPress: () => void; icon?: HubIconName; variant?: 'primary' | 'secondary' | 'quiet' | 'danger'; busy?: boolean; disabled?: boolean; testID?: string; compact?: boolean;
 }) {
   const primary = variant === 'primary';
   const tint = primary ? '#FFFFFF' : variant === 'danger' ? colors.error : colors.primary;
   return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress}
-    style={({ pressed }) => [ui.action, primary && ui.actionPrimary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
-    {busy ? <ActivityIndicator size="small" color={tint} /> : icon && <HubIcon name={icon} color={tint} size={18} />}
-    <Text style={[ui.actionText, { color: tint }]}>{title}</Text>
+    hitSlop={compact ? 4 : undefined} style={({ pressed }) => [ui.action, compact && { minHeight: 36, paddingHorizontal: 13, paddingVertical: 7, gap: 6, borderRadius: 8 }, primary && ui.actionPrimary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
+    {busy ? <ActivityIndicator size="small" color={tint} /> : icon && <HubIcon name={icon} color={tint} size={compact ? 16 : 18} />}
+    <Text style={[ui.actionText, compact && { fontSize: 13 }, { color: tint }]}>{title}</Text>
   </Pressable>;
 }
-export function HubTags({ values }: { values: string[] }) {
-  return <View style={ui.tags}>{values.map((value, i) => <View key={`${value}-${i}`} style={ui.tag}><Text style={ui.tagText}>{value}</Text></View>)}</View>;
+export function HubTags({ values, compact = false }: { values: string[]; compact?: boolean }) {
+  return <View style={ui.tags}>{values.map((value, i) => <View key={`${value}-${i}`} style={[ui.tag, compact && { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 }]}><Text style={[ui.tagText, compact && { fontSize: 12 }]}>{value}</Text></View>)}</View>;
 }
-export function HubStatus({ status }: { status: number }) {
+export function HubStatus({ status, compact = false }: { status: number; compact?: boolean }) {
   const label = ['Chờ duyệt', 'Đang thực hiện', 'Hoàn thành', 'Bị từ chối'][status] ?? 'Chưa xác định';
   const done = status === 1 || status === 2;
-  return <View style={[ui.status, { backgroundColor: done ? '#E6F7EC' : '#F0F3F8' }]}><HubIcon name={status === 2 ? 'check' : status === 1 ? 'play' : 'clock'} size={16} color={done ? '#198046' : colors.textSecondary} /><Text style={{ fontSize: 12, fontWeight: '600', color: done ? '#198046' : colors.textSecondary }}>{label}</Text></View>;
+  return <View style={[ui.status, compact && { paddingHorizontal: 8, paddingVertical: 4 }, { backgroundColor: done ? '#E6F7EC' : '#F0F3F8' }]}><HubIcon name={status === 2 ? 'check' : status === 1 ? 'play' : 'clock'} size={compact ? 14 : 16} color={done ? '#198046' : colors.textSecondary} /><Text style={{ fontSize: compact ? 11 : 12, fontWeight: '600', color: done ? '#198046' : colors.textSecondary }}>{label}</Text></View>;
 }
-export function ProjectCover({ url, title, height = 160, style }: { url: string | null; title: string; height?: number; style?: StyleProp<ViewStyle> }) {
+export function ProjectCover({ url, title, height = 160, style, hideTitle = false }: { url: string | null; title: string; height?: number; style?: StyleProp<ViewStyle>; hideTitle?: boolean }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
-  return <View style={[ui.cover, { height }, style]}>{url && !failed ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`Ảnh dự án ${title}`} onError={() => setFailed(true)} /> : <View style={ui.coverEmpty}><View style={ui.coverIcon}><HubIcon name="folder" size={38} /></View><Text numberOfLines={1} style={ui.coverInitial}>{title || 'Dự án của bạn'}</Text></View>}</View>;
+  return <View style={[ui.cover, { height }, style]}>{url && !failed ? <FullProjectImage source={{ uri: url }} label={title ? `Ảnh dự án ${title}` : 'Ảnh dự án'} onError={() => setFailed(true)} /> : <View style={ui.coverEmpty}><View style={ui.coverIcon}><HubIcon name="folder" size={38} /></View>{!hideTitle && <Text numberOfLines={1} style={ui.coverInitial}>{title || 'Dự án của bạn'}</Text>}</View>}</View>;
 }
-export function HubPanel({ title, icon, children, style }: { title?: string; icon?: HubIconName; children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[ui.panel, style]}>{title && <View style={ui.sectionTitle}>{icon && <HubIcon name={icon} />}<Text accessibilityRole="header" aria-level={2} style={ui.heading}>{title}</Text></View>}{children}</View>;
+export function HubPanel({ title, icon, children, style, compact = false }: { title?: string; icon?: HubIconName; children: ReactNode; style?: StyleProp<ViewStyle>; compact?: boolean }) {
+  return <View style={[ui.panel, compact && { padding: 16, gap: 10, borderRadius: 11 }, style]}>{title && <View style={[ui.sectionTitle, compact && { gap: 8 }]}>{icon && <HubIcon name={icon} size={compact ? 18 : 20} />}<Text accessibilityRole="header" aria-level={2} style={[ui.heading, compact && { fontSize: 15 }]}>{title}</Text></View>}{children}</View>;
 }
-export function HubModal({ title, subtitle, onClose, children, footer, wide = true }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder' }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName }) {
   const { width, height } = useWindowDimensions();
   const frame = useRef<View>(null);
   const close = useRef(onClose);
@@ -58,24 +60,31 @@ export function HubModal({ title, subtitle, onClose, children, footer, wide = tr
     if (Platform.OS !== 'web') return;
     const previous = document.activeElement as HTMLElement | null;
     const node = frame.current as unknown as HTMLElement | null;
+    const marker = {}; modalStack.push(marker);
+    const topmost = () => modalStack[modalStack.length - 1] === marker;
     const focusables = () => Array.from(node?.querySelectorAll<HTMLElement>('button, [role="button"], input, textarea, select, [tabindex="0"]') ?? []).filter(el => !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true' && el.offsetParent !== null);
-    const timer = requestAnimationFrame(() => focusables()[0]?.focus());
+    const timer = requestAnimationFrame(() => { if (topmost()) focusables()[0]?.focus(); });
     const handle = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); close.current(); }
+      if (!topmost()) return;
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); return; }
       if (event.key !== 'Tab') return;
       const elements = focusables(); const first = elements[0]; const last = elements[elements.length - 1];
       if (!first) { event.preventDefault(); return; }
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
-    document.addEventListener('keydown', handle);
-    return () => { cancelAnimationFrame(timer); document.removeEventListener('keydown', handle); previous?.focus(); };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (topmost() && event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); close.current(); }
+    };
+    document.addEventListener('keydown', handle, true);
+    document.addEventListener('keyup', handleKeyUp, true);
+    return () => { cancelAnimationFrame(timer); document.removeEventListener('keydown', handle, true); document.removeEventListener('keyup', handleKeyUp, true); const index = modalStack.indexOf(marker); if (index !== -1) modalStack.splice(index, 1); if (previous?.isConnected) previous.focus(); };
   }, []);
   return <Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, { padding: width < 600 ? 10 : 28 }]}>
-    <View ref={frame} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, { maxWidth: wide ? 1160 : 700, maxHeight: height - (width < 600 ? 20 : 56) }]}>
-      <View style={ui.modalHead}><View style={ui.modalEmblem}><HubIcon name="folder" size={27} /></View><View style={{ flex: 1, gap: 5 }}><Text accessibilityRole="header" aria-level={2} style={ui.modalTitle}>{title}</Text>{subtitle && <Text style={ui.muted}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={ui.iconButton}><HubIcon name="close" color={colors.textSecondary} size={24} /></Pressable></View>
-      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={[ui.modalBody, width < 600 && { padding: 18 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-      {footer && <View style={ui.modalFoot}>{footer}</View>}
+    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, compact && { borderRadius: 16 }, { maxWidth: wide ? compact ? 1000 : 1160 : 700, maxHeight: height - (width < 600 ? 20 : 56) }]}>
+      <View style={[ui.modalHead, compact && { padding: 18, gap: 12 }]}><View style={[ui.modalEmblem, compact && { width: 44, height: 44, borderRadius: 11 }]}><HubIcon name={icon} size={compact ? 22 : 27} /></View><View style={{ flex: 1, gap: 5 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, compact && { fontSize: 20 }]}>{title}</Text>{subtitle && <Text style={[ui.muted, compact && { fontSize: 12, lineHeight: 18 }]}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={ui.iconButton}><HubIcon name="close" color={colors.textSecondary} size={compact ? 20 : 24} /></Pressable></View>
+      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={[ui.modalBody, compact && { padding: 20 }, width < 600 && { padding: compact ? 16 : 18 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      {footer && <View style={[ui.modalFoot, compact && { paddingHorizontal: 20, paddingVertical: 12, gap: 8 }]}>{footer}</View>}
     </View>
   </View></Modal>;
 }

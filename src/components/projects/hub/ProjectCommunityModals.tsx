@@ -113,12 +113,6 @@ export function ProjectRequestsModal({ project, onClose, onChanged }: { project:
     </View>)}</View>}
   </HubModal>;
 }
-export function PersonalReviewModal({ project, onSaved, onClose }: SavedProps) {
-  const [challenges, setChallenges] = useState(project.myReview?.challenges ?? ''), [lessonsLearned, setLessons] = useState(project.myReview?.lessonsLearned ?? '');
-  const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  async function save() { setBusy(true); setError(''); try { onSaved(await projectHubService.saveReview(project.id, { challenges, lessonsLearned })); onClose(); } catch (cause) { setError(messageOf(cause)); } finally { setBusy(false); } }
-  return <HubModal wide={false} title="Tổng kết cá nhân" subtitle="Ghi lại những điều bạn đã trải qua và học được từ dự án." onClose={busy ? () => undefined : onClose} footer={<><HubAction title="Hủy" disabled={busy} onPress={onClose} /><HubAction title="Lưu tổng kết" variant="primary" busy={busy} onPress={() => void save()} /></>}><Field label="Khó khăn đã gặp" value={challenges} onChange={setChallenges} multiline maxLength={10000} /><Field label="Bài học kinh nghiệm" value={lessonsLearned} onChange={setLessons} multiline maxLength={10000} />{!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}</HubModal>;
-}
 export function MemberRoleModal({ project, member, onSaved, onClose }: SavedProps & { member: HubMember }) {
   const [role, setRole] = useState(member.role), [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmKick, setConfirmKick] = useState(false);
   async function save(kick = false) { if (!kick && !role.trim()) { setError('Nhập vai trò của thành viên.'); return; } setBusy(true); setError(''); try { onSaved(await projectHubService.updateMember(project.id, member.userId, kick ? { status: 1 } : { role: role.trim() })); onClose(); } catch (cause) { setError(messageOf(cause)); } finally { setBusy(false); } }

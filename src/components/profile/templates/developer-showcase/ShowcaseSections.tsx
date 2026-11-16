@@ -1,11 +1,11 @@
 import { Image } from 'expo-image';
-import { PortfolioProjectDetails, PortfolioProjectTitle } from '@/components/profile/PortfolioProjectDetails';
+import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
 import { EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
 import { profileMedia, isSampleLink } from '@/components/profile/profile-media';
 import { ProfileSkillIcon } from '@/components/profile/ProfileSkillIcon';
-import { Chip, PortfolioIcon, PortfolioLink, ui } from '../developer-modern/PortfolioPrimitives';
+import { PortfolioIcon, PortfolioLink, ui } from '../developer-modern/PortfolioPrimitives';
 
 export type ShowcaseSectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean };
 const cardWidth = (width: number, columns: number) => Math.floor((width - (columns - 1) * 12) / columns);
@@ -16,18 +16,9 @@ export function ShowcaseHeading({ eyebrow, title, theme }: { eyebrow: string; ti
 export function ShowcaseProjects({ projects, theme, width, thumbnail }: Omit<ShowcaseSectionProps, 'portfolio'> & { projects: PortfolioProject[] }) {
   const editing = useProfileEditing();
   if (!projects.length && !editing) return null;
-  const columns = width >= 900 ? 4 : width >= 600 ? 2 : 1;
+  const columns = width >= 810 ? 3 : width >= 540 ? 2 : 1;
   return <View style={s.section}><ShowcaseHeading eyebrow="DỰ ÁN" title="Dự án của tôi" theme={theme} />
-    <View style={s.grid}>{projects.map((project, index) => <View testID="showcase-project-card" key={`${project.title}-${index}`} style={[s.card, { width: cardWidth(width, columns), backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <View style={[s.projectCover, { backgroundColor: theme.accentSoft }]}>{profileMedia(project.coverUrl) ? <Image source={profileMedia(project.coverUrl)} contentFit="cover" priority="low" loading={thumbnail ? 'eager' : 'lazy'} style={StyleSheet.absoluteFill} accessibilityLabel={`Ảnh dự án ${project.title}`} /> : <View style={s.coverFallback}><PortfolioIcon name="project" size={40} color={theme.accentStrong} /></View>}
-        <EditPhoto color={theme.accentStrong} right={8} bottom={8} size={28} entry={{ section: 'projects', item: project, label: `dự án ${project.title}` }} />
-      </View>
-      <View style={s.projectBody}><PortfolioProjectTitle project={project} role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]} />{!!project.description && <Text numberOfLines={3} style={[s.body, { color: theme.muted }]}>{project.description}</Text>}
-        <PortfolioProjectDetails project={project} color={theme.muted} />
-        <View style={ui.chips}>{project.technologies.map(technology => <Chip key={technology} theme={theme}>{technology}</Chip>)}</View>
-        <View style={s.links}>{!isSampleLink(project.url) && <PortfolioLink label="Xem chi tiết →" url={project.url} theme={theme} thumbnail={thumbnail} subtle />}{!isSampleLink(project.githubUrl) && <PortfolioLink label="GitHub" url={project.githubUrl} theme={theme} thumbnail={thumbnail} subtle />}</View>
-      </View>
-    </View>)}</View>
+    <View style={s.grid}>{projects.map((project, index) => <PortfolioProjectCard key={`${project.title}-${index}`} project={project} width={cardWidth(width, columns)} theme={theme} thumbnail={thumbnail} testID="showcase-project-card" />)}</View>
   </View>;
 }
 export function ShowcaseSkills({ portfolio, theme, width, thumbnail, demo = false }: ShowcaseSectionProps) {

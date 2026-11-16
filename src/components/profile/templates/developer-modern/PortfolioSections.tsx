@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { PortfolioProjectDetails, PortfolioProjectTitle } from '@/components/profile/PortfolioProjectDetails';
+import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
 import { profileMedia } from '@/components/profile/profile-media';
@@ -12,16 +12,8 @@ export type SectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; c
 export function ProjectSection({ projects, title, theme, compact, thumbnail }: Omit<SectionProps, 'portfolio'> & { projects: PortfolioProject[]; title: string }) {
   const editing = useProfileEditing();
   if (!projects.length && !editing) return null;
-  const columns = compact ? 1 : title === 'Dự án nổi bật' ? 3 : 4;
-  return <View style={ui.section}><SectionTitle title={title} name="project" theme={theme} /><View style={ui.row}>{projects.map((project, index) => <View key={`${project.title}-${index}`} style={[ui.card, { width: compact ? '100%' : `${(100 - (columns - 1) * 2) / columns}%`, borderColor: theme.border, backgroundColor: theme.surface }]}>
-    <View style={s.cover}><Image source={profileMedia(project.coverUrl)} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Ảnh dự án ${project.title}`} /><EditPhoto color={theme.accentStrong} right={8} bottom={8} size={28} entry={{ section: 'projects', item: project, label: `dự án ${project.title}` }} /></View>
-    <View style={s.projectBody}><PortfolioProjectTitle project={project} style={[s.cardTitle, { color: theme.text }]} /><Text style={[ui.body, { color: theme.muted, marginTop: 6 }]}>{project.description}</Text>
-      <PortfolioProjectDetails project={project} color={theme.muted} />
-      {!!project.technologies.length && <View style={[ui.chips, { marginTop: 10 }]}>{project.technologies.map((technology, technologyIndex) => <Chip key={`${technology}-${technologyIndex}`} theme={theme}>{technology}</Chip>)}</View>}
-      {!!project.url && <PortfolioLink label="Xem chi tiết" url={project.url} theme={theme} thumbnail={thumbnail} subtle />}
-      {!!project.githubUrl && <PortfolioLink label="Mã nguồn" url={project.githubUrl} theme={theme} thumbnail={thumbnail} subtle />}
-    </View>
-  </View>)}</View></View>;
+  const columns = compact ? 1 : 3;
+  return <View style={ui.section}><SectionTitle title={title} name="project" theme={theme} /><View style={ui.row}>{projects.map((project, index) => <PortfolioProjectCard key={`${project.title}-${index}`} project={project} width={compact ? '100%' : `${(100 - (columns - 1) * 2) / columns}%`} theme={theme} thumbnail={thumbnail} />)}</View></View>;
 }
 export function Statistics({ portfolio, theme, compact }: SectionProps) {
   const editing = useProfileEditing();

@@ -91,7 +91,7 @@ export default function ProfileScreen({ initialTab = 'profile' }: { initialTab?:
         </View>}
       </ScrollView>}
     </View>
-    {desktop && activeTab !== 'projects' && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded /></View>}
+    {desktop && <View testID="profile-settings-column" style={styles.settingsColumn}><SettingsPanel embedded /></View>}
     </View>
     {showVerification && <StudentVerificationModal key={account.id} account={account} name={account.profile?.displayName || account.profile?.fullName || account.email.split('@')[0]} schoolName={data?.profile.universityName} value={verification.value} loading={verification.loading} error={verification.error} onRefresh={verification.refresh} onSubmitted={verification.submitted} onClose={() => setVerificationAccountId(null)} />}
   </SafeAreaView>;

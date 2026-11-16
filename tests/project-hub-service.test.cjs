@@ -22,6 +22,18 @@ test('project-hub endpoint prefix supports API base URLs with and without /api',
     assert.equal(calls[0].path, `${base.endsWith('/api') ? '' : '/api'}/project-hub/a%2Fb`);
   }
 });
+test('changing the project image patches only its URL', async () => {
+  const { api, calls } = service();
+  await api.update('project-1', { logoUrl: 'https://res.cloudinary.com/test/image/upload/project.png' });
+  assert.equal(calls[0].options.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { logoUrl: 'https://res.cloudinary.com/test/image/upload/project.png' });
+});
+test('summary edits patch only title and short description', async () => {
+  const { api, calls } = service();
+  await api.update('project-1', { title: 'New name', description: 'Short introduction' });
+  assert.equal(calls[0].options.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { title: 'New name', description: 'Short introduction' });
+});
 test('creation sends the chosen origin and technology names without legacy recruitment fields', async () => {
   const { api, calls } = service();
   await api.create({ title: 'Dự án cá nhân', description: 'Mô tả', origin: 1, technologies: ['Unity', 'C#'], status: 1 });
