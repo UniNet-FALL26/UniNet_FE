@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -11,6 +11,7 @@ import { useStudentVerification } from '@/hooks/useStudentVerification';
 import { ProfileTemplateRenderer } from '@/components/profile/ProfileTemplateRenderer';
 import { CommunityProfilePosts } from '@/components/community/CommunityProfilePosts';
 import { ProfileProjectsPanel } from '@/components/projects/hub/ProfileProjectsPanel';
+import { FriendsPanel } from '@/components/friends/FriendsPanel';
 import { colors } from '@/constants/colors';
 import { ACCOUNT_ROLE } from '@/constants/roles';
 import { useAuthStore } from '@/store/auth.store';
@@ -20,16 +21,18 @@ import { verificationReminder } from '@/utils/verification-reminder';
 import { VerificationBanner } from '@/components/profile/VerificationBanner';
 import type { PortfolioResponse } from '@/types/portfolio';
 
-export default function ProfileScreen({ initialTab = 'profile' }: { initialTab?: 'profile' | 'posts' | 'projects' } = {}) {
+export default function ProfileScreen({ initialTab = 'profile' }: { initialTab?: 'profile' | 'posts' | 'projects' | 'friends' } = {}) {
   const { account, isAuthenticated } = useAuthStore();
   const params = useLocalSearchParams<{ tab?: string; new?: string }>();
   const student = account?.role === ACCOUNT_ROLE.STUDENT;
   const [loaded, setLoaded] = useState<{ accountId: string; data: PortfolioResponse } | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'projects'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'projects' | 'friends'>(initialTab);
+  const profileTabsRef = useRef<ScrollView>(null);
+  useEffect(() => { if (activeTab === 'friends') profileTabsRef.current?.scrollToEnd({ animated: false }); }, [activeTab]);
   useEffect(() => { setActiveTab(initialTab); }, [account?.id, initialTab]);
-  useEffect(() => { if (params.tab === 'projects' || params.tab === 'posts' || params.tab === 'profile') setActiveTab(params.tab); }, [params.tab, account?.id]);
+  useEffect(() => { if (params.tab === 'friends' || params.tab === 'projects' || params.tab === 'posts' || params.tab === 'profile') setActiveTab(params.tab); }, [params.tab, account?.id]);
   const [frameWidth, setFrameWidth] = useState(0);
   const [columnWidth, setColumnWidth] = useState(0);
   const [reminderNow, setReminderNow] = useState(Date.now);
@@ -67,9 +70,9 @@ export default function ProfileScreen({ initialTab = 'profile' }: { initialTab?:
   const editAction = <Pressable testID="student-profile-edit-action" accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={() => router.push({ pathname: '/profile/editor', params: { template: template.id, theme: theme.id } })} style={({ pressed }) => [styles.profileEdit, pressed && styles.pressed]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={21} tintColor={colors.primary} /></Pressable>;
   const header = <View testID="student-profile-header" style={[styles.header, desktop && student && styles.desktopHeader, !student && { maxWidth: 600 }]}>
     <View style={styles.headerRow}>
-    {student ? <View role="tablist" aria-label="Nội dung hồ sơ" style={styles.profileTabs}>
-      {([{ id: 'profile', label: 'Hồ sơ', icon: { ios: 'person.crop.rectangle', android: 'badge', web: 'badge' } }, { id: 'posts', label: 'Bài viết', icon: { ios: 'doc.text', android: 'article', web: 'article' } }, { id: 'projects', label: 'Dự án', icon: { ios: 'folder', android: 'folder', web: 'folder' } }] as const).map(tab => <Pressable key={tab.id} role="tab" aria-label={tab.label} aria-selected={activeTab === tab.id} onPress={() => { if (tab.id === 'projects') { router.push('/profile/projects'); return; } if (initialTab === 'projects') { router.replace({ pathname: '/(tabs)/profile', params: { tab: tab.id } }); return; } setActiveTab(tab.id); router.setParams({ tab: tab.id, new: undefined }); }} style={[styles.profileTab, activeTab === tab.id && styles.profileTabActive]}><SymbolView name={tab.icon} size={18} tintColor={activeTab === tab.id ? colors.primary : colors.textSecondary} accessible={false} /><Text style={[styles.profileTabText, activeTab === tab.id && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
-    </View> : <View style={styles.reminderSlot}>{reminderBanner}</View>}
+    {student ? <ScrollView ref={profileTabsRef} horizontal showsHorizontalScrollIndicator={false} role="tablist" aria-label="Nội dung hồ sơ" style={styles.profileTabs} contentContainerStyle={{ alignItems: 'center', gap: 4 }} onContentSizeChange={() => { if (activeTab === 'friends') profileTabsRef.current?.scrollToEnd({ animated: false }); }}>
+      {([{ id: 'profile', label: 'Hồ sơ', icon: { ios: 'person.crop.rectangle', android: 'badge', web: 'badge' } }, { id: 'posts', label: 'Bài viết', icon: { ios: 'doc.text', android: 'article', web: 'article' } }, { id: 'projects', label: 'Dự án', icon: { ios: 'folder', android: 'folder', web: 'folder' } }, { id: 'friends', label: 'Bạn bè', icon: { ios: 'person.2', android: 'groups', web: 'groups' } }] as const).map(tab => <Pressable key={tab.id} role="tab" aria-label={tab.label} aria-selected={activeTab === tab.id} onPress={() => { if (tab.id === 'friends') { router.push('/profile/friends'); return; } if (tab.id === 'projects') { router.push('/profile/projects'); return; } if (initialTab === 'projects' || initialTab === 'friends') { router.replace({ pathname: '/(tabs)/profile', params: { tab: tab.id } }); return; } setActiveTab(tab.id); router.setParams({ tab: tab.id, new: undefined }); }} style={[styles.profileTab, activeTab === tab.id && styles.profileTabActive]}><SymbolView name={tab.icon} size={18} tintColor={activeTab === tab.id ? colors.primary : colors.textSecondary} accessible={false} /><Text style={[styles.profileTabText, activeTab === tab.id && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
+    </ScrollView> : <View style={styles.reminderSlot}>{reminderBanner}</View>}
     <View style={[styles.headerActions, compactHeader && styles.compactHeaderActions]}>
       {(!desktop || !student) && <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.settings, compactHeader && styles.compactSettings, pressed && styles.pressed]}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={colors.textPrimary} /></Pressable>}
     </View>
@@ -81,7 +84,7 @@ export default function ProfileScreen({ initialTab = 'profile' }: { initialTab?:
     <View style={[styles.body, desktop && styles.desktopBody]}>
     <View testID="profile-main-column" style={[styles.mainColumn, desktop && styles.desktopMainColumn]} onLayout={event => { if (desktop) setColumnWidth(event.nativeEvent.layout.width); }}>
     {header}
-    {activeTab === 'projects' ? <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}><ProfileProjectsPanel key={account?.id} initialCreate={params.new === '1'} /></ScrollView> : error ? <View style={styles.state}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View>
+    {activeTab === 'friends' ? <FriendsPanel key={account?.id} /> : activeTab === 'projects' ? <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}><ProfileProjectsPanel key={account?.id} initialCreate={params.new === '1'} /></ScrollView> : error ? <View style={styles.state}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View>
       : !data ? <View style={styles.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ" color={colors.primary} /></View>
       : <ScrollView key={activeTab} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {activeTab === 'profile' ? <View role="tabpanel" aria-label="Hồ sơ" style={[styles.saved, desktop && styles.desktopSaved]}>
@@ -103,7 +106,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.background }, scrollContent: { paddingBottom: 24 },
   header: { flexShrink: 0, zIndex: 1, backgroundColor: colors.background, gap: 8, width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  profileTabs: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  profileTabs: { flex: 1, minWidth: 0 },
   profileTab: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   profileTabActive: { borderBottomColor: colors.primary },
   profileTabText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },

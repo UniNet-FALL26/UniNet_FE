@@ -10,6 +10,7 @@ import { portfolioService } from '@/services/portfolio.service';
 import { colors } from '@/constants/colors';
 import type { PortfolioResponse } from '@/types/portfolio';
 import { useAuthStore } from '@/store/auth.store';
+import { FriendProfileActions } from '@/components/friends/FriendProfileActions';
 
 export default function StudentProfileViewer() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +33,7 @@ export default function StudentProfileViewer() {
   return <SafeAreaView style={s.safe}>
     <DetailNavigation title="Hồ sơ sinh viên" onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/community')} />
     {error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ sinh viên" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content}>
+      <FriendProfileActions profileId={data.profile.id} />
       <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={template.id} data={data} theme={theme} width={Math.min(frameWidth || width, 1120)} /></View>
     </ScrollView>}
   </SafeAreaView>;
