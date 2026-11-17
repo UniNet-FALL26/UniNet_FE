@@ -16,6 +16,7 @@ export const projectHubService = {
   complete: (projectId: string) => apiRequest<HubProject>(`${root()}/${id(projectId)}/complete`, json('POST')),
   saveRecruitment: (projectId: string, value: Pick<HubRecruitment, 'description' | 'positions' | 'deadline' | 'status'>) => apiRequest<HubProject>(`${root()}/${id(projectId)}/recruitment`, json('PUT', value)),
   requests: (projectId: string, signal?: AbortSignal) => apiRequest<{ items: HubRequest[] }>(`${root()}/${id(projectId)}/requests`, { signal, feedback: false }),
+  mineRequests: (projectId: string, signal?: AbortSignal) => apiRequest<{ items: HubRequest[] }>(`${root()}/requests/mine?${new URLSearchParams({ projectId })}`, { signal, feedback: false }),
   sendRequest: (projectId: string, value: { requestType: 0 | 1; invitedUserId?: string; positionId?: string; role?: string; message?: string }) => apiRequest<HubRequest>(`${root()}/${id(projectId)}/requests`, json('POST', value)),
   decide: (requestId: string, decision: 'accept' | 'reject' | 'cancel') => apiRequest<HubRequest>(`${root()}/requests/${id(requestId)}/decision`, json('POST', { decision })),
   updateMember: (projectId: string, userId: string, value: { role?: string; positionId?: string; status?: number }) => apiRequest<HubProject>(`${root()}/${id(projectId)}/members/${id(userId)}`, json('PATCH', value)),

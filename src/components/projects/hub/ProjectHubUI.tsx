@@ -1,9 +1,10 @@
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { colors } from '@/constants/colors';
 import { FullProjectImage } from './FullProjectImage';
 const modalStack: object[] = [];
+const ModalAppearance = createContext(false);
 
 export const hubColors = { ...colors, ink: '#111A36', canvas: '#F8FAFE', line: '#E2E8F3', blueWash: '#EAF1FF' };
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
@@ -18,21 +19,24 @@ const names = {
   flag: ['flag', 'flag'], info: ['info.circle', 'info'], trash: ['trash', 'delete_outline'],
   share: ['square.and.arrow.up', 'share'], more: ['ellipsis', 'more_horiz'], play: ['play.circle', 'play_circle_outline'],
   invite: ['person.badge.plus', 'person_add'], chevron: ['chevron.down', 'expand_more'], warning: ['exclamationmark.triangle', 'warning_amber'],
+  tag: ['tag', 'sell'], save: ['square.and.arrow.down', 'save'],
+  globe: ['globe', 'language'], code: ['chevron.left.forwardslash.chevron.right', 'code'],
 } as const;
 export type HubIconName = keyof typeof names;
 export function HubIcon({ name, size = 20, color = colors.primary }: { name: HubIconName; size?: number; color?: string }) {
   const [ios, web] = names[name];
   return <SymbolView name={{ ios, android: web, web } as SymbolName} size={size} tintColor={color} accessible={false} />;
 }
-export function HubAction({ title, onPress, icon, variant = 'secondary', busy, disabled, testID, compact = false }: {
-  title: string; onPress: () => void; icon?: HubIconName; variant?: 'primary' | 'secondary' | 'quiet' | 'danger'; busy?: boolean; disabled?: boolean; testID?: string; compact?: boolean;
+export function HubAction({ title, onPress, icon, variant = 'secondary', busy, disabled, testID, compact = false, style }: {
+  title: string; onPress: () => void; icon?: HubIconName; variant?: 'primary' | 'secondary' | 'quiet' | 'danger'; busy?: boolean; disabled?: boolean; testID?: string; compact?: boolean; style?: StyleProp<ViewStyle>;
 }) {
+  const inModal = useContext(ModalAppearance);
   const primary = variant === 'primary';
   const tint = primary ? '#FFFFFF' : variant === 'danger' ? colors.error : colors.primary;
   return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress}
-    hitSlop={compact ? 4 : undefined} style={({ pressed }) => [ui.action, compact && { minHeight: 36, paddingHorizontal: 13, paddingVertical: 7, gap: 6, borderRadius: 8 }, primary && ui.actionPrimary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
+    hitSlop={compact ? 4 : undefined} style={({ pressed }) => [ui.action, compact && { minHeight: 36, paddingHorizontal: 13, paddingVertical: 7, gap: 6, borderRadius: 8 }, inModal && modalStyles.action, primary && ui.actionPrimary, inModal && primary && modalStyles.primary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, style, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
     {busy ? <ActivityIndicator size="small" color={tint} /> : icon && <HubIcon name={icon} color={tint} size={compact ? 16 : 18} />}
-    <Text style={[ui.actionText, compact && { fontSize: 13 }, { color: tint }]}>{title}</Text>
+    <Text style={[ui.actionText, compact && { fontSize: 13 }, { color: inModal && variant === 'secondary' ? hubColors.ink : tint }]}>{title}</Text>
   </Pressable>;
 }
 export function HubTags({ values, compact = false }: { values: string[]; compact?: boolean }) {
@@ -48,8 +52,8 @@ export function ProjectCover({ url, title, height = 160, style, hideTitle = fals
   useEffect(() => setFailed(false), [url]);
   return <View style={[ui.cover, { height }, style]}>{url && !failed ? <FullProjectImage source={{ uri: url }} label={title ? `Ảnh dự án ${title}` : 'Ảnh dự án'} onError={() => setFailed(true)} /> : <View style={ui.coverEmpty}><View style={ui.coverIcon}><HubIcon name="folder" size={38} /></View>{!hideTitle && <Text numberOfLines={1} style={ui.coverInitial}>{title || 'Dự án của bạn'}</Text>}</View>}</View>;
 }
-export function HubPanel({ title, icon, children, style, compact = false }: { title?: string; icon?: HubIconName; children: ReactNode; style?: StyleProp<ViewStyle>; compact?: boolean }) {
-  return <View style={[ui.panel, compact && { padding: 16, gap: 10, borderRadius: 11 }, style]}>{title && <View style={[ui.sectionTitle, compact && { gap: 8 }]}>{icon && <HubIcon name={icon} size={compact ? 18 : 20} />}<Text accessibilityRole="header" aria-level={2} style={[ui.heading, compact && { fontSize: 15 }]}>{title}</Text></View>}{children}</View>;
+export function HubPanel({ title, icon, children, style, compact = false, action }: { title?: string; icon?: HubIconName; children: ReactNode; style?: StyleProp<ViewStyle>; compact?: boolean; action?: ReactNode }) {
+  return <View style={[ui.panel, compact && { padding: 16, gap: 10, borderRadius: 11 }, style]}>{title && <View style={[ui.sectionTitle, compact && { gap: 8 }, !!action && { alignItems: 'center' }]}>{icon && <HubIcon name={icon} size={compact ? 18 : 20} />}<Text accessibilityRole="header" aria-level={2} style={[ui.heading, compact && { fontSize: 15 }, !!action && { flex: 1, minWidth: 0 }]}>{title}</Text>{action}</View>}{children}</View>;
 }
 export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder' }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName }) {
   const { width, height } = useWindowDimensions();
@@ -80,14 +84,30 @@ export function HubModal({ title, subtitle, onClose, children, footer, wide = tr
     document.addEventListener('keyup', handleKeyUp, true);
     return () => { cancelAnimationFrame(timer); document.removeEventListener('keydown', handle, true); document.removeEventListener('keyup', handleKeyUp, true); const index = modalStack.indexOf(marker); if (index !== -1) modalStack.splice(index, 1); if (previous?.isConnected) previous.focus(); };
   }, []);
-  return <Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, { padding: width < 600 ? 10 : 28 }]}>
-    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, compact && { borderRadius: 16 }, { maxWidth: wide ? compact ? 1000 : 1160 : 700, maxHeight: height - (width < 600 ? 20 : 56) }]}>
-      <View style={[ui.modalHead, compact && { padding: 18, gap: 12 }]}><View style={[ui.modalEmblem, compact && { width: 44, height: 44, borderRadius: 11 }]}><HubIcon name={icon} size={compact ? 22 : 27} /></View><View style={{ flex: 1, gap: 5 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, compact && { fontSize: 20 }]}>{title}</Text>{subtitle && <Text style={[ui.muted, compact && { fontSize: 12, lineHeight: 18 }]}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={ui.iconButton}><HubIcon name="close" color={colors.textSecondary} size={compact ? 20 : 24} /></Pressable></View>
-      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={[ui.modalBody, compact && { padding: 20 }, width < 600 && { padding: compact ? 16 : 18 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-      {footer && <View style={[ui.modalFoot, compact && { paddingHorizontal: 20, paddingVertical: 12, gap: 8 }]}>{footer}</View>}
+  return <ModalAppearance.Provider value={true}><Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, { padding: width < 600 ? 10 : 28 }]}>
+    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, modalStyles.frame, { maxWidth: wide ? compact ? 1000 : 1160 : 700, maxHeight: height - (width < 600 ? 20 : 56) }]}>
+      <View style={[ui.modalHead, modalStyles.head, width < 600 && { padding: 16, gap: 12 }]}>
+        <View pointerEvents="none" aria-hidden style={modalStyles.wave} /><View pointerEvents="none" aria-hidden style={modalStyles.waveFront} />
+        <View style={modalStyles.emblem}><HubIcon name={icon} size={23} color="#FFFFFF" /></View><View style={{ flex: 1, minWidth: 0, gap: 6 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, modalStyles.title, compact && { fontSize: 21 }, width < 600 && { fontSize: 18 }]}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={[ui.iconButton, modalStyles.close]}><HubIcon name="close" color={colors.textSecondary} size={18} /></Pressable>
+      </View>
+      <ScrollView style={{ flexShrink: 1, backgroundColor: '#FCFDFF' }} contentContainerStyle={[ui.modalBody, { padding: 24 }, width < 600 && { padding: 16 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      {footer && <View style={[ui.modalFoot, modalStyles.foot, width < 600 && { paddingHorizontal: 16 }]}>{footer}</View>}
     </View>
-  </View></Modal>;
+  </View></Modal></ModalAppearance.Provider>;
 }
+const modalStyles = StyleSheet.create({
+  frame: { borderRadius: 22, borderColor: '#E4E9F7', backgroundColor: '#FCFDFF', boxShadow: '0 24px 80px rgba(23, 42, 88, 0.22)' },
+  head: { paddingVertical: 18, paddingHorizontal: 24, gap: 16, backgroundColor: '#F5F8FF', experimental_backgroundImage: 'linear-gradient(115deg, #FFFFFF, #F0F5FF)', borderColor: '#E5ECFC', overflow: 'hidden' },
+  wave: { position: 'absolute', width: 250, height: 100, borderRadius: 125, bottom: -75, right: -20, backgroundColor: '#E3ECFF', transform: [{ rotate: '-20deg' }] },
+  waveFront: { position: 'absolute', width: 180, height: 90, borderRadius: 90, bottom: -73, right: -50, backgroundColor: '#D2E1FF', transform: [{ rotate: '-24deg' }] },
+  emblem: { width: 44, height: 44, borderRadius: 13, flexShrink: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2471FF', experimental_backgroundImage: 'linear-gradient(145deg, #4990FF, #1050F6)', boxShadow: '0 6px 14px rgba(30, 92, 235, 0.24)' },
+  title: { fontSize: 23, lineHeight: 28, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { color: '#52617E', fontSize: 12, lineHeight: 18 },
+  close: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EAF0FC', alignSelf: 'flex-start' },
+  foot: { paddingHorizontal: 24, paddingVertical: 14, gap: 12, borderColor: '#E6ECF8', backgroundColor: '#F7F9FE', experimental_backgroundImage: 'linear-gradient(100deg, #FBFCFF, #F2F6FF)' },
+  action: { borderRadius: 10, borderColor: '#CFD9EF', minHeight: 38 },
+  primary: { backgroundColor: '#1252FF', borderColor: '#286BFF', experimental_backgroundImage: 'linear-gradient(180deg, #287BFF, #043DFF)', boxShadow: '0 3px 7px rgba(26, 83, 235, 0.16)' },
+});
 export const ui = StyleSheet.create({
   action: { minHeight: 44, paddingHorizontal: 17, paddingVertical: 10, borderRadius: 9, borderWidth: 1, borderColor: '#CCD9ED', flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary }, actionQuiet: { borderColor: 'transparent', backgroundColor: 'transparent' }, actionText: { fontSize: 14, fontWeight: '600' },

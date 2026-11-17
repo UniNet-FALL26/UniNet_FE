@@ -20,7 +20,7 @@ export function PersonalReviewModal({ project, onSaved, onClose }: { project: Hu
     finally { locked.current = false; setBusy(false); }
   }
   return <HubModal compact wide={false} icon="book" title="Tổng kết cá nhân" subtitle="Ghi lại khó khăn và bài học của riêng bạn trong dự án." onClose={close}
-    footer={<><HubAction compact title="Hủy" disabled={busy} onPress={close} /><HubAction compact title="Lưu tổng kết" variant="primary" busy={busy} onPress={() => void save()} testID="project-review-save" /></>}>
+    footer={<><HubAction compact title="Hủy" disabled={busy} onPress={close} /><HubAction compact title="Lưu tổng kết" icon="save" variant="primary" busy={busy} onPress={() => void save()} testID="project-review-save" /></>}>
     <View style={styles.field}>
       <View style={styles.heading}><View style={[styles.emblem, { backgroundColor: '#FFF3DB' }]}><HubIcon name="warning" color={c.warning} size={17} /></View><Text style={styles.label}>Khó khăn đã gặp</Text><Text style={styles.counter}>{challenges.length}/10000</Text></View>
       <Text style={styles.hint}>Những trở ngại bạn gặp và cách bạn đã xử lý hoặc thích nghi.</Text>

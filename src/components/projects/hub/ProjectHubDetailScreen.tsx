@@ -1,9 +1,10 @@
-import { formatProjectUpdatedAt } from '@/utils/project-updated-at';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { projectHubService } from '@/services/project-hub.service';
+import { formatProjectUpdatedAt } from '@/utils/project-updated-at';
+import { projectDisplayMembers } from '@/utils/project-members';
 import { useAuthStore } from '@/store/auth.store';
 import type { HubFile, HubMember, HubProject } from '@/types/project-hub';
 import { HubAction, HubIcon, HubModal, HubPanel, HubStatus, ProjectCover, hubColors as c, ui, type HubIconName } from './ProjectHubUI';
@@ -11,8 +12,12 @@ import { BulletList, messageOf, openProjectUrl } from './ProjectHubFields';
 import { ProjectOverviewModal } from './ProjectOverviewModal';
 import { ProjectOverviewHelp } from './ProjectOverviewHelp';
 import { overviewGuides, type OverviewGuideId } from '@/utils/project-overview-content';
+import { ProjectReceivedInvitation } from './ProjectReceivedInvitation';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
 import { ProjectSummaryModal } from './ProjectSummaryModal';
+import { ProjectLinksModal } from './ProjectLinksModal';
+import { ProjectLinkIcon } from './ProjectLinkIcon';
+import { ProjectVerificationCard } from './ProjectVerificationCard';
 import { pickProjectAsset, releaseProjectImage, selectProjectImage, type ProjectImageAsset } from '@/utils/project-hub-files';
 import { PersonalReviewModal } from './PersonalReviewModal';
 import { ProjectPencilButton } from './ProjectPencilButton';
@@ -21,7 +26,7 @@ import { ProjectImagePreviewModal } from './ProjectImagePreviewModal';
 import { ApplyProjectModal, InviteMemberModal, MemberRoleModal, PersonAvatar, ProjectRequestsModal, RecruitmentModal } from './ProjectCommunityModals';
 
 type Tab = 'overview' | 'members' | 'documents' | 'media' | 'settings';
-type ModalKind = 'summary' | 'overview' | 'community' | 'invite' | 'requests' | 'review' | 'apply' | 'complete' | 'delete' | 'leave' | null;
+type ModalKind = 'links' | 'summary' | 'overview' | 'community' | 'invite' | 'requests' | 'review' | 'apply' | 'complete' | 'delete' | 'leave' | null;
 const date = (value: string | null) => value ? new Date(value.slice(0, 10) + 'T12:00:00').toLocaleDateString('vi-VN') : 'Chưa cập nhật';
 const overviewTabs: { id: Tab; label: string; icon: HubIconName }[] = [
   { id: 'overview', label: 'Tổng quan', icon: 'folder' }, { id: 'members', label: 'Thành viên', icon: 'people' },
@@ -48,7 +53,7 @@ export function ProjectHubDetailScreen() {
   }, [projectId, account?.id, attempt]));
   const closeModal = useCallback(() => { setModal(null); setMutationError(''); }, []);
   const closeMember = useCallback(() => setMember(null), []);
-  const saved = useCallback((value: HubProject) => { setProject(value); setNotice('Đã lưu thay đổi.'); }, []);
+  const saved = useCallback((value: HubProject) => { setProject(value); setNotice(''); }, []);
   const refresh = useCallback(() => { if (projectId) void projectHubService.get(projectId).then(setProject).catch(cause => setError(messageOf(cause))); }, [projectId]);
   function show(value: ModalKind) { setMutationError(''); setModal(value); }
   async function chooseCover() {
@@ -81,15 +86,18 @@ export function ProjectHubDetailScreen() {
   }
   if (loading) return <View style={styles.state}><ActivityIndicator color={c.primary} accessibilityLabel="Đang tải dự án" /><Text style={styles.muted}>Đang tải thông tin dự án…</Text></View>;
   if (error || !project) return <View style={styles.state}><HubIcon name="folder" size={38} /><Text accessibilityRole="alert" style={ui.error}>{error || 'Dự án không còn khả dụng.'}</Text><HubAction compact title="Thử lại" onPress={() => setAttempt(value => value + 1)} /><HubAction compact title="Về dự án của tôi" variant="quiet" onPress={() => router.replace('/profile/projects' as never)} /></View>;
-  const activeMembers = project.members.filter(item => item.status === 0);
+  const displayMembers = projectDisplayMembers(project, account?.profile?.id);
+  const activeMembers = displayMembers.filter(item => item.status === 0);
   const canOpenCommunity = project.isOwner && project.status !== 2 && project.status !== 3;
   const tabs = overviewTabs.filter(item => (item.id !== 'settings' || project.isOwner || project.isMember));
-  const showHeaderActions = (canOpenCommunity) || (!project.isOwner && !project.isMember && project.recruitment?.status === 1);
+  const canApply = !project.isOwner && !project.isMember && (project.status === 0 || project.status === 1) && project.recruitment?.status === 1 && (!project.recruitment.deadline || Date.parse(project.recruitment.deadline) > Date.now());
+  const showHeaderActions = canOpenCommunity || (canApply);
   const actions = showHeaderActions ? <View style={styles.toolbarActions}>
-      {canOpenCommunity && <HubAction compact title="Đăng tuyển thành viên" icon="people" variant="primary" onPress={() => show('community')} />}
-      {!project.isOwner && !project.isMember && project.recruitment?.status === 1 && <HubAction compact title="Ứng tuyển tham gia" icon="people" variant="primary" onPress={() => show('apply')} />}
+      {canOpenCommunity && <HubAction compact title={project.recruitment ? 'Quản lý tuyển thành viên' : 'Đăng tuyển thành viên'} icon="people" variant="primary" onPress={() => show('community')} />}
+      {canApply && <HubAction compact title="Ứng tuyển tham gia" icon="people" variant="primary" onPress={() => show('apply')} />}
     </View> : null;
   return <View style={styles.screen}><DetailNavigation title={project.title} crumbs={[{ label: 'Hồ sơ', href: '/(tabs)/profile' }, { label: 'Dự án', href: '/profile/projects' }, { label: project.title }]} fallback="/profile/projects" /><ScrollView contentContainerStyle={[styles.page, compact && styles.compactPage]} showsVerticalScrollIndicator={false}>
+    <ProjectReceivedInvitation project={project} onChanged={refresh} />
     <View testID="project-detail-hero" style={[styles.hero, compact && styles.heroCompact]}>
       <View style={[styles.heroCover, compact && { width: '100%' }]}>
         <ProjectCover url={project.logoUrl} title={project.title} height={compact ? 170 : 160} style={{ borderRadius: 10 }} />
@@ -104,30 +112,30 @@ export function ProjectHubDetailScreen() {
     {!!notice && <View role="status" accessibilityLiveRegion="polite" style={styles.notice}><Text style={{ color: c.primary, fontSize: 13, flex: 1 }}>{notice}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng thông báo" onPress={() => setNotice('')} style={ui.iconButton}><HubIcon name="close" size={17} /></Pressable></View>}
     <ScrollView testID="project-detail-tabs" horizontal style={{ marginTop: 20 }} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{tabs.map(item => <Pressable key={item.id} accessibilityRole="tab" aria-selected={tab === item.id} onPress={() => setTab(item.id)} style={[styles.tab, tab === item.id && styles.tabActive]}><HubIcon name={item.icon} color={tab === item.id ? c.primary : c.textSecondary} size={17} /><Text style={{ color: tab === item.id ? c.primary : c.ink, fontSize: 13, fontWeight: tab === item.id ? '600' : '500' }}>{item.label}{item.id === 'members' ? ` (${activeMembers.length})` : ''}</Text></Pressable>)}</ScrollView>
     <View style={[styles.content, !columns && { flexDirection: 'column' }]}><View style={{ flex: 1, minWidth: 0, gap: 14 }}>
-      {tab === 'settings' && (project.isOwner || project.isMember) && <ProjectSettingsPanel project={project} onSaved={value => { setProject(value); setNotice(''); }} onManage={show} />}
+      {tab === 'settings' && (project.isOwner || project.isMember) && <ProjectSettingsPanel project={project} onManage={show} />}
       {tab === 'overview' && <ProjectOverview project={project} editingDisabled={addingResource !== null} onEdit={() => show('overview')} onReview={() => show('review')} />}
       {tab === 'documents' && <ResourcesPanel project={project} kind="documents" onAdd={() => void addResource('documents')} busy={addingResource !== null} error={resourceError?.kind === 'documents' ? resourceError.message : ''} />}
       {tab === 'media' && <ResourcesPanel project={project} kind="media" onAdd={() => void addResource('media')} busy={addingResource !== null} error={resourceError?.kind === 'media' ? resourceError.message : ''} />}
-      {tab === 'members' && <HubPanel compact title={`Thành viên dự án (${activeMembers.length})`} icon="people">
-        {project.isOwner && <View style={[styles.toolbarActions, { marginBottom: 7 }]}><HubAction compact title="Mời thành viên" icon="invite" variant="primary" disabled={project.status === 2} onPress={() => show('invite')} /><HubAction compact title="Đơn ứng tuyển & lời mời" icon="document" onPress={() => show('requests')} /></View>}
-        {!project.members.length ? <Text style={styles.muted}>Dự án chưa có thành viên khác.</Text> : project.members.map(item => <View key={item.id} style={styles.member}><PersonAvatar person={item} size={32} /><View style={{ flex: 1 }}><Text style={styles.name}>{item.fullName}</Text><Text style={styles.muted}>{item.role}{item.status === 1 ? ' · Đã kết thúc tham gia' : item.status === 2 ? ' · Đã rời dự án' : ''}</Text></View>{project.isOwner && item.userId !== project.creator.id && item.status === 0 && <HubAction compact title="Quản lý" variant="quiet" onPress={() => setMember(item)} />}</View>)}
+      {tab === 'members' && <HubPanel compact title={`Thành viên dự án (${activeMembers.length})`} icon="people" action={project.isOwner && <HubAction compact title="Lời mời" icon="invite" onPress={() => show('requests')} />}>
+        {displayMembers.map(item => <View key={item.id} testID="project-member-row" style={styles.member}><PersonAvatar person={item} size={32} /><View style={{ flex: 1 }}><Text style={styles.name}>{item.fullName}{item.userId === account?.profile?.id || (project.isOwner && item.userId === project.creator.id) ? ' (Bạn)' : ''}</Text><Text style={styles.muted}>{item.role}{item.status === 1 ? ' · Đã kết thúc tham gia' : item.status === 2 ? ' · Đã rời dự án' : ''}</Text></View>{project.isOwner && item.userId !== project.creator.id && item.status === 0 && <HubAction compact title="Quản lý" variant="quiet" onPress={() => setMember(item)} />}</View>)}
       </HubPanel>}
     </View><View style={[styles.sidebar, !columns && { width: '100%' }]}>
       <HubPanel compact title="Thông tin dự án" icon="info"><InfoRow icon="person" label="Chủ dự án"><View style={styles.creator}><PersonAvatar person={project.creator} size={22} /><Text style={[styles.infoValue, { flexShrink: 1 }]}>{project.creator.fullName}</Text></View></InfoRow><InfoRow icon="calendar" label="Ngày bắt đầu"><Text style={styles.infoValue}>{date(project.details.startDate)}</Text></InfoRow><InfoRow icon="calendar" label={project.status === 2 ? 'Ngày hoàn thành' : 'Dự kiến kết thúc'}><Text style={styles.infoValue}>{date(project.details.endDate)}</Text></InfoRow><InfoRow icon="people" label="Thành viên"><Text style={styles.infoValue}>{activeMembers.length} thành viên</Text></InfoRow><InfoRow icon="clock" label="Cập nhật gần đây"><Text testID="project-last-updated" style={styles.infoValue}>{formatProjectUpdatedAt(project.updatedAt)}</Text></InfoRow><InfoRow icon="info" label="Trạng thái"><HubStatus compact status={project.status} /></InfoRow></HubPanel>
-      <ProjectTechnologiesCard key={project.id} project={project} canEdit={project.isOwner} onSaved={value => { setProject(value); setNotice(''); }} />
-      <HubPanel compact title="Liên kết" icon="link">{project.details.links.length ? project.details.links.map((link, i) => <Pressable key={i} accessibilityRole="link" onPress={() => openProjectUrl(link.url)} style={styles.link}><HubIcon name="link" size={19} color={c.ink} /><Text numberOfLines={1} style={[styles.infoValue, { flex: 1 }]}>{link.label}</Text><HubIcon name="external" size={16} color={c.textSecondary} /></Pressable>) : <Text style={styles.muted}>Chưa có liên kết dự án.</Text>}</HubPanel>
-      {project.recruitment && <HubPanel compact title="Tuyển thành viên" icon="people"><Text style={styles.muted}>{project.recruitment.status === 1 ? 'Đang mở tuyển thành viên' : project.recruitment.status === 2 ? 'Đã đóng tuyển thành viên' : 'Bản nháp tuyển thành viên'}</Text>{!!project.recruitment.description && <Text style={styles.muted}>{project.recruitment.description}</Text>}{project.recruitment.positions.map(item => <View key={item.id} style={styles.positionRow}><Text style={styles.infoValue}>{item.name}</Text><Text style={styles.muted}>{item.quantity} vị trí</Text></View>)}{project.recruitment.deadline && <Text style={styles.muted}>Hạn tuyển: {date(project.recruitment.deadline)}</Text>}{canOpenCommunity && <HubAction compact title="Quản lý tuyển dụng" icon="edit" onPress={() => show('community')} />}</HubPanel>}
+      <ProjectTechnologiesCard key={project.id} project={project} canEdit={project.isOwner} onSaved={saved} />
+      <HubPanel compact title="Liên kết" icon="link" style={{ paddingRight: project.isOwner ? 42 : 16 }}>{project.isOwner && <ProjectPencilButton corner label="Chỉnh sửa liên kết dự án" disabled={addingResource !== null} onPress={() => show('links')} />}{project.details.links.length ? project.details.links.map((link, i) => <Pressable key={i} accessibilityRole="link" onPress={() => openProjectUrl(link.url)} style={styles.link}><ProjectLinkIcon label={link.label} size={19} /><Text numberOfLines={1} style={[styles.infoValue, { flex: 1 }]}>{link.label}</Text><HubIcon name="external" size={16} color={c.textSecondary} /></Pressable>) : <Text style={styles.muted}>Chưa có liên kết dự án.</Text>}</HubPanel>
+      <ProjectVerificationCard project={project} />
     </View></View>
 
   </ScrollView>
     {imageFile && <ProjectImagePreviewModal initialFile={imageFile} onClose={() => setImageFile(null)} onConfirm={async logoUrl => { setProject(await projectHubService.update(project.id, { logoUrl })); setNotice(''); }} />}
-    {modal === 'overview' && <ProjectOverviewModal project={project} onSaved={value => { setProject(value); setNotice(''); }} onClose={closeModal} />}
-    {modal === 'summary' && <ProjectSummaryModal project={project} onSaved={value => { setProject(value); setNotice(''); }} onClose={closeModal} />}
+    {modal === 'overview' && <ProjectOverviewModal project={project} onSaved={saved} onClose={closeModal} />}
+    {modal === 'summary' && <ProjectSummaryModal project={project} onSaved={saved} onClose={closeModal} />}
+    {modal === 'links' && project.isOwner && <ProjectLinksModal project={project} onSaved={saved} onClose={closeModal} />}
     {modal === 'community' && <RecruitmentModal project={project} onSaved={saved} onClose={closeModal} />}
-    {modal === 'invite' && <InviteMemberModal project={project} onClose={closeModal} onInvited={() => setNotice('Đã gửi lời mời tham gia dự án.')} />}
+    {modal === 'invite' && <InviteMemberModal project={project} onClose={() => show('requests')} onInvited={() => setNotice('Đã gửi lời mời tham gia dự án.')} />}
     {modal === 'apply' && <ApplyProjectModal project={project} onClose={closeModal} onApplied={() => setNotice('Đã gửi đơn ứng tuyển. Chủ dự án sẽ xem xét yêu cầu của bạn.')} />}
-    {modal === 'requests' && <ProjectRequestsModal project={project} onClose={closeModal} onChanged={refresh} />}
-    {modal === 'review' && <PersonalReviewModal project={project} onSaved={value => { setProject(value); setNotice(''); }} onClose={closeModal} />}
+    {modal === 'requests' && <ProjectRequestsModal project={project} onClose={closeModal} onChanged={refresh} onInvite={() => show('invite')} />}
+    {modal === 'review' && <PersonalReviewModal project={project} onSaved={saved} onClose={closeModal} />}
     {member && <MemberRoleModal project={project} member={member} onSaved={saved} onClose={closeMember} />}
     {(modal === 'complete' || modal === 'delete' || modal === 'leave') && <HubModal wide={false} title={modal === 'delete' ? 'Xóa dự án?' : modal === 'leave' ? 'Rời dự án?' : 'Hoàn thành dự án?'} onClose={busy ? () => undefined : closeModal} footer={<><HubAction compact title="Hủy" onPress={closeModal} disabled={busy} /><HubAction compact title={modal === 'delete' ? 'Xóa dự án' : modal === 'leave' ? 'Xác nhận rời dự án' : 'Xác nhận hoàn thành'} variant={modal === 'complete' ? 'primary' : 'danger'} busy={busy} onPress={() => void confirm()} /></>}><Text style={styles.description}>{modal === 'delete' ? `Bạn đang xóa “${project.title}”. Dự án có lịch sử nghiệp vụ liên quan có thể không được phép xóa.` : modal === 'leave' ? 'Bạn sẽ không còn là thành viên hoạt động của dự án. Lịch sử tham gia vẫn được giữ.' : 'Dự án sẽ chuyển sang trạng thái hoàn thành và đóng tuyển thành viên.'}</Text>{!!mutationError && <Text accessibilityRole="alert" style={ui.error}>{mutationError}</Text>}</HubModal>}
   </View>;
@@ -181,6 +189,6 @@ const styles = StyleSheet.create({
   hero: { flexDirection: 'row', gap: 18, alignItems: 'flex-start' }, heroCompact: { flexDirection: 'column', gap: 14 }, heroCover: { width: 280, borderRadius: 10 }, heroContent: { flex: 1, minWidth: 0, gap: 10, paddingTop: 2 }, titleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' }, title: { fontSize: 24, fontWeight: '700', color: c.ink, flexShrink: 1 }, mode: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, flexDirection: 'row', gap: 5, backgroundColor: c.blueWash, alignItems: 'center' }, description: { color: c.ink, fontSize: 13, lineHeight: 21 },
   toolbar: { flexDirection: 'row', justifyContent: 'flex-end', paddingVertical: 12 }, toolbarActions: { flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' }, notice: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.blueWash, paddingLeft: 12, borderRadius: 8, marginBottom: 10 },
   tabs: { minWidth: '100%', borderBottomWidth: 1, borderColor: c.line, marginBottom: 16 }, tab: { minHeight: 44, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' }, tabActive: { borderBottomColor: c.primary }, content: { flexDirection: 'row', gap: 18, alignItems: 'flex-start' }, sidebar: { width: 300, gap: 14 },
-  overviewSection: { paddingVertical: 13, gap: 9 }, sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 }, tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, tile: { flex: 1, minWidth: 140, padding: 12, gap: 6, borderRadius: 9 }, resultTile: { minWidth: 140, backgroundColor: '#F3F6FC' }, tileHeading: { flexDirection: 'row', alignItems: 'center', gap: 7 }, tileTitle: { color: c.primary, fontSize: 13, fontWeight: '600', flexShrink: 1 }, infoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5, borderBottomWidth: 1, borderColor: '#F0F3F8' }, infoLabel: { color: c.ink, fontSize: 11, width: 88 }, infoValue: { color: c.ink, fontSize: 12, lineHeight: 19 }, creator: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }, link: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 36, borderBottomWidth: 1, borderColor: '#F0F3F8' }, positionRow: { flexDirection: 'row', alignItems: 'center', gap: 9, justifyContent: 'space-between' },
+  overviewSection: { paddingVertical: 13, gap: 9 }, sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 }, tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, tile: { flex: 1, minWidth: 140, padding: 12, gap: 6, borderRadius: 9 }, resultTile: { minWidth: 140, backgroundColor: '#F3F6FC' }, tileHeading: { flexDirection: 'row', alignItems: 'center', gap: 7 }, tileTitle: { color: c.primary, fontSize: 13, fontWeight: '600', flexShrink: 1 }, infoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5, borderBottomWidth: 1, borderColor: '#F0F3F8' }, infoLabel: { color: c.ink, fontSize: 11, width: 88 }, infoValue: { color: c.ink, fontSize: 12, lineHeight: 19 }, creator: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }, link: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 36, borderBottomWidth: 1, borderColor: '#F0F3F8' },
   member: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line }, name: { color: c.ink, fontSize: 13, fontWeight: '600' }, resourceEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 28, gap: 13 }, document: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: c.canvas, borderWidth: 1, borderColor: c.line, borderRadius: 8 }, mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, media: { flexGrow: 1, flexBasis: 200, maxWidth: 400, borderRadius: 9, borderWidth: 1, borderColor: c.line, overflow: 'hidden' }, mediaImage: { width: '100%', height: 140 }, mediaLabel: { flexDirection: 'row', padding: 10, gap: 8, alignItems: 'center' },
 });

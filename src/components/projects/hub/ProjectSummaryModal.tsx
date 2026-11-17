@@ -22,11 +22,11 @@ export function ProjectSummaryModal({ project, onSaved, onClose }: { project: Hu
     } catch (cause) { setError(messageOf(cause)); }
     finally { locked.current = false; setBusy(false); }
   }
-  return <HubModal compact wide={false} title="Chỉnh sửa thông tin dự án" onClose={close}
-    footer={<><HubAction compact title="Hủy" onPress={close} disabled={busy} /><HubAction compact title="Lưu thay đổi" variant="primary" onPress={() => void save()} busy={busy} testID="project-summary-save" /></>}>
+  return <HubModal compact wide={false} icon="edit" title="Chỉnh sửa thông tin dự án" subtitle="Cập nhật tên và giới thiệu ngắn để mọi người hiểu hơn về dự án." onClose={close}
+    footer={<><HubAction compact title="Hủy" onPress={close} disabled={busy} /><HubAction compact title="Lưu thay đổi" icon="save" variant="primary" onPress={() => void save()} busy={busy} testID="project-summary-save" /></>}>
     <View style={styles.field}><View style={styles.labelRow}><Text style={styles.label}>Tên dự án <Text style={ui.error}>*</Text></Text><Text style={styles.counter}>{title.length}/200</Text></View><TextInput accessibilityLabel="Tên dự án" value={title} onChangeText={setTitle} maxLength={200} editable={!busy} style={[ui.input, styles.input]} /></View>
     <View style={styles.field}><View style={styles.labelRow}><Text style={styles.label}>Giới thiệu ngắn <Text style={ui.error}>*</Text></Text><Text style={styles.counter}>{description.length}/500</Text></View><AutoGrowingTextInput minHeight={64} accessibilityLabel="Giới thiệu ngắn" value={description} onChangeText={setDescription} maxLength={500} multiline editable={!busy} textAlignVertical="top" style={[ui.input, styles.input, styles.description]} /></View>
     {!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}
   </HubModal>;
 }
-const styles = StyleSheet.create({ field: { marginBottom: 16 }, labelRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 6 }, label: { color: c.ink, fontSize: 13, fontWeight: '600' }, counter: { color: c.textSecondary, fontSize: 11 }, input: { minHeight: 40, paddingVertical: 9, paddingHorizontal: 11, fontSize: 13, borderRadius: 8 }, description: { lineHeight: 20 } });
+const styles = StyleSheet.create({ field: { marginBottom: 16, padding: 16, borderWidth: 1, borderColor: '#D4DFF7', borderRadius: 14, backgroundColor: '#F5F7FF' }, labelRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 10 }, label: { color: c.ink, fontSize: 13, fontWeight: '600' }, counter: { color: c.textSecondary, fontSize: 11 }, input: { minHeight: 40, paddingVertical: 9, paddingHorizontal: 11, fontSize: 13, borderRadius: 9, borderColor: '#D1DBF2' }, description: { lineHeight: 20 } });

@@ -30,8 +30,8 @@ export function ProjectTechnologiesModal({ project, catalog, onSaved, onClose }:
     catch (cause) { setError(messageOf(cause)); }
     finally { locked.current = false; setBusy(false); }
   }
-  return <HubModal compact wide={false} icon="layers" title="Chỉnh sửa công nghệ sử dụng" onClose={close}
-    footer={<><HubAction compact title="Hủy" onPress={close} disabled={busy} /><HubAction compact title="Lưu thay đổi" variant="primary" onPress={() => void save()} busy={busy} /></>}>
+  return <HubModal compact wide={false} icon="layers" title="Chỉnh sửa công nghệ sử dụng" subtitle="Chọn hoặc thêm nền tảng, ngôn ngữ và công cụ được sử dụng trong dự án." onClose={close}
+    footer={<><HubAction compact title="Hủy" onPress={close} disabled={busy} /><HubAction compact title="Lưu thay đổi" icon="save" variant="primary" onPress={() => void save()} busy={busy} /></>}>
     <View style={styles.search}><HubIcon name="search" size={17} /><TextInput accessibilityLabel="Tìm hoặc nhập công nghệ" placeholder="Tìm hoặc nhập công nghệ" value={query} onChangeText={setQuery} editable={!busy} maxLength={80} style={styles.input} /></View>
     {!!custom && <HubAction compact title={`Thêm “${query.trim()}”`} icon="plus" onPress={() => add(query)} disabled={busy} />}
     <View style={styles.options}>{options.map(item => {
