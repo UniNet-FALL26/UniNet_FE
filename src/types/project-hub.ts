@@ -20,7 +20,7 @@ export type HubRecruitment = { id: string; description: string | null; positions
   deadline: string | null; status: 0 | 1 | 2; publishedAt: string | null };
 export type HubProject = {
   id: string; title: string; logoUrl: string | null; description: string; technologies: string[];
-  origin: 0 | 1; status: number; visibility: 0 | 1; mode: 'personal' | 'community';
+  status: number; visibility: 0 | 1;
   isOwner: boolean; isMember: boolean; creator: HubPerson; details: HubDetails;
   recruitment: HubRecruitment | null; members: HubMember[];
   myReview: { challenges: string | null; lessonsLearned: string | null } | null;
@@ -29,7 +29,7 @@ export type HubProject = {
 export type HubPage = { items: HubProject[]; total: number; page: number; pageSize: number };
 export type HubProjectInput = {
   title: string; description: string; logoUrl?: string | null; technologies?: string[];
-  origin?: 0 | 1; status?: number; visibility?: 0 | 1; submitterRole?: string;
+  status?: number; visibility?: 0 | 1; submitterRole?: string;
   details?: HubDetails;
 };
 export type HubRequest = {

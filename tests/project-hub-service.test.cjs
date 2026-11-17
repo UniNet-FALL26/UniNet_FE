@@ -34,10 +34,10 @@ test('summary edits patch only title and short description', async () => {
   assert.equal(calls[0].options.method, 'PATCH');
   assert.deepEqual(JSON.parse(calls[0].options.body), { title: 'New name', description: 'Short introduction' });
 });
-test('creation sends the chosen origin and technology names without legacy recruitment fields', async () => {
+test('creation sends technology names and status without project classification', async () => {
   const { api, calls } = service();
-  await api.create({ title: 'Dự án cá nhân', description: 'Mô tả', origin: 1, technologies: ['Unity', 'C#'], status: 1 });
-  assert.deepEqual(JSON.parse(calls[0].options.body), { title: 'Dự án cá nhân', description: 'Mô tả', origin: 1, technologies: ['Unity', 'C#'], status: 1 });
+  await api.create({ title: 'Dự án', description: 'Mô tả', technologies: ['Unity', 'C#'], status: 1 });
+  assert.deepEqual(JSON.parse(calls[0].options.body), { title: 'Dự án', description: 'Mô tả', technologies: ['Unity', 'C#'], status: 1 });
   assert.equal(calls[0].options.method, 'POST');
 });
 test('search and pagination preserve the abort signal and encode Vietnamese query text', async () => {

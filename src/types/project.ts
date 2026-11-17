@@ -1,5 +1,4 @@
 import type { DraftData } from '@/types/external-project-draft';
-export enum ProjectOrigin { Internal, External }
 export type ProjectLeader = { userId: string | null; fullName: string; nickname: string | null; avatarUrl: string | null; role?: string | null; status?: number | null; joinedAt?: string | null };
 export type ProjectStatus =
   | "Private"
@@ -46,7 +45,6 @@ export type UpdateProjectRequest = {
   expectedOutput: string;
 };
 export type ProjectListItem = {
-  origin?: ProjectOrigin;
   ownerUserId?: string | null;
   leader?: ProjectLeader | null;
   id: string;

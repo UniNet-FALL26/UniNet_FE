@@ -5,7 +5,7 @@ export interface AssessorAssignment { id: string; projectVerificationId: string;
 export interface AssignmentUser { userId: string; fullName: string | null; avatarUrl: string | null; nickname: string | null }
 export interface AssignmentProjectMember extends AssignmentUser { role: string | null; status: number; joinedAt: string | null }
 export interface AssignmentProjectSkill { skillId: string; skillName: string; category: string | null; iconUrl: string | null; minLevel: number | null }
-export interface AssessorProject { imageUrl?: string | null; id: string; title: string; projectField: string; description: string; status: number; leaderId: string | null; skills?: AssignmentProjectSkill[]; members?: AssignmentProjectMember[]; leader?: ProjectLeader | null; origin?: number; ownerUserId?: string | null; externalDetails?: DraftData | null }
+export interface AssessorProject { imageUrl?: string | null; id: string; title: string; projectField: string; description: string; status: number; leaderId: string | null; skills?: AssignmentProjectSkill[]; members?: AssignmentProjectMember[]; leader?: ProjectLeader | null; ownerUserId?: string | null; externalDetails?: DraftData | null }
 export interface AssessmentRubric { code: string; version: string; passingScore: number; criteria: { code: string; name: string; weight: number }[]; conditions: { code: string; description: string }[] }
 export interface AssessmentInput { rubricVersion: string; scores: { code: string; score: number | null; reason: string; evidence: string | null }[]; conditions: { code: string; passed: boolean | null; reason: string }[] }
 export interface AssessmentResult extends Omit<AssessmentInput, 'rubricVersion'> { rubric: AssessmentRubric; totalScore: number | null; outcome: number }

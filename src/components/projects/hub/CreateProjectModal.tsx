@@ -10,8 +10,7 @@ import { HubAction, HubIcon, HubModal, ProjectCover, hubColors, ui } from './Pro
 export function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: (project: HubProject) => void }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [origin, setOrigin] = useState<0 | 1>(1);
-  const status = origin === 1 ? 2 : 1;
+  const status = 1;
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [technologies, setTechnologies] = useState<string[]>([]);
   const [technology, setTechnology] = useState('');
@@ -46,7 +45,7 @@ export function CreateProjectModal({ onClose, onCreated }: { onClose: () => void
     const names = technology.trim() && !technologies.some(t => t.toLowerCase() === technology.trim().toLowerCase()) ? [...technologies, technology.trim()] : technologies;
     if (names.length > 20 || names.some(t => t.length > 80)) { setError('Chọn tối đa 20 công nghệ, mỗi tên tối đa 80 ký tự.'); return; }
     setError(''); setSaving(true);
-    try { onCreated(await projectHubService.create({ title: title.trim(), description: description.trim(), logoUrl, technologies: names, origin, status, visibility: 0 })); }
+    try { onCreated(await projectHubService.create({ title: title.trim(), description: description.trim(), logoUrl, technologies: names, status, visibility: 1 })); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa tạo được dự án. Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
@@ -55,9 +54,6 @@ export function CreateProjectModal({ onClose, onCreated }: { onClose: () => void
     footer={<><HubAction compact title="Hủy" onPress={close} disabled={saving || uploading} /><HubAction compact title="Tạo dự án" icon="plus" variant="primary" busy={saving} disabled={uploading} onPress={() => void submit()} testID="project-create-submit" /></>}>
     <View style={[styles.layout, wide && styles.wide]}>
       <View style={styles.form}>
-        <View style={styles.field}><Text style={styles.label}>Loại dự án</Text><View role="radiogroup" aria-label="Loại dự án" style={styles.choices}>
-          {([{ value: 0, title: 'Tạo mới', icon: 'folder' }, { value: 1, title: 'Có sẵn', icon: 'external' }] as const).map(option => <Pressable key={option.value} role="radio" aria-label={option.title} aria-checked={origin === option.value} onPress={() => setOrigin(option.value)} style={[styles.choice, origin === option.value && styles.selected]}><HubIcon name={option.icon} size={16} color={origin === option.value ? hubColors.primary : hubColors.textSecondary} /><Text style={[styles.choiceText, origin === option.value && { color: hubColors.primary }]}>{option.title}</Text></Pressable>)}
-        </View><Text style={styles.help}>{origin === 1 ? 'Thêm dự án đã có vào hồ sơ của bạn.' : 'Bắt đầu dự án mới trên UniNet.'}</Text></View>
         <View style={styles.field}><Text style={styles.label}>Tên dự án <Text style={ui.error}>*</Text></Text><View style={styles.counted}><TextInput testID="project-create-title" accessibilityLabel="Tên dự án" placeholder="Nhập tên dự án của bạn" placeholderTextColor={hubColors.textMuted} value={title} onChangeText={setTitle} maxLength={200} style={[ui.input, styles.input, styles.countedInput]} /><Text style={styles.counter}>{title.length}/200</Text></View></View>
         <View style={styles.field}><Text style={styles.label}>Ảnh/Logo dự án</Text><View style={styles.uploadRow}>
           {logoUrl && <View style={styles.uploadPreview}><ProjectCover url={logoUrl} title={title} height={94} /><Pressable accessibilityRole="button" accessibilityLabel="Xóa ảnh dự án" onPress={() => setLogoUrl(null)} disabled={saving || uploading} style={styles.removeImage}><HubIcon name="close" size={18} color={hubColors.textSecondary} /></Pressable></View>}
@@ -71,7 +67,7 @@ export function CreateProjectModal({ onClose, onCreated }: { onClose: () => void
         </View>
         {!!error && <Text accessibilityRole="alert" style={[ui.error, { marginTop: 16 }]}>{error}</Text>}
       </View>
-      <View style={[styles.preview, wide && styles.previewWide]}><Text accessibilityRole="header" aria-level={3} style={styles.previewTitle}>Xem trước</Text><Text style={[styles.help, { marginTop: 5, marginBottom: 16 }]}>Dự án sẽ hiển thị như bên dưới trong danh sách và hồ sơ.</Text><ProjectCard title={title.trim() || 'Tên dự án của bạn'} description={description.trim() || 'Mô tả ngắn giúp mọi người hiểu hơn về ý tưởng và mục tiêu của dự án.'} coverUrl={logoUrl} technologies={technologies} width="100%" /><View style={styles.privacy}><HubIcon name="info" size={15} /><Text style={[styles.help, { flex: 1, marginTop: 0 }]}>Dự án mới ở chế độ riêng tư. Bạn có thể thay đổi khi chỉnh sửa.</Text></View></View>
+      <View style={[styles.preview, wide && styles.previewWide]}><Text accessibilityRole="header" aria-level={3} style={styles.previewTitle}>Xem trước</Text><Text style={[styles.help, { marginTop: 5, marginBottom: 16 }]}>Dự án sẽ hiển thị như bên dưới trong danh sách và hồ sơ.</Text><ProjectCard title={title.trim() || 'Tên dự án của bạn'} description={description.trim() || 'Mô tả ngắn giúp mọi người hiểu hơn về ý tưởng và mục tiêu của dự án.'} coverUrl={logoUrl} technologies={technologies} width="100%" /><View style={styles.privacy}><HubIcon name="info" size={15} /><Text style={[styles.help, { flex: 1, marginTop: 0 }]}>Dự án hiển thị công khai trên hồ sơ của bạn.</Text></View></View>
     </View>
   </HubModal>;
 }
