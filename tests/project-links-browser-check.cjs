@@ -17,7 +17,7 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
     const project = { id: 'links-fixture', title: 'Links fixture', description: 'Project links editor', logoUrl: null,
       technologies: [], status: 1, visibility: 0, isOwner: true, isMember: false,
       creator: { id: data.profile.id, fullName: data.profile.fullName, avatarUrl: null }, members: [],
-      details: { description: 'Preserve overview', features: ['Feature'], results: { problem: 'Problem' }, documents: [], media: [], links: [], startDate: null, endDate: null, completedAt: null },
+      details: { description: 'Preserve overview', features: ['Feature'], results: { problem: 'Problem' }, documents: [], media: [], links: [], startDate: null, actualEndDate: null, startDateIsCreationDate: false, completedAt: null },
       recruitment: null, myReview: null, chatRoomId: null, createdAt: '2026-11-17T00:00:00Z', updatedAt: '2026-11-17T00:00:00Z' };
     const original = structuredClone(project.details);
     let failSave = false;
@@ -62,6 +62,12 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
       if (path.endsWith('/project-hub/' + project.id)) {
         if (route.request().method() === 'PATCH') {
           const payload = route.request().postDataJSON();
+          if (payload.timeline) {
+            const timeline = payload.timeline;
+            assert.deepEqual(Object.keys(payload), ['timeline']);
+            project.details = { ...project.details, startDate: timeline.startDate, actualEndDate: timeline.actualEndDate };
+            return ok(project);
+          }
           writes.push(payload);
           assert.deepEqual(Object.keys(payload), ['details']);
           assert.deepEqual({ ...payload.details, links: [] }, original);
@@ -87,6 +93,88 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
     const detailUrl = origin + '/group/' + project.id;
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('project-last-updated').getByText('07:00 17/11/2026', { exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Thẩm định dự án', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Thẩm định dự án', exact: true }).count(), 0);
+    if (process.env.PROJECT_VERIFICATION_CARD_SMOKE === '1') {
+      const card = page.getByRole('heading', { name: 'Thẩm định dự án', exact: true });
+      for (const width of [1440, 375]) {
+        await page.setViewportSize({ width, height: 900 });
+        await card.scrollIntoViewIfNeeded();
+        await card.locator('..').locator('..').screenshot({ path: `C:/Users/minec/UniNet/project-verification-active-${width}.png`, animations: 'disabled' });
+      }
+      for (const status of [0, 3, 2]) {
+        project.status = status;
+        await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('heading', { name: project.title, exact: true }).waitFor();
+        if (status === 3) assert.equal(await card.count(), 0);
+        else await card.waitFor();
+        assert.equal(await page.getByRole('button', { name: 'Thẩm định dự án', exact: true }).count(), status === 2 ? 1 : 0);
+      }
+      await page.getByRole('button', { name: 'Thẩm định dự án', exact: true }).click();
+      await page.waitForURL('**/group/verification/' + project.id);
+      project.isOwner = false;
+      await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: project.title, exact: true }).waitFor();
+      assert.equal(await card.count(), 0);
+      assert.deepEqual(errors, []);
+      console.log('Verification card checks passed: active/pending owners, rejected/visitor gating, completed booking and desktop/mobile layout.');
+      return;
+    }
+    assert.equal(await page.getByRole('button', { name: 'Tuyển', exact: true }).count(), 0);
+    await page.getByRole('tab', { name: /Tài liệu/ }).click();
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const heading = page.getByRole('heading', { name: 'Tài liệu dự án', exact: true });
+      const upload = page.getByRole('button', { name: 'Tải lên tài liệu', exact: true });
+      await upload.waitFor();
+      await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
+      const titleBox = await heading.boundingBox(), uploadBox = await upload.boundingBox();
+      if (width >= 600) {
+        assert.ok(uploadBox.x > titleBox.x);
+        const headerBox = await heading.locator('..').boundingBox();
+        assert.ok(Math.abs(headerBox.y + headerBox.height / 2 - uploadBox.y - uploadBox.height / 2) < 2);
+      } else assert.ok(uploadBox.y > titleBox.y);
+      assert.equal(await page.getByRole('button', { name: 'Thêm tài liệu', exact: true }).count(), 0);
+      await page.screenshot({ path: `C:/Users/minec/UniNet/project-documents-${width}.png`, animations: 'disabled' });
+    }
+    for (const width of [320, 375, 768, 1024]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const [tab, title] of [[/Tài liệu/, 'Tài liệu dự án'], [/Hình ảnh & Video demo/, 'Hình ảnh & Video demo'], [/Thành viên/, /^Thành viên/], [/Cài đặt/, 'Quản lý dự án']]) {
+        await page.getByRole('tab', { name: tab }).click();
+        const heading = page.getByRole('heading', { name: title, exact: typeof title === 'string' });
+        await heading.waitFor();
+        assert.equal(await page.getByRole('button', { name: 'Tuyển', exact: true }).count(), 0);
+        const panel = await heading.evaluate(node => { const box = (node.closest('[role="region"]') ?? node.parentElement.parentElement).getBoundingClientRect(); return { x: box.x, width: box.width }; });
+        const reference = await page.getByRole('heading', { name: 'Thông tin dự án', exact: true }).evaluate(node => { const box = node.parentElement.parentElement.getBoundingClientRect(); return { x: box.x, width: box.width }; });
+        assert.ok(Math.abs(panel.width - reference.width) < 2, `${width}px ${String(title)}: ${panel.width} vs ${reference.width}`);
+        assert.ok(Math.abs(panel.x - reference.x) < 2);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('tab', { name: /Cài đặt/ }).click();
+    const dateLabels = ['Cập nhật ngày bắt đầu', 'Cập nhật ngày kết thúc'];
+    const chosenDate = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 7) + '-01';
+    const shownDate = chosenDate.split('-').reverse().join('/');
+    async function editDate(label, clear = false) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      const modal = page.getByRole('dialog', { name: label, exact: true });
+      await modal.getByRole('button', { name: clear ? 'Xóa ngày' : `Chọn ngày ${shownDate}`, exact: true }).click();
+      await modal.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+      await modal.waitFor({ state: 'hidden' });
+    }
+    for (const key of ['startDate', 'actualEndDate']) assert.equal(project.details[key], null);
+    for (const label of dateLabels) await editDate(label);
+    await page.getByText('Đã lưu thời gian dự án.', { exact: true }).waitFor();
+    assert.equal(project.status, 1);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByRole('tab', { name: /Cài đặt/ }).click();
+    for (const label of dateLabels) await page.getByRole('button', { name: label, exact: true }).getByText(shownDate, { exact: true }).waitFor();
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: 'C:/Users/minec/UniNet/project-timeline-settings-mobile.png', animations: 'disabled' });
+    for (const label of dateLabels) await editDate(label, true);
+    await page.getByText('Đã lưu thời gian dự án.', { exact: true }).waitFor();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('tab', { name: /Tổng quan/ }).click();
     for (const label of ['Loại dự án', 'Nguồn dự án', 'Dự án cá nhân', 'Dự án cộng đồng']) assert.equal(await page.getByText(label, { exact: true }).count(), 0);
     const edit = page.getByRole('button', { name: 'Chỉnh sửa liên kết dự án', exact: true });
     await edit.click();
@@ -169,20 +257,25 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
     assert.deepEqual(project.details.links, []);
     const verification = page.getByRole('button', { name: 'Thẩm định dự án', exact: true });
     await page.getByRole('heading', { name: 'Thẩm định dự án', exact: true }).waitFor();
+    await page.getByText('Bạn có thể đăng ký thẩm định sau khi dự án hoàn thành.', { exact: true }).waitFor();
     assert.equal(await verification.count(), 0);
     project.mode = 'community';
     project.recruitment = { status: 2, positions: [], description: 'Old recruitment', deadline: null };
     for (const status of [0, 1, 3]) {
       project.status = status;
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Thẩm định dự án', exact: true }).waitFor();
+      await page.getByRole('heading', { name: project.title, exact: true }).waitFor();
+      if (status === 3) assert.equal(await page.getByRole('heading', { name: 'Thẩm định dự án', exact: true }).count(), 0);
+      else await page.getByRole('heading', { name: 'Thẩm định dự án', exact: true }).waitFor();
       assert.equal(await verification.count(), 0);
       assert.equal(await page.getByRole('heading', { name: 'Tuyển thành viên', exact: true }).count(), 0);
     }
     const verificationCard = page.getByRole('heading', { name: 'Thẩm định dự án', exact: true }).locator('..').locator('..');
+    project.status = 2;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await verification.waitFor();
     await verificationCard.scrollIntoViewIfNeeded();
     await verificationCard.screenshot({ path: 'C:/Users/minec/UniNet/project-verification-card-mobile.png', animations: 'disabled' });
-    project.status = 2;
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await verification.waitFor();
@@ -195,7 +288,7 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
     await verification.waitFor();
     await page.getByRole('tab', { name: /Thành viên \(1\)/ }).click();
-    await page.getByRole('heading', { name: 'Thành viên dự án (1)', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Thành viên (1)', exact: true }).waitFor();
     const rows = page.getByTestId('project-member-row');
     assert.equal(await rows.count(), 1);
     await rows.first().getByText(data.profile.fullName + ' (Bạn)', { exact: true }).waitFor();
@@ -204,9 +297,9 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
     await page.getByText('1 thành viên', { exact: true }).waitFor();
     const invitations = page.getByRole('button', { name: 'Lời mời', exact: true });
     await invitations.waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Mời thành viên', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Mời', exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Đơn ứng tuyển & lời mời', exact: true }).count(), 0);
-    const headingBox = await page.getByRole('heading', { name: 'Thành viên dự án (1)', exact: true }).boundingBox();
+    const headingBox = await page.getByRole('heading', { name: 'Thành viên (1)', exact: true }).boundingBox();
     const invitationsBox = await invitations.boundingBox();
     assert.ok(invitationsBox.x > headingBox.x + headingBox.width && Math.abs(invitationsBox.y + invitationsBox.height / 2 - headingBox.y - headingBox.height / 2) < 2);
     await invitations.click();
@@ -231,21 +324,30 @@ const origin = process.env.PROJECT_LINKS_TEST_ORIGIN || 'http://localhost:8084';
     assert.equal(await rows.count(), 2);
     await rows.first().getByText(data.profile.fullName + ' (Bạn)', { exact: true }).waitFor();
     await rows.first().getByText('Team leader', { exact: true }).waitFor();
-    await page.getByRole('heading', { name: 'Thành viên dự án (2)', exact: true }).locator('..').locator('..').screenshot({ path: 'C:/Users/minec/UniNet/project-members-self-first.png', animations: 'disabled' });
+    await page.getByRole('heading', { name: 'Thành viên (2)', exact: true }).locator('..').locator('..').screenshot({ path: 'C:/Users/minec/UniNet/project-members-self-first.png', animations: 'disabled' });
     project.status = 1;
-    project.recruitment = { ...project.recruitment, status: 1, positions: [{ id: 'designer', name: 'Designer', quantity: 2 }], deadline: null };
+    project.recruitment = { ...project.recruitment, status: 1, positions: [{ id: 'designer', name: 'Designer', quantity: 2, technologies: [], skills: [], requirements: [], benefits: [], jobDescription: '' }], deadline: null };
     await page.setViewportSize({ width: 375, height: 812 });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('tab', { name: /Thành viên \(2\)/ }).click();
     const mobileAction = await invitations.boundingBox();
-    const mobileHeading = await page.getByRole('heading', { name: 'Thành viên dự án (2)', exact: true }).boundingBox();
-    assert.ok(mobileAction.x + mobileAction.width <= 375 && Math.abs(mobileAction.y + mobileAction.height / 2 - mobileHeading.y - mobileHeading.height / 2) < 2);
-    await page.getByRole('heading', { name: 'Thành viên dự án (2)', exact: true }).locator('..').locator('..').screenshot({ path: 'C:/Users/minec/UniNet/project-member-invitations-mobile.png', animations: 'disabled' });
+    const mobileHeading = await page.getByRole('heading', { name: 'Thành viên (2)', exact: true }).boundingBox();
+    assert.ok(mobileAction.y >= mobileHeading.y + mobileHeading.height);
+    assert.equal(await page.getByRole('button', { name: 'Tuyển', exact: true }).count(), 0);
+    assert.ok(mobileAction.height <= 32);
+    await page.getByRole('heading', { name: 'Thành viên (2)', exact: true }).locator('..').locator('..').screenshot({ path: 'C:/Users/minec/UniNet/project-member-invitations-mobile.png', animations: 'disabled' });
     await invitations.click();
-    await invitationsModal.getByRole('button', { name: 'Mời thành viên', exact: true }).click();
+    const mobileInviteButton = await invitationsModal.getByRole('button', { name: 'Mời', exact: true }).boundingBox();
+    const mobileRecruitButton = await invitationsModal.getByRole('button', { name: 'Tuyển', exact: true }).boundingBox();
+    assert.ok(mobileRecruitButton.x >= mobileInviteButton.x + mobileInviteButton.width && Math.abs(mobileRecruitButton.y - mobileInviteButton.y) < 2);
+    assert.ok(mobileRecruitButton.height <= 30 && mobileInviteButton.height <= 30);
+    await invitationsModal.getByRole('button', { name: 'Tuyển', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Quản lý tuyển thành viên', exact: true }).getByRole('button', { name: 'Hủy', exact: true }).click();
+    await invitationsModal.waitFor();
+    await invitationsModal.getByRole('button', { name: 'Mời', exact: true }).click();
     await page.getByRole('dialog', { name: 'Mời thành viên', exact: true }).getByRole('button', { name: 'Hủy', exact: true }).click();
     await invitationsModal.getByText('Invited person', { exact: true }).waitFor();
-    await invitationsModal.getByRole('button', { name: 'Mời thành viên', exact: true }).click();
+    await invitationsModal.getByRole('button', { name: 'Mời', exact: true }).click();
     await page.getByRole('textbox', { name: 'Tìm kiếm bạn bè', exact: true }).fill('New');
     await page.getByRole('radio', { name: 'New invited person', exact: true }).click();
     await page.getByRole('textbox', { name: 'Vị trí mời tham gia', exact: true }).fill('Designer');

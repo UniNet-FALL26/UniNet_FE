@@ -42,7 +42,6 @@ export type UpdateProjectRequest = {
   projectField: string;
   description: string;
   recruitmentDeadline: string;
-  expectedOutput: string;
 };
 export type ProjectListItem = {
   ownerUserId?: string | null;
@@ -79,7 +78,6 @@ export type ProjectDetail = ProjectListItem & {
   externalDetails?: DraftData | null;
   status: ApiProjectStatus;
   updatedAt: string | null;
-  expectedOutput: string | null;
   roleRequirements: {
     id: string;
     roleName: string;
@@ -186,7 +184,6 @@ export type Project = {
   };
   roles: ProjectRoleRequirement[];
   recruitmentDeadline: string;
-  expectedOutput?: string;
   status: ProjectStatus;
   recruitmentStatus: RecruitmentStatus;
   createdAt: string;
@@ -200,7 +197,6 @@ export type CreateProjectRequest = {
   memberTarget: number;
   minimumQuantity: number;
   recruitmentDeadline: string;
-  expectedOutput: string;
   visibility: ProjectVisibility;
   roleRequirements: { role: string; quantity: number; requirements: string }[];
   skillIds: string[];

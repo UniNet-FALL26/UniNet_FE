@@ -36,7 +36,7 @@ export function HubAction({ title, onPress, icon, variant = 'secondary', busy, d
   return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress}
     hitSlop={compact ? 4 : undefined} style={({ pressed }) => [ui.action, compact && { minHeight: 36, paddingHorizontal: 13, paddingVertical: 7, gap: 6, borderRadius: 8 }, inModal && modalStyles.action, primary && ui.actionPrimary, inModal && primary && modalStyles.primary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, style, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
     {busy ? <ActivityIndicator size="small" color={tint} /> : icon && <HubIcon name={icon} color={tint} size={compact ? 16 : 18} />}
-    <Text style={[ui.actionText, compact && { fontSize: 13 }, { color: inModal && variant === 'secondary' ? hubColors.ink : tint }]}>{title}</Text>
+    <Text style={[ui.actionText, (compact || inModal) && { fontSize: 13 }, { color: inModal && variant === 'secondary' ? hubColors.ink : tint }]}>{title}</Text>
   </Pressable>;
 }
 export function HubTags({ values, compact = false }: { values: string[]; compact?: boolean }) {
@@ -55,7 +55,7 @@ export function ProjectCover({ url, title, height = 160, style, hideTitle = fals
 export function HubPanel({ title, icon, children, style, compact = false, action }: { title?: string; icon?: HubIconName; children: ReactNode; style?: StyleProp<ViewStyle>; compact?: boolean; action?: ReactNode }) {
   return <View style={[ui.panel, compact && { padding: 16, gap: 10, borderRadius: 11 }, style]}>{title && <View style={[ui.sectionTitle, compact && { gap: 8 }, !!action && { alignItems: 'center' }]}>{icon && <HubIcon name={icon} size={compact ? 18 : 20} />}<Text accessibilityRole="header" aria-level={2} style={[ui.heading, compact && { fontSize: 15 }, !!action && { flex: 1, minWidth: 0 }]}>{title}</Text>{action}</View>}{children}</View>;
 }
-export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder' }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName }) {
+export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder', maxWidth }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName; maxWidth?: number }) {
   const { width, height } = useWindowDimensions();
   const frame = useRef<View>(null);
   const close = useRef(onClose);
@@ -85,27 +85,24 @@ export function HubModal({ title, subtitle, onClose, children, footer, wide = tr
     return () => { cancelAnimationFrame(timer); document.removeEventListener('keydown', handle, true); document.removeEventListener('keyup', handleKeyUp, true); const index = modalStack.indexOf(marker); if (index !== -1) modalStack.splice(index, 1); if (previous?.isConnected) previous.focus(); };
   }, []);
   return <ModalAppearance.Provider value={true}><Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, { padding: width < 600 ? 10 : 28 }]}>
-    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, modalStyles.frame, { maxWidth: wide ? compact ? 1000 : 1160 : 700, maxHeight: height - (width < 600 ? 20 : 56) }]}>
-      <View style={[ui.modalHead, modalStyles.head, width < 600 && { padding: 16, gap: 12 }]}>
-        <View pointerEvents="none" aria-hidden style={modalStyles.wave} /><View pointerEvents="none" aria-hidden style={modalStyles.waveFront} />
-        <View style={modalStyles.emblem}><HubIcon name={icon} size={23} color="#FFFFFF" /></View><View style={{ flex: 1, minWidth: 0, gap: 6 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, modalStyles.title, compact && { fontSize: 21 }, width < 600 && { fontSize: 18 }]}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={[ui.iconButton, modalStyles.close]}><HubIcon name="close" color={colors.textSecondary} size={18} /></Pressable>
+    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, modalStyles.frame, { maxWidth: maxWidth ?? (wide ? compact ? 880 : 960 : 600), maxHeight: height - (width < 600 ? 20 : 56) }]}>
+      <View style={[ui.modalHead, modalStyles.head, width < 600 && { paddingHorizontal: 16 }]}>
+        <View style={modalStyles.emblem}><HubIcon name={icon} size={18} /></View><View style={{ flex: 1, minWidth: 0, gap: 3 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, modalStyles.title, width < 600 && { fontSize: 16, lineHeight: 22 }]}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} hitSlop={6} style={[ui.iconButton, modalStyles.close]}><HubIcon name="close" color={colors.textSecondary} size={17} /></Pressable>
       </View>
-      <ScrollView style={{ flexShrink: 1, backgroundColor: '#FCFDFF' }} contentContainerStyle={[ui.modalBody, { padding: 24 }, width < 600 && { padding: 16 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      <ScrollView style={{ flexShrink: 1, backgroundColor: '#FCFDFF' }} contentContainerStyle={[ui.modalBody, { padding: 18 }, width < 600 && { padding: 16 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
       {footer && <View style={[ui.modalFoot, modalStyles.foot, width < 600 && { paddingHorizontal: 16 }]}>{footer}</View>}
     </View>
   </View></Modal></ModalAppearance.Provider>;
 }
 const modalStyles = StyleSheet.create({
-  frame: { borderRadius: 22, borderColor: '#E4E9F7', backgroundColor: '#FCFDFF', boxShadow: '0 24px 80px rgba(23, 42, 88, 0.22)' },
-  head: { paddingVertical: 18, paddingHorizontal: 24, gap: 16, backgroundColor: '#F5F8FF', experimental_backgroundImage: 'linear-gradient(115deg, #FFFFFF, #F0F5FF)', borderColor: '#E5ECFC', overflow: 'hidden' },
-  wave: { position: 'absolute', width: 250, height: 100, borderRadius: 125, bottom: -75, right: -20, backgroundColor: '#E3ECFF', transform: [{ rotate: '-20deg' }] },
-  waveFront: { position: 'absolute', width: 180, height: 90, borderRadius: 90, bottom: -73, right: -50, backgroundColor: '#D2E1FF', transform: [{ rotate: '-24deg' }] },
-  emblem: { width: 44, height: 44, borderRadius: 13, flexShrink: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2471FF', experimental_backgroundImage: 'linear-gradient(145deg, #4990FF, #1050F6)', boxShadow: '0 6px 14px rgba(30, 92, 235, 0.24)' },
-  title: { fontSize: 23, lineHeight: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { color: '#52617E', fontSize: 12, lineHeight: 18 },
-  close: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EAF0FC', alignSelf: 'flex-start' },
-  foot: { paddingHorizontal: 24, paddingVertical: 14, gap: 12, borderColor: '#E6ECF8', backgroundColor: '#F7F9FE', experimental_backgroundImage: 'linear-gradient(100deg, #FBFCFF, #F2F6FF)' },
-  action: { borderRadius: 10, borderColor: '#CFD9EF', minHeight: 38 },
+  frame: { borderRadius: 16, borderColor: '#E4E9F7', backgroundColor: '#FCFDFF', boxShadow: '0 18px 60px rgba(23, 42, 88, 0.18)' },
+  head: { paddingVertical: 14, paddingHorizontal: 18, gap: 10, backgroundColor: '#FBFCFF', borderColor: '#E9EDF5' },
+  emblem: { width: 32, height: 32, borderRadius: 9, flexShrink: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF1FF' },
+  title: { fontSize: 17, lineHeight: 24, fontWeight: '600', letterSpacing: -0.25 },
+  subtitle: { color: '#52617E', fontSize: 12, lineHeight: 17 },
+  close: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F0F3FA' },
+  foot: { paddingHorizontal: 18, paddingVertical: 12, gap: 8, borderColor: '#E9EDF5', backgroundColor: '#F8FAFE' },
+  action: { borderRadius: 8, borderColor: '#CFD9EF', minHeight: 36, paddingHorizontal: 13, paddingVertical: 7 },
   primary: { backgroundColor: '#1252FF', borderColor: '#286BFF', experimental_backgroundImage: 'linear-gradient(180deg, #287BFF, #043DFF)', boxShadow: '0 3px 7px rgba(26, 83, 235, 0.16)' },
 });
 export const ui = StyleSheet.create({

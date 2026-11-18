@@ -21,6 +21,7 @@ const origin = process.env.PROJECT_RECRUITMENT_TEST_ORIGIN || 'http://localhost:
       if (path.endsWith('/auth/login')) return ok({ account, accessToken: 'fixture-access', refreshToken: 'fixture-refresh', requiresProfileCompletion: false });
       if (path.endsWith('/auth/me')) return ok(account);
       if (path.endsWith('/profile/portfolio/me')) return ok(data);
+      if (path.endsWith('/project-hub/' + project.id + '/requests')) return ok({ items: [] });
       if (path.endsWith('/project-hub/' + project.id + '/recruitment')) {
         assert.equal(method, 'PUT');
         const body = route.request().postDataJSON(); writes.push(body);
@@ -46,7 +47,9 @@ const origin = process.env.PROJECT_RECRUITMENT_TEST_ORIGIN || 'http://localhost:
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.waitForURL(url => !url.pathname.includes('/login'));
     await page.goto(origin + '/group/' + project.id, { waitUntil: 'domcontentloaded' });
-    const open = () => page.getByRole('button', { name: 'Quản lý tuyển thành viên', exact: true }).click();
+    await page.getByRole('tab', { name: /Thành viên/ }).click();
+    await page.getByRole('button', { name: 'Lời mời', exact: true }).click();
+    const open = () => page.getByRole('button', { name: 'Tuyển', exact: true }).click();
     await open();
     const modal = page.getByRole('dialog', { name: 'Quản lý tuyển thành viên', exact: true });
     const input = modal.getByRole('textbox', { name: 'Tên vị trí 1 *', exact: true });

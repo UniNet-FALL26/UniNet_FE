@@ -31,6 +31,7 @@ const origin = process.env.PROJECT_CREATE_TEST_ORIGIN || 'http://localhost:8088'
         const body = route.request().postDataJSON(); writes.push(body);
         assert.equal(Object.hasOwn(body, 'origin'), false); assert.equal(Object.hasOwn(body, 'mode'), false);
         assert.equal(body.status, 1);
+        assert.equal(Object.hasOwn(body, 'expectedEndDate'), false);
         assert.ok(body.technologies.every(name => catalog.some(item => item.name === name)));
         const project = { ...body, id: 'created-project', mode: 'personal', isOwner: true, isMember: false, creator: { id: data.profile.id, fullName: data.profile.fullName, avatarUrl: null }, members: [], details: { features: [], results: {}, documents: [], media: [], links: [] }, recruitment: null, createdAt: '2026-11-17T00:00:00Z' };
         projects.push(project); return ok(project);
@@ -72,6 +73,8 @@ const origin = process.env.PROJECT_CREATE_TEST_ORIGIN || 'http://localhost:8088'
     assert.ok((await descriptionInput.boundingBox()).height > initialHeight);
     assert.equal(await descriptionInput.evaluate(node => node.scrollHeight <= node.clientHeight + 2), true);
     await page.getByTestId('project-create-description').fill('Only select from the system catalog.');
+    assert.equal(await modal.getByLabel('Ngày dự kiến kết thúc', { exact: true }).count(), 0);
+    assert.equal(await modal.getByText('Không bắt buộc. Ngày bắt đầu được lấy theo ngày tạo dự án.', { exact: true }).count(), 0);
     await page.waitForFunction(() => document.querySelector('[data-testid="project-create-description"]').getBoundingClientRect().height <= 90);
     await modal.getByRole('textbox', { name: 'Tìm công nghệ', exact: true }).fill('');
     await page.screenshot({ path: 'C:/Users/minec/UniNet/project-create-catalog-desktop.png', animations: 'disabled' });

@@ -1,4 +1,5 @@
-export type HubFile = { url: string; name: string; type: 'image' | 'video' | 'document' };
+export type HubFile = { url: string; name: string; type: 'image' | 'video' | 'document';
+  sizeBytes?: number | null; uploadedAt?: string | null; uploadedBy?: HubPerson | null };
 export type HubLink = { label: string; url: string };
 export type HubPerson = { id: string; fullName: string; avatarUrl: string | null };
 export type HubPosition = {
@@ -10,7 +11,8 @@ export type HubDetails = {
   results: { problem?: string; solution?: string; objectives?: string[]; achievements?: string[];
     expectedProduct?: string; expectedValue?: string; expectedGrowth?: string };
   documents: HubFile[]; media: HubFile[]; links: HubLink[];
-  startDate: string | null; endDate: string | null; completedAt: string | null;
+  startDate: string | null; completedAt: string | null;
+  actualEndDate?: string | null; startDateIsCreationDate?: boolean;
 };
 export type HubMember = {
   id: string; userId: string; fullName: string; avatarUrl: string | null; role: string;
@@ -31,6 +33,7 @@ export type HubProjectInput = {
   title: string; description: string; logoUrl?: string | null; technologies?: string[];
   status?: number; visibility?: 0 | 1; submitterRole?: string;
   details?: HubDetails;
+  timeline?: { startDate: string | null; actualEndDate: string | null };
 };
 export type HubRequest = {
   id: string; projectId: string; projectTitle: string; userId: string; fullName: string;

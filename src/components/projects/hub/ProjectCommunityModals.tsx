@@ -1,6 +1,6 @@
 import { PersonAvatar } from './PersonAvatar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { projectHubService } from '@/services/project-hub.service';
 import { canInviteProjectFriends } from '@/utils/project-invitations';
 import type { HubMember, HubPosition, HubProject, HubRequest } from '@/types/project-hub';
@@ -66,7 +66,9 @@ export function ApplyProjectModal({ project, onClose, onApplied }: { project: Hu
 function PositionChoices({ project, selected, onSelect }: { project: HubProject; selected: string; onSelect: (value: string) => void }) {
   return project.recruitment?.positions.length ? <View style={ui.field}><Text style={ui.label}>Vị trí</Text><View style={{ gap: 9 }}>{project.recruitment.positions.map(item => <Pressable key={item.id} accessibilityRole="radio" accessibilityState={{ checked: selected === item.id }} onPress={() => onSelect(item.id)} style={[styles.position, selected === item.id && { borderColor: c.primary, backgroundColor: c.blueWash }]}><View style={{ flex: 1, gap: 5 }}><Text style={{ color: c.ink, fontWeight: '600' }}>{item.name}</Text><Text style={ui.muted}>Tuyển {item.quantity} thành viên</Text>{!!item.jobDescription && <Text style={ui.muted}>{item.jobDescription}</Text>}</View><HubIcon name={selected === item.id ? 'check' : 'person'} /></Pressable>)}</View></View> : null;
 }
-export function ProjectRequestsModal({ project, onClose, onChanged, onInvite }: { project: HubProject; onClose: () => void; onChanged: () => void; onInvite: () => void }) {
+export function ProjectRequestsModal({ project, onClose, onChanged, onInvite, onRecruit }: { project: HubProject; onClose: () => void; onChanged: () => void; onInvite: () => void; onRecruit?: () => void }) {
+  const compact = useWindowDimensions().width < 800;
+  const actionStyle = compact ? { minHeight: 30, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7 } : undefined;
   const [items, setItems] = useState<HubRequest[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState('');
   useEffect(() => { const controller = new AbortController(); projectHubService.requests(project.id, controller.signal).then(result => { if (!controller.signal.aborted) setItems(result.items); }).catch(cause => { if (!controller.signal.aborted) setError(messageOf(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); }); return () => controller.abort(); }, [project.id]);
   async function decide(item: HubRequest, decision: 'accept' | 'reject' | 'cancel') {
@@ -75,7 +77,7 @@ export function ProjectRequestsModal({ project, onClose, onChanged, onInvite }: 
     catch (cause) { setError(messageOf(cause)); } finally { setBusy(''); }
   }
   return <HubModal compact wide={false} icon="invite" title="Lời mời" subtitle="Danh sách người xin tham gia và người được mời vào dự án." onClose={busy ? () => undefined : onClose} footer={<HubAction compact title="Đóng" onPress={onClose} disabled={!!busy} />}>
-    <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap' }]}><Text style={ui.muted}>{items.length} yêu cầu & lời mời</Text><HubAction compact title="Mời thành viên" icon="invite" variant="primary" disabled={!!busy || !canInviteProjectFriends(project)} onPress={onInvite} /></View>
+    <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap' }]}><Text style={ui.muted}>{items.length} yêu cầu & lời mời</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' }}><HubAction compact title="Mời" icon={compact ? undefined : 'invite'} style={actionStyle} variant="primary" disabled={!!busy || !canInviteProjectFriends(project)} onPress={onInvite} />{onRecruit && <HubAction compact title="Tuyển" icon={compact ? undefined : 'people'} style={actionStyle} variant="primary" disabled={!!busy} onPress={onRecruit} />}</View></View>
     {!!error && <Text accessibilityRole="alert" style={[ui.error, { marginBottom: 16 }]}>{error}</Text>}
     {loading ? <ActivityIndicator color={c.primary} /> : !items.length ? <View style={styles.empty}><HubIcon name="people" size={34} /><Text style={ui.muted}>Chưa có yêu cầu tham gia hoặc lời mời.</Text></View> : <View style={{ gap: 12 }}>{items.map(item => <View key={item.id} testID={`project-request-${item.id}`} style={styles.request}>
       <View style={[styles.row, { gap: 6 }]}><HubIcon name={item.requestType === 0 ? 'person' : 'invite'} size={15} /><Text style={{ color: c.primary, fontSize: 12, fontWeight: '600' }}>{item.requestType === 0 ? 'Xin tham gia' : 'Được mời'}</Text></View>

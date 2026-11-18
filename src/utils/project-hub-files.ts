@@ -30,7 +30,7 @@ export async function uploadProjectImage(file: ProjectImageAsset): Promise<strin
 
 export async function pickProjectAsset(kind: 'logo' | 'media' | 'document'): Promise<HubFile | null> {
   const picked = await DocumentPicker.getDocumentAsync({
-    type: kind === 'logo' ? ['image/png', 'image/jpeg'] : kind === 'media' ? ['image/*', 'video/*'] : ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
+    type: kind === 'logo' ? ['image/png', 'image/jpeg'] : kind === 'media' ? ['image/*', 'video/*'] : ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/plain'],
     multiple: false, copyToCacheDirectory: true,
   });
   if (picked.canceled || !picked.assets?.[0]) return null;

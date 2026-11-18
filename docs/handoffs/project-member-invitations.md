@@ -1,7 +1,11 @@
 # Unified member invitations
 
-- Members panel exposes one owner-only “Lời mời” action, right-aligned with its
-  title using HubPanel.action. Previous two standalone actions removed.
+- Members panel exposes owner-only “Lời mời”. “Tuyển” now lives inside
+  that popup, to the right of “Mời” on the same row. Its owner/status
+  conditions are unchanged. Below 800px both popup buttons are 30px with no icons.
+  Closing/cancelling/saving recruitment returns to the invitations popup.
+- The recruitment action is always labeled “Tuyển”, whether creating
+  or managing recruitment. Public applicant action remains in the project hero.
 - ProjectRequestsModal renders the complete requests response in one list;
   per-row “Xin tham gia”/“Được mời” labels replace the old filter tabs.
 - Existing status/accept/reject/cancel handlers and API contracts are preserved.
