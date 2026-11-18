@@ -93,7 +93,8 @@ function renderCheckout(snapshot) {
   const source = ts.transpileModule(fs.readFileSync('src/components/projects/VerificationCheckoutScreen.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const imports = {
     react: { ...React, useState: initial => { const index = stateIndex++; return React.useState(index === 0 ? snapshot : index === 1 ? false : initial); } },
-    'react-native': require('react-native-web'),
+    'react-native': { ...require('react-native-web'), useWindowDimensions: () => ({ width: 390 }) },
+    '@/components/navigation/DetailNavigation': { DetailNavigation: () => null },
     'react-native-safe-area-context': { SafeAreaView: ({ children }) => React.createElement('div', null, children) },
     'expo-router': { router: {}, useFocusEffect() {}, useLocalSearchParams: () => ({ id: 'v', projectId: 'project', status: 'PAID', cancel: 'false' }) },
     'expo-web-browser': { openBrowserAsync() {} },
@@ -116,14 +117,14 @@ test('checkout screen renders ready, pending, successful and expired states with
   let html = renderCheckout({ detail: d, transaction: null, packageData: { name: 'Gói sinh viên', price: 120000 } });
   assert.match(html, /Tạo mã QR thanh toán/); assert.doesNotMatch(html, />Thanh toán thành công</);
   html = renderCheckout({ detail: d, transaction: transaction({ expiredAt: d.verification.reservedUntil }), packageData: null });
-  assert.match(html, /Mở PayOS để thanh toán/); assert.match(html, /Đang chờ xác nhận/); assert.doesNotMatch(html, />Thanh toán thành công</);
-  assert.match(html, /chưa có dữ liệu QR/);
+  assert.match(html, />Mở PayOS</); assert.match(html, /Đang chờ xác nhận/); assert.doesNotMatch(html, />Thanh toán thành công</);
+  assert.match(html, /Mở PayOS để xem mã QR/);
   html = renderCheckout({ detail: d, transaction: transaction({ expiredAt: d.verification.reservedUntil, qrCode: 'bank-qr-payload' }), packageData: null });
   assert.match(html, /data-qr="bank-qr-payload"/);
   d.verification.bookingStatus = 2;
   html = renderCheckout({ detail: d, transaction: transaction({ status: 1, qrCode: 'bank-qr-payload' }), packageData: null });
   assert.doesNotMatch(html, /data-qr/);
-  assert.match(html, /Thanh toán thành công/); assert.ok(!html.includes('Mở PayOS để thanh toán'));
+  assert.match(html, /Thanh toán thành công/); assert.doesNotMatch(html, />Mở PayOS</);
   assert.doesNotMatch(html, /Mã giao dịch:/);
   d.verification.bookingStatus = 3;
   html = renderCheckout({ detail: d, transaction: transaction({ status: 2 }), packageData: null });
@@ -139,7 +140,8 @@ test('checkout polling only reads, pauses in background, stops after three failu
   const source = ts.transpileModule(fs.readFileSync('src/components/projects/VerificationCheckoutScreen.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const imports = {
     react: { useState: initial => [initial, () => {}], useRef: current => ({ current }), useCallback: fn => fn, useEffect() {} },
-    'react-native': { Platform: { OS: 'android' }, AppState: appState, Linking: { addEventListener: () => ({ remove() { removed++; } }) }, StyleSheet: { create: v => v } },
+    'react-native': { useWindowDimensions: () => ({ width: 1024 }), Platform: { OS: 'android' }, AppState: appState, Linking: { addEventListener: () => ({ remove() { removed++; } }) }, StyleSheet: { create: v => v } },
+    '@/components/navigation/DetailNavigation': {},
     'react-native-safe-area-context': {},
     'expo-router': { router: {}, useFocusEffect: cb => { focus = cb; }, useLocalSearchParams: () => ({ id: 'v' }) },
     'expo-web-browser': {}, '@/components/ui/Button': {}, '@/components/projects/PaymentQrCode': {}, '@/constants/colors': { colors: {} },
