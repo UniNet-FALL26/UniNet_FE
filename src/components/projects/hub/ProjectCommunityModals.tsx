@@ -5,15 +5,33 @@ import { projectHubService } from '@/services/project-hub.service';
 import { canInviteProjectFriends } from '@/utils/project-invitations';
 import type { HubMember, HubPosition, HubProject, HubRequest } from '@/types/project-hub';
 import { HubAction, HubIcon, HubModal, hubColors as c, ui } from './ProjectHubUI';
-import { Field, lines, messageOf, technologies, validDate } from './ProjectHubFields';
+import { Field, lines, messageOf, technologies } from './ProjectHubFields';
+import { RecruitmentDeadlineModal, RecruitmentCompetenciesModal, formatRecruitmentDeadline } from './ProjectRecruitmentPickers';
+import { skillService, type SkillCatalogItem } from '@/services/skill.service';
+import { findTechnology } from '@/utils/project-technologies';
+import { TechnologyLogo } from './ProjectTechnologyChips';
+import { ProjectRecruitmentOverview } from './ProjectRecruitmentOverview';
 
 const position = (): HubPosition => ({ id: `position-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`, name: '', quantity: 1, technologies: [], skills: [], jobDescription: '', requirements: [], benefits: [] });
 type SavedProps = { project: HubProject; onSaved: (value: HubProject) => void; onClose: () => void };
 export function RecruitmentModal({ project, onSaved, onClose }: SavedProps) {
+  const [editing, setEditing] = useState(!project.recruitment);
+  return editing ? <RecruitmentEditor project={project} onSaved={onSaved} onClose={() => project.recruitment ? setEditing(false) : onClose()} />
+    : <ProjectRecruitmentOverview project={project} onSaved={onSaved} onClose={onClose} onEdit={() => setEditing(true)} />;
+}
+function RecruitmentEditor({ project, onSaved, onClose }: SavedProps) {
   const existing = project.recruitment;
   const [positions, setPositions] = useState<HubPosition[]>(existing?.positions.length ? existing.positions : [position()]);
   const [raw, setRaw] = useState<Record<string, Partial<Record<'competencies' | 'requirements', string>>>>({});
-  const [deadline, setDeadline] = useState(existing?.deadline?.slice(0, 10) ?? '');
+  const [deadline, setDeadline] = useState(existing?.deadline ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
+  const [picker, setPicker] = useState<'deadline' | number | null>(null);
+  const [catalog, setCatalog] = useState<SkillCatalogItem[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    skillService.getSkills(controller.signal).then(items => { if (!controller.signal.aborted) setCatalog(items); }).catch(() => {});
+    return () => controller.abort();
+  }, []);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   function patch(index: number, value: Partial<HubPosition>) { setPositions(old => old.map((item, i) => i === index ? { ...item, ...value } : item)); }
   function listText(item: HubPosition, key: 'competencies' | 'requirements') { return raw[item.id]?.[key] ?? (key === 'competencies' ? [...new Set([...item.technologies, ...item.skills])].join(', ') : item.requirements.join('\n')); }
@@ -26,27 +44,38 @@ export function RecruitmentModal({ project, onSaved, onClose }: SavedProps) {
     const technologyNames = new Set(item.technologies.map(technology => technology.toLocaleLowerCase()));
     patch(index, { technologies: values.filter(value => !skillNames.has(value.toLocaleLowerCase()) || technologyNames.has(value.toLocaleLowerCase())), skills: values.filter(value => skillNames.has(value.toLocaleLowerCase())) });
   }
-  async function save(status: 0 | 1 | 2) {
+  async function save() {
     setError('');
     if (positions.some(item => !item.name.trim() || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100)) { setError('Mỗi vị trí cần có tên và số lượng tuyển từ 1 đến 100.'); return; }
-    if (!validDate(deadline)) { setError('Hạn tuyển cần có dạng YYYY-MM-DD.'); return; }
-    const end = deadline ? new Date(`${deadline}T23:59:59+07:00`).toISOString() : null;
-    if (status === 1 && end && Date.parse(end) <= Date.now()) { setError('Hạn tuyển phải nằm trong tương lai.'); return; }
+    const end = deadline || null;
+    if (end && Date.parse(end) <= Date.now()) { setError('Hạn tuyển phải nằm trong tương lai.'); return; }
     setBusy(true);
-    try { const saved = await projectHubService.saveRecruitment(project.id, { description: existing?.description ?? null, positions: positions.map(item => ({ ...item, name: item.name.trim() })), deadline: end, status }); onSaved(saved); onClose(); }
+    try { const saved = await projectHubService.saveRecruitment(project.id, { description: description.trim() || null, positions: positions.map(item => ({ ...item, name: item.name.trim() })), deadline: end, status: 1 }); onSaved(saved); onClose(); }
     catch (cause) { setError(messageOf(cause)); } finally { setBusy(false); }
   }
-  return <HubModal compact wide={false} icon="people" title={existing ? 'Quản lý tuyển thành viên' : 'Đăng tuyển thành viên'} subtitle="Thiết lập vị trí và yêu cầu để tìm thành viên phù hợp." onClose={busy ? () => undefined : onClose} footer={<><HubAction compact title="Hủy" onPress={onClose} disabled={busy} />{existing && <HubAction compact title="Đóng tuyển" onPress={() => void save(2)} disabled={busy} />}<HubAction compact title="Lưu nháp" onPress={() => void save(0)} disabled={busy} /><HubAction compact title="Đăng tuyển" variant="primary" onPress={() => void save(1)} busy={busy} disabled={project.status === 2} /></>}>
-    <Field compact label="Hạn tuyển" value={deadline} onChange={setDeadline} placeholder="YYYY-MM-DD" hint="Để trống nếu chưa xác định hạn tuyển." />
+  return <><HubModal compact wide={false} icon="people" title={existing ? 'Chỉnh sửa tuyển thành viên' : 'Đăng tuyển thành viên'} subtitle="Thiết lập vị trí và yêu cầu để tìm thành viên phù hợp." onClose={busy ? () => undefined : onClose} footer={<><HubAction compact title="Hủy" onPress={onClose} disabled={busy} /><HubAction compact title={existing?.status === 1 ? 'Lưu thay đổi' : 'Đăng tuyển'} variant="primary" onPress={() => void save()} busy={busy} disabled={project.status === 2} /></>}>
+    <Field compact label="Giới thiệu ngắn" value={description} onChange={setDescription} multiline maxLength={5000} placeholder="Giới thiệu ngắn về dự án, mục tiêu tuyển và thành viên bạn đang tìm kiếm…" hint="Tóm tắt trong vài câu để ứng viên hiểu bài đăng tuyển của bạn." />
+    <View style={ui.field}><Text style={ui.label}>Hạn tuyển</Text><HubAction compact title={formatRecruitmentDeadline(deadline)} icon="calendar" disabled={busy} onPress={() => setPicker('deadline')} />
+      <Text style={[ui.muted, { marginTop: 6 }]}>Giờ Việt Nam (UTC+7). Để trống nếu chưa xác định hạn tuyển.</Text></View>
     {positions.map((item, i) => <View key={item.id} style={{ borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 14, marginTop: 12, backgroundColor: '#F8FAFF' }}>
       <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 12 }]}><Text accessibilityRole="header" style={{ fontSize: 14, fontWeight: '600', color: c.ink }}>Vị trí {i + 1}</Text>{positions.length > 1 && <HubAction compact title={`Gỡ vị trí ${i + 1}`} icon="trash" variant="quiet" disabled={busy} onPress={() => setPositions(old => old.filter((_, index) => index !== i))} />}</View>
       <View style={styles.row}><View style={{ flex: 1, minWidth: 0 }}><Field compact label={`Tên vị trí ${i + 1} *`} value={item.name} onChange={name => patch(i, { name })} maxLength={150} placeholder="Ví dụ: Backend Developer" /></View><View style={{ width: 78 }}><Field compact label="Số lượng *" value={String(item.quantity || '')} onChange={quantity => patch(i, { quantity: Number(quantity) })} maxLength={3} /></View></View>
-      <Field compact label={`Kỹ năng & công nghệ — vị trí ${i + 1}`} value={listText(item, 'competencies')} onChange={value => changeList(i, 'competencies', value)} placeholder="ASP.NET Core, PostgreSQL, REST API, Git…" />
+      <View style={ui.field}><Text style={ui.label}>Kỹ năng & công nghệ — vị trí {i + 1}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Chọn kỹ năng & công nghệ — vị trí ${i + 1}`} disabled={busy} onPress={() => setPicker(i)} style={[ui.input, { minHeight: 38, justifyContent: 'center', padding: 6 }]}>
+          {listText(item, 'competencies') ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {technologies(listText(item, 'competencies')).map(name => <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: c.primary, backgroundColor: c.blueWash, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4, maxWidth: '100%' }}>
+              <TechnologyLogo name={name} iconUrl={findTechnology(catalog, name)?.iconUrl} size={14} /><Text style={{ color: c.ink, fontSize: 11, lineHeight: 16, flexShrink: 1 }}>{name}</Text>
+            </View>)}
+          </View> : <Text style={{ color: c.textMuted, fontSize: 13 }}>Chọn kỹ năng và công nghệ…</Text>}
+        </Pressable></View>
       <Field compact label={`Yêu cầu bổ sung — vị trí ${i + 1}`} value={listText(item, 'requirements')} onChange={value => changeList(i, 'requirements', value)} multiline hint="Mỗi yêu cầu trên một dòng." />
     </View>)}
     <View style={{ marginTop: 16 }}><HubAction compact title="Thêm vị trí tuyển" icon="plus" disabled={busy || positions.length >= 20} onPress={() => setPositions(old => [...old, position()])} /></View>
     {!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}
-  </HubModal>;
+  </HubModal>
+    {picker === 'deadline' && <RecruitmentDeadlineModal value={deadline} onClose={() => setPicker(null)} onConfirm={value => { setDeadline(value); setPicker(null); }} />}
+    {typeof picker === 'number' && positions[picker] && <RecruitmentCompetenciesModal value={technologies(listText(positions[picker], 'competencies'))} onClose={() => setPicker(null)} onConfirm={values => { changeList(picker, 'competencies', values.join(', ')); setPicker(null); }} />}
+  </>;
 }
 
 export { ProjectFriendInviteModal as InviteMemberModal } from './ProjectFriendInviteModal';

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { HubAction, HubIcon, HubModal, hubColors as c, ui } from './ProjectHubUI';
 import { projectToday } from './ProjectDateField';
@@ -10,9 +10,10 @@ const calendarMonth = (year: number, month: number) => {
   return date;
 };
 
-export function ProjectTimelineDateModal({ title, value, min, max, busy, error, onClose, onConfirm }: {
+export function ProjectTimelineDateModal({ title, value, min, max, busy, error, onClose, onConfirm, children }: {
   title: string; value: string; min?: string; max?: string; busy: boolean; error: string;
   onClose: () => void; onConfirm: (value: string) => void;
+  children?: ReactNode;
 }) {
   const [draft, setDraft] = useState(value);
   const [month, setMonth] = useState(() => {
@@ -45,6 +46,7 @@ export function ProjectTimelineDateModal({ title, value, min, max, busy, error, 
         <Text style={styles.caption}>Ngày đang chọn</Text>
         <Text accessibilityLiveRegion="polite" style={styles.date}>{formatTimelineDate(draft)}</Text>
       </View>
+      {children}
       <View style={styles.month}>
         <HubAction compact title={view === 'days' ? 'Tháng trước' : view === 'months' ? 'Năm trước' : '12 năm trước'} icon="back" variant="quiet" disabled={previousDisabled} onPress={() => navigate(-1)} />
         <Pressable accessibilityRole="button" accessibilityLabel={view === 'days' ? 'Chọn tháng và năm' : view === 'months' ? 'Chọn năm' : 'Quay lại chọn tháng'}

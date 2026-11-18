@@ -5,10 +5,10 @@ import type { SkillCatalogItem } from '@/services/skill.service';
 import { findTechnology } from '@/utils/project-technologies';
 import { HubIcon, hubColors as c } from './ProjectHubUI';
 
-export function TechnologyLogo({ name, iconUrl }: { name: string; iconUrl?: string | null }) {
+export function TechnologyLogo({ name, iconUrl, size = 18 }: { name: string; iconUrl?: string | null; size?: number }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [iconUrl]);
-  return iconUrl && !failed ? <Image source={{ uri: iconUrl }} contentFit="contain" accessibilityLabel={`Icon ${name}`} onError={() => setFailed(true)} style={styles.logo} /> : <View style={styles.fallback}><HubIcon name="layers" size={14} /></View>;
+  return iconUrl && !failed ? <Image source={{ uri: iconUrl }} contentFit="contain" accessibilityLabel={`Icon ${name}`} onError={() => setFailed(true)} style={[styles.logo, { width: size, height: size }]} /> : <View style={[styles.fallback, { width: size, height: size }]}><HubIcon name="layers" size={Math.min(14, size)} /></View>;
 }
 export function ProjectTechnologyChips({ values, catalog, onRemove, disabled }: { values: string[]; catalog: SkillCatalogItem[]; onRemove?: (name: string) => void; disabled?: boolean }) {
   return <View style={styles.chips}>{values.map((name, index) => <View key={`${name}-${index}`} style={styles.chip}>
