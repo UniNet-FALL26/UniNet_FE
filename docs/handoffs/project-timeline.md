@@ -1,5 +1,22 @@
 # Project dates
 
+## Timeline guidance (2026-11-18)
+
+- Add a red exclamation button and persistent notice in owner timeline settings.
+  Reuse HubModal for guidance about historical projects imported into UniNet,
+  newly created projects, actual end dates and Vietnam-day selection bounds.
+- Historical projects: correct the start date first; keep end blank while ongoing.
+  New projects default to creation day, with an editable start date.
+- Remove the saved-success message and its state. Keep save/error behavior and
+  existing date validation. No API or schema changes.
+- Plan/validation: implement notice/modal, check open/close on desktop/mobile,
+  then run existing timeline regression and TypeScript validation.
+- Verified: Chrome timeline fixture passes guidance content, desktop dismiss,
+  mobile bounds/Escape, no writes from guidance and no inline success message
+  after saving. Existing date persistence, bounds and error retry also pass.
+  Mobile screenshot inspected. TypeScript errors remain in unchanged
+  opportunities.tsx and AssessorProfilePosts.tsx only.
+
 ## Current contract: start and end only
 
 - Planned completion was removed from Settings, sidebar, model/API and active DB

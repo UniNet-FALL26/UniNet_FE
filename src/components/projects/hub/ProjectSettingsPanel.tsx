@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { HubProject } from '@/types/project-hub';
-import { HubAction, HubIcon, hubColors as c, ui, type HubIconName } from './ProjectHubUI';
+import { HubAction, HubIcon, HubModal, hubColors as c, type HubIconName } from './ProjectHubUI';
 import { projectToday } from './ProjectDateField';
 import { ProjectTimelineDateModal, formatTimelineDate } from './ProjectTimelineDateModal';
 import { messageOf, validDate } from './ProjectHubFields';
@@ -41,7 +41,8 @@ function ProjectTimelineSettings({ project, onSaved }: { project: HubProject; on
   const { width } = useWindowDimensions();
   type DateField = 'startDate' | 'actualEndDate';
   const [editing, setEditing] = useState<DateField | null>(null);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
   const lock = useRef(false);
   const timeline = { startDate: project.details.startDate ?? '', actualEndDate: project.details.actualEndDate ?? '' };
   const fields: { key: DateField; label: string; title: string }[] = [
@@ -51,7 +52,7 @@ function ProjectTimelineSettings({ project, onSaved }: { project: HubProject; on
   const close = () => { if (!lock.current) { setEditing(null); setError(''); } };
   async function save(value: string) {
     if (lock.current || !editing) return;
-    setError(''); setSaved(false);
+    setError('');
     const nextTimeline = { ...timeline, [editing]: value };
     const { startDate: start, actualEndDate: actual } = nextTimeline;
     if (![start, actual].every(validDate)) { setError('Vui lòng chọn ngày hợp lệ.'); return; }
@@ -60,18 +61,27 @@ function ProjectTimelineSettings({ project, onSaved }: { project: HubProject; on
     lock.current = true; setBusy(true);
     try {
       onSaved(await projectHubService.update(project.id, { timeline: { startDate: start || null, actualEndDate: actual || null } }));
-      setSaved(true); setEditing(null);
+      setEditing(null);
     } catch (cause) { setError(messageOf(cause)); }
     finally { lock.current = false; setBusy(false); }
   }
   return <SettingsSection title="Thời gian dự án" subtitle="Thiết lập ngày bắt đầu và ngày kết thúc dự án." icon="calendar">
+    <View style={styles.dateNotice}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Giải thích thời gian dự án" aria-haspopup="dialog" accessibilityState={{ expanded: showGuide }} hitSlop={6}
+        onPress={() => setShowGuide(true)} style={({ pressed }) => [styles.guideButton, pressed && { opacity: 0.65 }]}>
+        <Text accessible={false} style={styles.guideMark}>!</Text>
+      </Pressable>
+      <Text style={styles.noticeText}>Lưu ý: ngày kết thúc là ngày đã kết thúc thực tế, không phải ngày dự kiến.{' '}
+        <Text accessibilityRole="button" onPress={() => setShowGuide(true)} style={styles.guideLink}>Xem hướng dẫn</Text>
+      </Text>
+    </View>
     <View style={[styles.dateFields, width < 1200 && styles.stacked]}>
       {fields.map(field => {
         const disabled = busy;
         return <View key={field.key} style={styles.dateField}>
           <Text style={styles.dateLabel}>{field.label}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={field.title} accessibilityState={{ disabled }} disabled={disabled}
-            onPress={() => { setError(''); setSaved(false); setEditing(field.key); }}
+            onPress={() => { setError(''); setEditing(field.key); }}
             style={({ pressed }) => [styles.control, disabled && styles.locked, pressed && styles.pressed]}>
             <HubIcon name="calendar" size={16} color={c.ink} />
             <Text style={[styles.controlText, !timeline[field.key] && { color: c.textSecondary }]}>
@@ -81,7 +91,17 @@ function ProjectTimelineSettings({ project, onSaved }: { project: HubProject; on
         </View>;
       })}
     </View>
-    {saved && <Text role="status" style={ui.muted}>Đã lưu thời gian dự án.</Text>}
+    {showGuide && <HubModal title="Hướng dẫn thời gian dự án" icon="warning" compact wide={false} onClose={() => setShowGuide(false)}
+      footer={<HubAction compact title="Đã hiểu" variant="primary" onPress={() => setShowGuide(false)} />}>
+      <View style={{ gap: 16 }}>
+        <View style={{ gap: 6 }}><Text style={styles.guideTitle}>Dự án đã làm bên ngoài UniNet</Text>
+          <Text style={styles.guideText}>Nhập ngày bắt đầu thực tế, kể cả khi trước ngày đưa dự án lên UniNet. Nếu dự án đã kết thúc, nhập ngày kết thúc thực tế; nếu vẫn đang thực hiện, để trống ngày kết thúc.</Text></View>
+        <View style={{ gap: 6 }}><Text style={styles.guideTitle}>Dự án mới tạo trên UniNet</Text>
+          <Text style={styles.guideText}>Ngày bắt đầu mặc định là ngày tạo dự án và có thể chỉnh sửa cho đúng thực tế. Để trống ngày kết thúc cho đến khi dự án thực sự kết thúc.</Text></View>
+        <View style={{ gap: 6 }}><Text style={styles.guideTitle}>Vì sao có ngày không chọn được?</Text>
+          <Text style={styles.guideText}>Ngày kết thúc phải bằng hoặc sau ngày bắt đầu và không được sau hôm nay (giờ Việt Nam). Nếu ngày bắt đầu là hôm nay, bạn chỉ có thể chọn hôm nay làm ngày kết thúc. Với dự án đã làm trước đó, hãy cập nhật ngày bắt đầu trước rồi chọn ngày kết thúc phù hợp.</Text></View>
+      </View>
+    </HubModal>}
     {editing && <ProjectTimelineDateModal key={`${project.id}-${editing}`} title={fields.find(field => field.key === editing)!.title}
       value={timeline[editing]} min={editing !== 'startDate' ? timeline.startDate || undefined : undefined}
       max={editing === 'actualEndDate' ? projectToday() : timeline.actualEndDate || undefined}
@@ -91,6 +111,13 @@ function ProjectTimelineSettings({ project, onSaved }: { project: HubProject; on
 
 const styles = StyleSheet.create({
   settings: { gap: 16 },
+  dateNotice: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF3F5', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8 },
+  guideButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  guideMark: { width: 20, height: 20, borderRadius: 10, backgroundColor: c.error, color: '#FFFFFF', fontSize: 14, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
+  noticeText: { flex: 1, minWidth: 0, color: '#9F2434', fontSize: 11, lineHeight: 17 },
+  guideLink: { color: c.primary, fontWeight: '600' },
+  guideTitle: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  guideText: { color: c.textSecondary, fontSize: 13, lineHeight: 21 },
   section: { backgroundColor: c.surface, borderWidth: 1, borderColor: '#E7ECF7', borderRadius: 12, padding: 18, gap: 16, boxShadow: '0 2px 8px rgba(33, 62, 115, 0.03)' },
   sectionHead: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   sectionIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.blueWash, alignItems: 'center', justifyContent: 'center' },
