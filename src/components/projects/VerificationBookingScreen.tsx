@@ -124,12 +124,12 @@ export function VerificationBookingScreen() {
     />;
   }
   return <SafeAreaView style={s.safe}>
-    <DetailNavigation title={detail ? 'Chọn lịch xác minh' : 'Chọn gói thẩm định'} />
+    <DetailNavigation title={detail ? 'Chọn lịch xác minh' : 'Thanh toán phí dịch vụ thẩm định'} />
     <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}>
         <View accessible={false} style={s.heroRing} />
         <View style={s.steps}>
-          <Text style={detail ? s.step : s.stepActive}>{detail ? '✓ Chọn gói' : 'Chọn gói'}</Text>
+          <Text style={detail ? s.step : s.stepActive}>{detail ? '✓ Phí dịch vụ' : 'Phí dịch vụ'}</Text>
           <Text style={detail ? s.stepActive : s.step}>Chọn lịch</Text>
           <Text style={s.step}>Thanh toán</Text>
         </View>
@@ -140,13 +140,14 @@ export function VerificationBookingScreen() {
       {error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Tải lại trạng thái" onPress={reload} /></View>}
       {loading && <Text accessibilityRole="progressbar" style={s.body}>Đang tải dữ liệu mới nhất…</Text>}
       {!loading && !error && !detail && <>
-        <Text style={s.heading}>Gói dành cho sinh viên</Text><Text style={s.body}>Chọn gói để tạo hồ sơ. Bước này chưa thu phí; bạn sẽ chọn lịch trước khi thanh toán.</Text>
-        {!packages.length && <Text style={s.notice}>Chưa có gói xác minh phù hợp đang mở bán.</Text>}
+        <Text accessibilityRole="header" style={s.heading}>Thanh toán phí dịch vụ thẩm định</Text>
+        <Text style={s.body}>Bạn sẽ chọn lịch hẹn trước khi thanh toán.</Text>
+        {!packages.length && <Text style={s.notice}>Dịch vụ thẩm định hiện chưa mở đăng ký.</Text>}
         {packages.map(p => <Pressable key={p.id} accessibilityRole="radio" accessibilityState={{ checked: selectedPackage === p.id }} onPress={() => setSelectedPackage(p.id)} style={[s.card, selectedPackage === p.id && s.selected]}>
-          <Text style={s.kickerDark}>{selectedPackage === p.id ? '● ĐÃ CHỌN' : '○ CHỌN GÓI'}</Text><Text style={s.heading}>{p.name}</Text><Text style={s.price}>{p.price.toLocaleString('vi-VN')} ₫</Text><Text style={s.body}>Xác minh dự án với chuyên viên</Text>{p.durationInDays != null && <Text style={s.small}>Thời hạn gói: {p.durationInDays} ngày</Text>}
+          <Text style={s.kickerDark}>{selectedPackage === p.id ? '● ĐÃ CHỌN' : '○ CHỌN DỊCH VỤ'}</Text><Text style={s.heading}>Thẩm định dự án với chuyên viên</Text><Text style={s.price}>{p.price.toLocaleString('vi-VN')} ₫</Text>{p.durationInDays != null && <Text style={s.small}>Thời hạn dịch vụ: {p.durationInDays} ngày</Text>}
         </Pressable>)}
         {packagePages > 1 && <View style={s.row}><Button title="Trang trước" variant="outline" disabled={packagePage <= 1} onPress={() => { setSelectedPackage(null); setPackagePage(v => v - 1); }} /><Text style={s.small}>{packagePage} / {packagePages}</Text><Button title="Trang sau" variant="outline" disabled={packagePage >= packagePages} onPress={() => { setSelectedPackage(null); setPackagePage(v => v + 1); }} /></View>}
-        <View style={s.card}><Text style={s.heading}>Điều kiện đăng ký</Text><Text style={s.body}>✓ Bạn là người tạo dự án đã hoàn thành.</Text><Text style={s.small}>Kết quả thẩm định do chuyên viên kết luận sau buổi xác minh. Đăng ký gói không bảo đảm dự án sẽ đạt.</Text></View>
+        <View style={s.card}><Text style={s.heading}>Điều kiện đăng ký</Text><Text style={s.body}>✓ Bạn là người tạo dự án đã hoàn thành.</Text><Text style={s.small}>Chuyên viên sẽ đưa ra kết luận sau buổi thẩm định.</Text></View>
       </>}
       {!loading && !error && detail && <>
         <View style={s.card}><Text style={s.heading}>{level2Label(detail, true)}</Text>{detail.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {verificationDate(detail.verification.scheduledStartAt)}{'\n'}{VERIFICATION_TIME_LABEL}</Text>}
