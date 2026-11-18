@@ -244,10 +244,18 @@ function VerificationResultPanel({ result }: { result: VerificationFinalResult }
     </HubPanel>
     {result.reports.map((report, index) => <HubPanel key={report.id} title={`Báo cáo chuyên viên ${index + 1}`} icon="document">
       <Text style={ds.small}>Nộp lúc {verificationDate(report.submittedAt)}</Text>
-      <Text style={ds.heading}>Tóm tắt</Text>
-      <Text selectable style={ds.body}>{report.summary}</Text>
-      {report.findings && <><Text style={ds.heading}>Nhận định và phát hiện</Text><Text selectable style={ds.body}>{report.findings}</Text></>}
-      {report.recommendations && <><Text style={ds.heading}>Khuyến nghị</Text><Text selectable style={ds.body}>{report.recommendations}</Text></>}
+      <View style={ds.reportBlueBox}>
+        <Text style={ds.heading}>Tóm tắt</Text>
+        <Text selectable style={ds.body}>{report.summary}</Text>
+      </View>
+      {report.findings && <View style={ds.reportSectionBox}>
+        <Text style={ds.heading}>Nhận định và phát hiện</Text>
+        <Text selectable style={ds.body}>{report.findings}</Text>
+      </View>}
+      {report.recommendations && <View style={ds.reportGreenBox}>
+        <Text style={ds.heading}>Khuyến nghị</Text>
+        <Text selectable style={ds.body}>{report.recommendations}</Text>
+      </View>}
     </HubPanel>)}
   </View>;
 }

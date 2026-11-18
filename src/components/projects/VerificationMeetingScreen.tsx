@@ -20,6 +20,7 @@ export function VerificationMeetingScreen() {
       pathname: "/group/verification-dossier/[id]",
       params: { id },
     } as never);
+
   return (
     <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Buổi thẩm định dự án">
       <Button title="Quay lại hồ sơ" variant="outline" onPress={dossier} />
@@ -49,9 +50,11 @@ export function VerificationMeetingScreen() {
           >
             <Text style={ds.notice}>{state.message}</Text>
             {state.waitingSeconds > 0 && (
-              <Text style={ds.body}>Còn {meetingWaitLabel(state.waitingSeconds)} đến giờ tham gia.</Text>
+              <Text style={ds.waitingBanner}>
+                Còn {meetingWaitLabel(state.waitingSeconds)} đến giờ tham gia.
+              </Text>
             )}
-            <Text style={ds.body}>
+            <Text style={ds.meetingTimeBox}>
               Dự kiến bắt đầu:{" "}
               {date(
                 meeting?.scheduledStartAt ??
