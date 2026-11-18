@@ -45,6 +45,7 @@ export function VerificationDossierScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const lock = useRef(false);
   const generation = useRef(0);
+
   useFocusEffect(
     useCallback(() => {
       const current = ++generation.current;
@@ -57,7 +58,7 @@ export function VerificationDossierScreen() {
       };
     }, [id, account?.id]),
   );
-  // Payment history is independent: a failed page never removes the dossier.
+
   useFocusEffect(
     useCallback(() => {
       const controller = new AbortController();
@@ -83,10 +84,12 @@ export function VerificationDossierScreen() {
       return () => controller.abort();
     }, [id, account?.id, page, historyRevision]),
   );
+
   function reload() {
     refresh();
     setHistoryRevision((v) => v + 1);
   }
+
   async function cancel() {
     if (
       lock.current ||
@@ -131,6 +134,7 @@ export function VerificationDossierScreen() {
       }
     }
   }
+
   const v = detail?.verification;
   const projectId = detail?.project?.id ?? v?.projectId;
   const activeAssignments = detail?.assignments.filter(a => a.status === 0 || a.status === 2) ?? [];
@@ -138,10 +142,20 @@ export function VerificationDossierScreen() {
   const canAct = !loading && !error && !busy;
   const remaining = detail ? holdSeconds(detail, Date.now()) : 0;
   const final = v?.status === 1 || v?.status === 2;
+
   return (
     <DossierLayout projectId={detail?.project?.id || detail?.verification.projectId} title="Hồ sơ thẩm định">
       <View style={ds.hero}>
-        <Text style={ds.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text>
+        <View style={ds.heroHeader}>
+          <Text style={ds.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text>
+          {v && (
+            <View style={[ds.statusPill, v.status === 1 ? ds.pillSuccess : v.status === 2 ? ds.pillDanger : v.status === 3 ? ds.pillMuted : ds.pillActive]}>
+              <Text style={[ds.statusPillText, v.status === 1 ? ds.textSuccess : v.status === 2 ? ds.textDanger : v.status === 3 ? ds.textMuted : ds.textActive]}>
+                {v.status === 1 ? 'Đạt thẩm định' : v.status === 2 ? 'Không đạt thẩm định' : v.status === 3 ? 'Đã hủy' : 'Đang xử lý'}
+              </Text>
+            </View>
+          )}
+        </View>
         <Text style={ds.title}>
           {detail?.project?.title ||
             v?.projectTitle ||
@@ -151,6 +165,7 @@ export function VerificationDossierScreen() {
           {detail ? level2Label(detail, true) : "Đang tải hồ sơ từ hệ thống"}
         </Text>
       </View>
+
       {loading && (
         <Text accessibilityRole="progressbar" style={ds.small}>
           Đang làm mới hồ sơ…
@@ -166,36 +181,46 @@ export function VerificationDossierScreen() {
           {notice}
         </Text>
       )}
+
       {detail && v && (
         <>
           <DossierCard title="Tiến trình hồ sơ">
-            {dossierSteps(detail).map((step, index) => (
-              <View key={step.title} style={ds.step}>
-                <Text style={[ds.number, step.done && ds.stepDone]}>
-                  {step.done ? "✓" : String(index + 1).padStart(2, "0")}
-                </Text>
-                <Text style={ds.stepText}>
-                  {step.title} ·{" "}
-                  {step.statusText ??
-                    (step.done ? "Đã ghi nhận" : "Chưa hoàn tất")}
-                </Text>
-              </View>
-            ))}
+            <View style={ds.stepsList}>
+              {dossierSteps(detail).map((step, index) => (
+                <View key={step.title} style={ds.step}>
+                  <Text style={[ds.number, step.done && ds.stepDone]}>
+                    {step.done ? "✓" : String(index + 1).padStart(2, "0")}
+                  </Text>
+                  <Text style={ds.stepText}>
+                    {step.title} ·{" "}
+                    {step.statusText ??
+                      (step.done ? "Đã ghi nhận" : "Chưa hoàn tất")}
+                  </Text>
+                </View>
+              ))}
+            </View>
             {v.status === 3 && (
               <Text style={ds.notice}>Hồ sơ đã hủy. Tiến trình đã dừng.</Text>
             )}
-            <Text style={ds.small}>
-              Ngày nộp: {date(v.submittedAt)}
-              {"\n"}Cập nhật: {date(v.updatedAt)}
-            </Text>
+            <View style={ds.metaRow}>
+              <Text style={ds.small}>
+                Ngày nộp: {date(v.submittedAt)}
+                {"\n"}Cập nhật: {date(v.updatedAt)}
+              </Text>
+            </View>
           </DossierCard>
+
           <DossierCard title="Lịch hẹn và chuyên viên">
-            <Text style={ds.body}>
-              {v.scheduledStartAt
-                ? `${date(v.scheduledStartAt)} — ${date(v.scheduledEndAt)}`
-                : "Chưa chọn lịch xác minh."}
-            </Text>
-            <Text style={ds.small}>Giờ Việt Nam (UTC+7)</Text>
+            <View style={ds.scheduleBox}>
+              <Text style={ds.heading}>Thời gian thẩm định dự kiến</Text>
+              <Text style={ds.body}>
+                {v.scheduledStartAt
+                  ? `${date(v.scheduledStartAt)} — ${date(v.scheduledEndAt)}`
+                  : "Chưa chọn lịch xác minh."}
+              </Text>
+              <Text style={ds.small}>Giờ Việt Nam (UTC+7)</Text>
+            </View>
+
             {v.bookingStatus === 1 && (
               <Text style={ds.notice}>
                 {remaining > 0
@@ -203,21 +228,25 @@ export function VerificationDossierScreen() {
                   : "Đã hết thời gian giữ lịch. Kiểm tra giao dịch cũ trước khi chọn lại lịch."}
               </Text>
             )}
-            <Text style={ds.body}>
-              {detail.meetingEndAt
-                ? `Buổi xác minh kết thúc: ${date(detail.meetingEndAt)}`
-                : detail.meetingStartAt
-                  ? `Buổi xác minh bắt đầu: ${date(detail.meetingStartAt)}`
-                  : activeAssignment
-                    ? "Đã phân công chuyên viên. Vui lòng theo dõi lịch hẹn."
-                    : "Chưa có phân công đang hoạt động."}
-            </Text>
-            {activeAssignment && (
-              <Text style={ds.small}>
-                Phân công lúc: {date(activeAssignment.assignedAt)}. Hệ thống
-                chưa cung cấp tên chuyên viên trong hồ sơ.
+
+            <View style={ds.meetingBox}>
+              <Text style={ds.body}>
+                {detail.meetingEndAt
+                  ? `Buổi xác minh kết thúc: ${date(detail.meetingEndAt)}`
+                  : detail.meetingStartAt
+                    ? `Buổi xác minh bắt đầu: ${date(detail.meetingStartAt)}`
+                    : activeAssignment
+                      ? "Đã phân công chuyên viên. Vui lòng theo dõi lịch hẹn."
+                      : "Chưa có phân công đang hoạt động."}
               </Text>
-            )}
+              {activeAssignment && (
+                <Text style={ds.small}>
+                  Phân công lúc: {date(activeAssignment.assignedAt)}. Hệ thống
+                  chưa cung cấp tên chuyên viên trong hồ sơ.
+                </Text>
+              )}
+            </View>
+
             {v.status === 0 && !detail.finalResult && (
               <Button title="Tham gia buổi thẩm định" disabled={!canAct}
                 onPress={() => router.push({ pathname: '/group/verification-meeting/[id]', params: { id } } as never)} />
@@ -268,6 +297,7 @@ export function VerificationDossierScreen() {
               }
             />
           </DossierCard>
+
           {v.status === 3 && (
             <DossierCard title="Thông tin hủy">
               <Text style={ds.body}>
@@ -281,6 +311,7 @@ export function VerificationDossierScreen() {
           )}
         </>
       )}
+
       {detail && (
         <DossierCard title="Lịch sử thanh toán">
           {historyLoading && <Text style={ds.small}>Đang tải giao dịch…</Text>}
@@ -301,28 +332,36 @@ export function VerificationDossierScreen() {
               {!history.transactions.length && (
                 <Text style={ds.body}>Chưa có giao dịch trên trang này.</Text>
               )}
-              {history.transactions.map((transaction) => (
-                <View key={transaction.id} style={ds.divider}>
-                  <Text style={ds.heading}>
-                    {transaction.amountVnd.toLocaleString("vi-VN")} ₫ ·{" "}
-                    {["Đang chờ", "Thành công", "Thất bại"][
-                      transaction.status
-                    ] ?? "Chưa xác định"}
-                  </Text>
-                  <Text style={ds.small}>
-                    Tạo lúc: {date(transaction.createdAt)}
-                    {"\n"}Thanh toán lúc: {date(transaction.paidAt)}
-                  </Text>
-
-                  {(transaction.requiresReview ||
-                    transaction.reconciliationRequired) && (
-                    <Text style={ds.notice}>
-                      Giao dịch cần đối soát. Vui lòng liên hệ hỗ trợ trước khi
-                      thanh toán tiếp.
+              {history.transactions.map((transaction) => {
+                const isPaid = transaction.status === 1;
+                const isFailed = transaction.status === 2;
+                return (
+                  <View key={transaction.id} style={ds.transactionItem}>
+                    <View style={ds.txRow}>
+                      <Text style={ds.txAmount}>
+                        {transaction.amountVnd.toLocaleString("vi-VN")} ₫
+                      </Text>
+                      <View style={[ds.statusPill, isPaid ? ds.pillSuccess : isFailed ? ds.pillDanger : ds.pillActive]}>
+                        <Text style={[ds.statusPillText, isPaid ? ds.textSuccess : isFailed ? ds.textDanger : ds.textActive]}>
+                          {["Đang chờ", "Thành công", "Thất bại"][transaction.status] ?? "Chưa xác định"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={ds.small}>
+                      Tạo lúc: {date(transaction.createdAt)}
+                      {"\n"}Thanh toán lúc: {date(transaction.paidAt)}
                     </Text>
-                  )}
-                </View>
-              ))}
+
+                    {(transaction.requiresReview ||
+                      transaction.reconciliationRequired) && (
+                      <Text style={ds.notice}>
+                        Giao dịch cần đối soát. Vui lòng liên hệ hỗ trợ trước khi
+                        thanh toán tiếp.
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
               <View style={ds.row}>
                 <Button
                   title="Trang trước"
@@ -330,9 +369,11 @@ export function VerificationDossierScreen() {
                   disabled={page <= 1 || historyLoading}
                   onPress={() => setPage((v) => v - 1)}
                 />
-                <Text style={ds.small}>
-                  Trang {page} / {Math.max(1, history.totalPages)}
-                </Text>
+                <View style={ds.pagePill}>
+                  <Text style={ds.pagePillText}>
+                    Trang {page} / {Math.max(1, history.totalPages)}
+                  </Text>
+                </View>
                 <Button
                   title="Trang sau"
                   variant="outline"
@@ -347,23 +388,27 @@ export function VerificationDossierScreen() {
           </Text>
         </DossierCard>
       )}
-      <Button
-        title="Làm mới hồ sơ"
-        variant="outline"
-        disabled={loading || busy}
-        onPress={reload}
-      />
-      {detail && canCancelVerification(detail) && (
+
+      <View style={ds.actionBottom}>
         <Button
-          title="Hủy hồ sơ"
+          title="Làm mới hồ sơ"
           variant="outline"
-          disabled={!canAct}
-          onPress={() => setConfirming(true)}
+          disabled={loading || busy}
+          onPress={reload}
         />
-      )}
+        {detail && canCancelVerification(detail) && (
+          <Button
+            title="Hủy hồ sơ"
+            variant="outline"
+            disabled={!canAct}
+            onPress={() => setConfirming(true)}
+          />
+        )}
+      </View>
+
       <Modal
         visible={confirming}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => {
           if (!busy) setConfirming(false);
         }}
