@@ -14,6 +14,7 @@ import { ApiProjectStatus } from '@/types/project';
 import type { MeetingSlot, MeetingSlots, VerificationDetail, VerificationPackage } from '@/types/project-verification';
 import { canChooseMeeting, holdSeconds, slotDate, slotTime } from '@/utils/verification-booking';
 import { level2Label } from '@/utils/project-verification';
+import { VerificationCheckoutScreen } from './VerificationCheckoutScreen';
 
 const errorMessage = (cause: unknown) => {
   const code = cause instanceof ApiError ? cause.code : '';
@@ -43,6 +44,7 @@ export function VerificationBookingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [editingSlotFor, setEditingSlotFor] = useState<string | null>(null);
   const lock = useRef(false);
   const generation = useRef(0);
   const uncertain = useRef(false);
@@ -60,7 +62,12 @@ export function VerificationBookingScreen() {
       if (controller.signal.aborted) return;
       setTitle(project.title); setDetail(resumed);
       if (resumed) {
-        if (!canChooseMeeting(resumed)) { setSlots(null); return; }
+        const hasPayment = holdSeconds(resumed, Date.now()) > 0 || resumed.payments.length > 0;
+        if (!canChooseMeeting(resumed) || (hasPayment && editingSlotFor !== resumed.verification.id)) {
+          setSlots(null);
+          uncertain.current = false;
+          return;
+        }
         const from = new Date(Date.now() + week * 7 * 86400000);
         const result = await service.slots(resumed.verification.id, from.toISOString(), new Date(from.getTime() + 7 * 86400000).toISOString(), controller.signal);
         // Validate the server's zone before rendering dates; never silently substitute device time.
@@ -76,7 +83,7 @@ export function VerificationBookingScreen() {
     const timer = setInterval(() => { if (AppState.currentState === 'active') setNow(Date.now()); }, 1000);
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') { setNow(Date.now()); } });
     return () => { controller.abort(); generation.current = current + 1; clearInterval(timer); subscription.remove(); };
-  }, [id, account?.id, week, packagePage, revision]));
+  }, [id, account?.id, week, packagePage, revision, editingSlotFor]));
 
   const remaining = detail ? holdSeconds(detail, now) : 0;
   const expired = detail?.verification.bookingStatus === 1 && remaining === 0;
@@ -94,7 +101,7 @@ export function VerificationBookingScreen() {
       let result: VerificationDetail;
       if (!detail) result = pending.verifications[0] ? await service.detail(pending.verifications[0].id) : await service.create(id, selectedPackage!);
       else result = await service.hold(detail.verification.id, selectedSlot!);
-      if (current === generation.current) { setDetail(result); setSelectedSlot(null); setNotice(detail ? 'Đã giữ lịch. Thời hạn được xác nhận bởi hệ thống.' : 'Hồ sơ đã sẵn sàng. Tiếp tục chọn lịch xác minh.'); reload(); }
+      if (current === generation.current) { setDetail(result); setEditingSlotFor(null); setSelectedSlot(null); setNotice(detail ? 'Đã giữ lịch. Thời hạn được xác nhận bởi hệ thống.' : 'Hồ sơ đã sẵn sàng. Tiếp tục chọn lịch xác minh.'); reload(); }
     } catch (cause) {
       uncertain.current = true;
       if (current === generation.current) {
@@ -105,10 +112,30 @@ export function VerificationBookingScreen() {
     } finally { lock.current = false; setBusy(false); }
   }
   const dates = slots ? [...new Set(slots.slots.map(s => slotDate(s.startAt, VERIFICATION_TIME_ZONE)))] : [];
+  const hasPaymentStep = detail && (held || detail.payments.length > 0);
+  if (hasPaymentStep && !error && (!choosing || editingSlotFor !== detail.verification.id)) {
+    return <VerificationCheckoutScreen
+      key={`${account?.id}:${detail.verification.id}`}
+      verificationId={detail.verification.id}
+      returnProjectId={id}
+      projectTitle={title}
+      embedded
+      onEditSchedule={choosing ? () => setEditingSlotFor(detail.verification.id) : undefined}
+    />;
+  }
   return <SafeAreaView style={s.safe}>
     <DetailNavigation title={detail ? 'Chọn lịch xác minh' : 'Chọn gói thẩm định'} />
     <ScrollView contentContainerStyle={s.content}>
-      <View style={s.hero}><Text style={s.kicker}>THẨM ĐỊNH DỰ ÁN · CHUYÊN VIÊN</Text><Text style={s.title}>{detail ? 'Hẹn gặp chuyên viên' : 'Thêm sự tin cậy cho dự án'}</Text><Text style={s.heroText}>{title || 'Dự án đã hoàn thành'}</Text><Text style={s.heroText}>{detail ? '02  Chọn lịch hẹn' : '01  Chọn gói dịch vụ'}  →  Thanh toán  →  Xác minh</Text></View>
+      <View style={s.hero}>
+        <View accessible={false} style={s.heroRing} />
+        <View style={s.steps}>
+          <Text style={detail ? s.step : s.stepActive}>{detail ? '✓ Chọn gói' : 'Chọn gói'}</Text>
+          <Text style={detail ? s.stepActive : s.step}>Chọn lịch</Text>
+          <Text style={s.step}>Thanh toán</Text>
+        </View>
+        <Text accessibilityRole="header" style={s.title}>{detail ? 'Chọn lịch thẩm định' : 'Đăng ký thẩm định dự án'}</Text>
+        {!!title && <Text style={s.heroText}>{title}</Text>}
+      </View>
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}
       {error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Tải lại trạng thái" onPress={reload} /></View>}
       {loading && <Text accessibilityRole="progressbar" style={s.body}>Đang tải dữ liệu mới nhất…</Text>}
@@ -118,13 +145,13 @@ export function VerificationBookingScreen() {
         {packages.map(p => <Pressable key={p.id} accessibilityRole="radio" accessibilityState={{ checked: selectedPackage === p.id }} onPress={() => setSelectedPackage(p.id)} style={[s.card, selectedPackage === p.id && s.selected]}>
           <Text style={s.kickerDark}>{selectedPackage === p.id ? '● ĐÃ CHỌN' : '○ CHỌN GÓI'}</Text><Text style={s.heading}>{p.name}</Text><Text style={s.price}>{p.price.toLocaleString('vi-VN')} ₫</Text><Text style={s.body}>Xác minh dự án với chuyên viên</Text>{p.durationInDays != null && <Text style={s.small}>Thời hạn gói: {p.durationInDays} ngày</Text>}
         </Pressable>)}
-        <View style={s.row}><Button title="Trang trước" variant="outline" disabled={packagePage <= 1} onPress={() => { setSelectedPackage(null); setPackagePage(v => v - 1); }} /><Text style={s.small}>{packagePage} / {Math.max(1, packagePages)}</Text><Button title="Trang sau" variant="outline" disabled={packagePage >= packagePages} onPress={() => { setSelectedPackage(null); setPackagePage(v => v + 1); }} /></View>
+        {packagePages > 1 && <View style={s.row}><Button title="Trang trước" variant="outline" disabled={packagePage <= 1} onPress={() => { setSelectedPackage(null); setPackagePage(v => v - 1); }} /><Text style={s.small}>{packagePage} / {packagePages}</Text><Button title="Trang sau" variant="outline" disabled={packagePage >= packagePages} onPress={() => { setSelectedPackage(null); setPackagePage(v => v + 1); }} /></View>}
         <View style={s.card}><Text style={s.heading}>Điều kiện đăng ký</Text><Text style={s.body}>✓ Bạn là người tạo dự án đã hoàn thành.</Text><Text style={s.small}>Kết quả thẩm định do chuyên viên kết luận sau buổi xác minh. Đăng ký gói không bảo đảm dự án sẽ đạt.</Text></View>
       </>}
       {!loading && !error && detail && <>
         <View style={s.card}><Text style={s.heading}>{level2Label(detail, true)}</Text>{detail.verification.scheduledStartAt && <Text style={s.body}>Lịch hẹn: {verificationDate(detail.verification.scheduledStartAt)}{'\n'}{VERIFICATION_TIME_LABEL}</Text>}
           {held && <><Text accessibilityLiveRegion="none" style={s.price}>{Math.floor(remaining / 60).toString().padStart(2, '0')}:{(remaining % 60).toString().padStart(2, '0')}</Text><Text style={s.small}>Thời gian giữ lịch còn lại. Giữ lịch chưa phải xác nhận thanh toán.</Text></>}
-          {(held || detail.payments.length > 0) && <Button title={detail.payments.length ? 'Xem thanh toán và kết quả' : 'Tiếp tục thanh toán'} onPress={() => router.push({ pathname: '/group/checkout/[id]', params: { id: detail.verification.id, projectId: id } } as never)} disabled={busy} />}
+          {hasPaymentStep && <Button title="Về bước thanh toán" onPress={() => setEditingSlotFor(null)} disabled={busy} />}
           {expired && <Text accessibilityRole="alert" style={s.error}>Đã hết thời gian giữ lịch. Chọn lại khung giờ khi hệ thống cho phép.</Text>}
           {!choosing && <Text style={s.small}>Hồ sơ hiện không cho phép chọn hoặc đổi lịch. Nếu giao dịch đang chờ, cần kiểm tra thanh toán trước khi đặt lại.</Text>}
           <Button title="Làm mới hồ sơ" variant="outline" onPress={reload} disabled={busy} />
@@ -145,6 +172,10 @@ export function VerificationBookingScreen() {
 }
 
 const s = StyleSheet.create({
+  heroRing: { position: 'absolute', pointerEvents: 'none', width: 290, height: 290, borderRadius: 145, borderWidth: 45, borderColor: '#1C3B63', top: -160, right: -55 },
+  steps: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  step: { color: '#D8E9FF', backgroundColor: '#254568', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: '600' },
+  stepActive: { color: '#102747', backgroundColor: '#BFE8F5', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: '700' },
   safe: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border }, back: { minWidth: 52, minHeight: 54, alignItems: 'center', justifyContent: 'center' }, backText: { fontSize: 34, color: colors.primary }, headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: colors.navy },
-  content: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: 20, gap: 20, paddingBottom: 32 }, hero: { backgroundColor: colors.navy, borderRadius: 24, padding: 24, gap: 14, borderWidth: 1, borderColor: '#244774' }, kicker: { color: '#AFCFFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '700' }, title: { fontSize: 28, lineHeight: 38, fontWeight: '800', color: '#FFFFFF' }, heroText: { fontSize: 15, lineHeight: 24, color: '#D7E6FA' }, card: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface, padding: 22, gap: 16, shadowColor: colors.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 }, selected: { borderColor: colors.primary, backgroundColor: '#EDF5FF', borderWidth: 2 }, heading: { color: colors.navy, fontSize: 18, lineHeight: 27, fontWeight: '700' }, body: { color: colors.textPrimary, fontSize: 16, lineHeight: 25 }, small: { color: colors.textSecondary, fontSize: 14, lineHeight: 22 }, price: { color: colors.primary, fontSize: 30, fontWeight: '800' }, kickerDark: { color: colors.primary, fontSize: 12, fontWeight: '700' }, notice: { backgroundColor: colors.primaryLight, borderLeftWidth: 3, borderColor: colors.primary, padding: 16, borderRadius: 12, color: colors.navy, fontSize: 15, lineHeight: 24 }, error: { color: colors.error, fontSize: 16, lineHeight: 24 }, row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, chip: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface }, slot: { minWidth: 180, flexGrow: 1, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 6, borderRadius: 14, backgroundColor: colors.surface }, footer: { padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.border },
+  content: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: 20, gap: 20, paddingBottom: 32 }, hero: { overflow: 'hidden', backgroundColor: '#102747', borderRadius: 22, padding: 24, gap: 10, borderWidth: 1, borderColor: '#244774' }, kicker: { color: '#AFCFFF', fontSize: 11, letterSpacing: 1.4, fontWeight: '700' }, title: { fontSize: 28, lineHeight: 38, fontWeight: '800', color: '#FFFFFF' }, heroText: { fontSize: 15, lineHeight: 24, color: '#D7E6FA' }, card: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface, padding: 22, gap: 16, shadowColor: colors.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 }, selected: { borderColor: colors.primary, backgroundColor: '#EDF5FF', borderWidth: 2 }, heading: { color: colors.navy, fontSize: 18, lineHeight: 27, fontWeight: '700' }, body: { color: colors.textPrimary, fontSize: 16, lineHeight: 25 }, small: { color: colors.textSecondary, fontSize: 14, lineHeight: 22 }, price: { color: colors.primary, fontSize: 30, fontWeight: '800' }, kickerDark: { color: colors.primary, fontSize: 12, fontWeight: '700' }, notice: { backgroundColor: colors.primaryLight, borderLeftWidth: 3, borderColor: colors.primary, padding: 16, borderRadius: 12, color: colors.navy, fontSize: 15, lineHeight: 24 }, error: { color: colors.error, fontSize: 16, lineHeight: 24 }, row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, chip: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface }, slot: { minWidth: 180, flexGrow: 1, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 6, borderRadius: 14, backgroundColor: colors.surface }, footer: { padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.border },
 });

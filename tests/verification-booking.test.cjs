@@ -27,6 +27,33 @@ test('slot dates use backend timezone across midnight', () => {
   assert.equal(rules.slotDate('2026-10-21T18:30:00Z', 'Asia/Ho_Chi_Minh'), '2026-10-22');
   assert.equal(rules.slotTime('2026-10-21T18:30:00Z', 'Asia/Ho_Chi_Minh'), '01:30');
 });
+test('a live hold opens checkout within the booking route', () => {
+  const held = detail();
+  held.verification = { ...held.verification, id: 'verification', bookingStatus: 1, reservedUntil: '2099-10-21T02:00:00Z' };
+  const source = fs.readFileSync('src/components/projects/VerificationBookingScreen.tsx', 'utf8');
+  const exports = {};
+  const checkout = () => {};
+  let state = 0;
+  const imports = {
+    react: { useState: initial => [state++ === 1 ? held : initial, () => {}], useRef: () => ({}), useCallback: fn => fn, useEffect() {} },
+    'react/jsx-runtime': { jsx: (type, props) => ({ type, props }) },
+    'react-native': { StyleSheet: { create: value => value } },
+    'expo-router': { useFocusEffect() {}, useLocalSearchParams: () => ({ id: 'project' }) },
+    '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'account' } }) },
+    '@/constants/colors': { colors: {} },
+    '@/utils/verification-booking': rules,
+    './VerificationCheckoutScreen': { VerificationCheckoutScreen: checkout },
+  };
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
+    exports, Date, require: key => imports[key] ?? {},
+  });
+  const screen = exports.VerificationBookingScreen();
+  assert.equal(screen.type, checkout);
+  assert.equal(screen.props.embedded, true);
+  assert.equal(screen.props.verificationId, 'verification');
+  assert.equal(screen.props.returnProjectId, 'project');
+  assert.equal(typeof screen.props.onEditSchedule, 'function');
+});
 test('service uses package filters and sends only backend slot timestamps', async () => {
   const calls = [];
   const service = load('services/project-verification.service', { '@/constants/config': { API_URL: 'https://example.test/api' }, '@/services/api': { apiRequest: async (path, options) => { calls.push({ path, options }); return {}; } } }).projectVerificationService;

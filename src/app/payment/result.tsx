@@ -76,25 +76,6 @@ export default function PaymentResultScreen() {
           )}
         </View>
       )}
-      {isAuthenticated && id && (
-        <View style={styles.banner}>
-          <Button
-            title="Về trang thanh toán của hồ sơ"
-            variant="outline"
-            onPress={() =>
-              router.replace({
-                pathname: "/group/checkout/[id]",
-                params: {
-                  id,
-                  ...(resolved?.projectId
-                    ? { projectId: resolved.projectId }
-                    : {}),
-                },
-              } as never)
-            }
-          />
-        </View>
-      )}
       {!isAuthenticated ? (
         <View style={styles.banner}>
           <Text style={styles.text}>

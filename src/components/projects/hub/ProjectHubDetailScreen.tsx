@@ -3,6 +3,9 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { projectHubService } from '@/services/project-hub.service';
+import { projectVerificationService } from '@/services/project-verification.service';
+import type { VerificationFinalResult } from '@/types/project-verification';
+import { ds, verificationDate } from '@/components/projects/VerificationDossierUI';
 import { formatProjectUpdatedAt } from '@/utils/project-updated-at';
 import { projectDisplayMembers } from '@/utils/project-members';
 import { useAuthStore } from '@/store/auth.store';
@@ -25,7 +28,7 @@ import { ProjectTechnologiesCard } from './ProjectTechnologiesCard';
 import { ProjectImagePreviewModal } from './ProjectImagePreviewModal';
 import { ApplyProjectModal, InviteMemberModal, MemberRoleModal, PersonAvatar, ProjectRequestsModal, RecruitmentModal } from './ProjectCommunityModals';
 
-type Tab = 'overview' | 'members' | 'documents' | 'media' | 'settings';
+type Tab = 'overview' | 'members' | 'documents' | 'media' | 'verification' | 'settings';
 type ModalKind = 'links' | 'summary' | 'overview' | 'community' | 'invite' | 'requests' | 'review' | 'apply' | 'complete' | 'delete' | 'leave' | null;
 const date = (value: string | null) => value ? new Date(value.slice(0, 10) + 'T12:00:00').toLocaleDateString('vi-VN') : 'Chưa cập nhật';
 const overviewTabs: { id: Tab; label: string; icon: HubIconName }[] = [
@@ -44,6 +47,12 @@ export function ProjectHubDetailScreen() {
   const imageRequest = useRef(0), pickerLocked = useRef(false), resourceLocked = useRef(false);
   const [addingResource, setAddingResource] = useState<'documents' | 'media' | null>(null);
   const [resourceError, setResourceError] = useState<{ kind: 'documents' | 'media'; message: string } | null>(null);
+  const [verification, setVerification] = useState<{ key: string; result: VerificationFinalResult } | null>(null);
+  const [recruitmentClock, setRecruitmentClock] = useState<{ deadline: string; now: number } | null>(null);
+  const recruitmentDeadline = project?.recruitment?.deadline;
+  const verificationKey = project?.id === projectId && (project?.isOwner || project?.isMember) && account?.id
+    ? `${account.id}:${projectId}` : null;
+  const verificationResult = verificationKey && verification?.key === verificationKey ? verification.result : null;
   const { width } = useWindowDimensions(); const compact = width < 800; const columns = width >= 1050;
   useFocusEffect(useCallback(() => {
     const controller = new AbortController(); setLoading(true); setProject(null); setError(''); setTab('overview'); setImageFile(null); setImageError(''); setPickingImage(false); pickerLocked.current = false; setResourceError(null); setAddingResource(null); resourceLocked.current = false;
@@ -51,6 +60,30 @@ export function ProjectHubDetailScreen() {
     projectHubService.get(projectId, controller.signal).then(value => { if (!controller.signal.aborted) setProject(value); }).catch(cause => { if (!controller.signal.aborted) setError(messageOf(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => { controller.abort(); imageRequest.current++; };
   }, [projectId, account?.id, attempt]));
+  useFocusEffect(useCallback(() => {
+    setVerification(null);
+    if (!verificationKey || !projectId) return;
+    const controller = new AbortController();
+    void projectVerificationService.latestFinalResult(projectId, controller.signal).then(result => {
+      if (result && !controller.signal.aborted) setVerification({ key: verificationKey, result });
+    }).catch(() => {
+      // A missing or inaccessible result should not interrupt project details.
+    });
+    return () => controller.abort();
+  }, [projectId, verificationKey, attempt]));
+  useFocusEffect(useCallback(() => {
+    if (!recruitmentDeadline) return;
+    const expiresAt = Date.parse(recruitmentDeadline);
+    if (!Number.isFinite(expiresAt)) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const checkDeadline = () => {
+      const now = Date.now();
+      setRecruitmentClock({ deadline: recruitmentDeadline, now });
+      if (now < expiresAt) timer = setTimeout(checkDeadline, Math.min(expiresAt - now, 2_147_483_647));
+    };
+    checkDeadline();
+    return () => clearTimeout(timer);
+  }, [recruitmentDeadline]));
   const closeModal = useCallback(() => { setModal(null); setMutationError(''); }, []);
   const closeMember = useCallback(() => setMember(null), []);
   const saved = useCallback((value: HubProject) => { setProject(value); setNotice(''); }, []);
@@ -90,7 +123,11 @@ export function ProjectHubDetailScreen() {
   const activeMembers = displayMembers.filter(item => item.status === 0);
   const canOpenCommunity = project.isOwner && project.status !== 2 && project.status !== 3;
   const tabs = overviewTabs.filter(item => (item.id !== 'settings' || project.isOwner || project.isMember));
-  const canApply = !project.isOwner && !project.isMember && (project.status === 0 || project.status === 1) && project.recruitment?.status === 1 && (!project.recruitment.deadline || Date.parse(project.recruitment.deadline) > Date.now());
+  if (verificationResult) tabs.splice(4, 0, { id: 'verification', label: 'Thẩm định', icon: 'check' });
+  const deadlineOpen = !recruitmentDeadline || (recruitmentClock?.deadline === recruitmentDeadline &&
+    Date.parse(recruitmentDeadline) > recruitmentClock.now);
+  const canApply = !project.isOwner && !project.isMember && (project.status === 0 || project.status === 1) &&
+    project.recruitment?.status === 1 && deadlineOpen;
   const showHeaderActions = canOpenCommunity || (canApply);
   const actions = showHeaderActions ? <View style={styles.toolbarActions}>
       {canOpenCommunity && <HubAction compact title={project.recruitment ? 'Quản lý tuyển thành viên' : 'Đăng tuyển thành viên'} icon="people" variant="primary" onPress={() => show('community')} />}
@@ -113,6 +150,7 @@ export function ProjectHubDetailScreen() {
     <ScrollView testID="project-detail-tabs" horizontal style={{ marginTop: 20 }} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{tabs.map(item => <Pressable key={item.id} accessibilityRole="tab" aria-selected={tab === item.id} onPress={() => setTab(item.id)} style={[styles.tab, tab === item.id && styles.tabActive]}><HubIcon name={item.icon} color={tab === item.id ? c.primary : c.textSecondary} size={17} /><Text style={{ color: tab === item.id ? c.primary : c.ink, fontSize: 13, fontWeight: tab === item.id ? '600' : '500' }}>{item.label}{item.id === 'members' ? ` (${activeMembers.length})` : ''}</Text></Pressable>)}</ScrollView>
     <View style={[styles.content, !columns && { flexDirection: 'column' }]}><View style={{ flex: 1, minWidth: 0, gap: 14 }}>
       {tab === 'settings' && (project.isOwner || project.isMember) && <ProjectSettingsPanel project={project} onManage={show} />}
+      {tab === 'verification' && verificationResult && <VerificationResultPanel result={verificationResult} />}
       {tab === 'overview' && <ProjectOverview project={project} editingDisabled={addingResource !== null} onEdit={() => show('overview')} onReview={() => show('review')} />}
       {tab === 'documents' && <ResourcesPanel project={project} kind="documents" onAdd={() => void addResource('documents')} busy={addingResource !== null} error={resourceError?.kind === 'documents' ? resourceError.message : ''} />}
       {tab === 'media' && <ResourcesPanel project={project} kind="media" onAdd={() => void addResource('media')} busy={addingResource !== null} error={resourceError?.kind === 'media' ? resourceError.message : ''} />}
@@ -123,7 +161,7 @@ export function ProjectHubDetailScreen() {
       <HubPanel compact title="Thông tin dự án" icon="info"><InfoRow icon="person" label="Chủ dự án"><View style={styles.creator}><PersonAvatar person={project.creator} size={22} /><Text style={[styles.infoValue, { flexShrink: 1 }]}>{project.creator.fullName}</Text></View></InfoRow><InfoRow icon="calendar" label="Ngày bắt đầu"><Text style={styles.infoValue}>{date(project.details.startDate)}</Text></InfoRow><InfoRow icon="calendar" label={project.status === 2 ? 'Ngày hoàn thành' : 'Dự kiến kết thúc'}><Text style={styles.infoValue}>{date(project.details.endDate)}</Text></InfoRow><InfoRow icon="people" label="Thành viên"><Text style={styles.infoValue}>{activeMembers.length} thành viên</Text></InfoRow><InfoRow icon="clock" label="Cập nhật gần đây"><Text testID="project-last-updated" style={styles.infoValue}>{formatProjectUpdatedAt(project.updatedAt)}</Text></InfoRow><InfoRow icon="info" label="Trạng thái"><HubStatus compact status={project.status} /></InfoRow></HubPanel>
       <ProjectTechnologiesCard key={project.id} project={project} canEdit={project.isOwner} onSaved={saved} />
       <HubPanel compact title="Liên kết" icon="link" style={{ paddingRight: project.isOwner ? 42 : 16 }}>{project.isOwner && <ProjectPencilButton corner label="Chỉnh sửa liên kết dự án" disabled={addingResource !== null} onPress={() => show('links')} />}{project.details.links.length ? project.details.links.map((link, i) => <Pressable key={i} accessibilityRole="link" onPress={() => openProjectUrl(link.url)} style={styles.link}><ProjectLinkIcon label={link.label} size={19} /><Text numberOfLines={1} style={[styles.infoValue, { flex: 1 }]}>{link.label}</Text><HubIcon name="external" size={16} color={c.textSecondary} /></Pressable>) : <Text style={styles.muted}>Chưa có liên kết dự án.</Text>}</HubPanel>
-      <ProjectVerificationCard project={project} />
+        {!verificationResult && project.isOwner && project.status === 2 && <ProjectVerificationCard project={project} />}
     </View></View>
 
   </ScrollView>
@@ -181,6 +219,25 @@ function ResourcesPanel({ project, kind, onAdd, busy, error }: { project: HubPro
   </HubPanel>;
 }
 function Resource({ file, media }: { file: HubFile; media: boolean }) { return <Pressable accessibilityRole="link" accessibilityLabel={`Mở ${file.name}`} onPress={() => openProjectUrl(file.url)} style={media ? styles.media : styles.document}>{media ? <>{file.type === 'image' ? <Image source={{ uri: file.url }} style={styles.mediaImage} resizeMode="cover" /> : <View style={[styles.mediaImage, { backgroundColor: c.blueWash, justifyContent: 'center', alignItems: 'center' }]}><HubIcon name="play" size={38} /></View>}<View style={styles.mediaLabel}><Text numberOfLines={2} style={[styles.infoValue, { flex: 1 }]}>{file.name}</Text><HubIcon name="external" size={15} /></View></> : <><HubIcon name="document" size={20} /><Text style={[styles.infoValue, { flex: 1 }]}>{file.name}</Text><HubIcon name="external" size={17} /></>}</Pressable>; }
+function VerificationResultPanel({ result }: { result: VerificationFinalResult }) {
+  const passed = result.status === 1;
+  return <View style={{ gap: 14 }}>
+    <HubPanel title="Kết quả thẩm định" icon="check">
+      <Text style={[ds.resultBadge, passed ? ds.resultSuccess : ds.resultFailed]}>
+        {passed ? 'Đạt thẩm định' : 'Không đạt thẩm định'}
+      </Text>
+      {result.finalizedAt && <Text style={ds.body}>Thời điểm kết luận {verificationDate(result.finalizedAt)}</Text>}
+    </HubPanel>
+    {result.reports.map((report, index) => <HubPanel key={report.id} title={`Báo cáo chuyên viên ${index + 1}`} icon="document">
+      <Text style={ds.small}>Nộp lúc {verificationDate(report.submittedAt)}</Text>
+      <Text style={ds.heading}>Tóm tắt</Text>
+      <Text selectable style={ds.body}>{report.summary}</Text>
+      {report.findings && <><Text style={ds.heading}>Nhận định và phát hiện</Text><Text selectable style={ds.body}>{report.findings}</Text></>}
+      {report.recommendations && <><Text style={ds.heading}>Khuyến nghị</Text><Text selectable style={ds.body}>{report.recommendations}</Text></>}
+    </HubPanel>)}
+  </View>;
+}
+
 const styles = StyleSheet.create({
   editableTitle: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' },
   screen: { flex: 1, backgroundColor: c.canvas }, page: { width: '100%', maxWidth: 1380, alignSelf: 'center', padding: 24, paddingBottom: 40 }, compactPage: { padding: 14, paddingBottom: 28 },

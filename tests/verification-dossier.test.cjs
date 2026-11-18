@@ -55,6 +55,28 @@ test('result and cancellation use actual backend routes, body and abort signal',
   assert.equal(calls[1][1].method, 'PATCH');
   assert.deepEqual(JSON.parse(calls[1][1].body), { reason: 'Không còn nhu cầu' });
 });
+test('project details find a final report behind pending or cancelled dossiers', async () => {
+  const signal = new AbortController().signal;
+  for (const status of [0, 1, 2, 3]) {
+    const calls = [];
+    const result = { status, finalizedAt: '2026-11-18', reports: [] };
+    const api = load('src/services/project-verification.service.ts', {
+      '@/constants/config': { API_URL: 'https://test/api' },
+      '@/services/api': { apiRequest: async (url, options) => {
+        assert.equal(options.signal, signal);
+        assert.equal(options.feedback, false);
+        calls.push(url);
+        if (url.endsWith('page=1&pageSize=20')) return { totalPages: 2, verifications: [{ id: 'pending', status: 0 }, { id: 'cancelled', status: 3 }] };
+        if (url.endsWith('page=2&pageSize=20')) return { totalPages: 2, verifications: [{ id: 'older', status }] };
+        assert.equal(url, '/projects/verifications/older/result');
+        return result;
+      } },
+    }).projectVerificationService;
+    const final = status === 1 || status === 2;
+    assert.equal(await api.latestFinalResult('project', signal), final ? result : null);
+    assert.equal(calls.length, final ? 3 : 2);
+  }
+});
 test('history requests the selected page without discarding server pagination', async () => {
   const api = load('src/services/verification-payment.service.ts', {
     '@/constants/config': { API_URL: 'https://test/api' },

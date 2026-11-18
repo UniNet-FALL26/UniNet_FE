@@ -11,8 +11,8 @@ export const projectVerificationService = {
   cancel(verificationId: string, reason: string) {
     return apiRequest<VerificationDetail>(`${base()}/verifications/${id(verificationId)}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason: reason.trim() }) });
   },
-  async result(verificationId: string, signal?: AbortSignal) {
-    const value = await apiRequest<VerificationFinalResult>(`${base()}/verifications/${id(verificationId)}/result`, { signal });
+  async result(verificationId: string, signal?: AbortSignal, feedback?: false) {
+    const value = await apiRequest<VerificationFinalResult>(`${base()}/verifications/${id(verificationId)}/result`, { signal, feedback });
     if (!value || ![0, 1, 2, 3].includes(value.status) || !Array.isArray(value.reports)) throw new Error('Phản hồi kết quả thẩm định không hợp lệ.');
     return value;
   },
@@ -37,6 +37,18 @@ export const projectVerificationService = {
     const result = await apiRequest<VerificationDetail>(`${base()}/verifications/${id(verificationId)}`, { signal });
     if (!result?.verification || !Array.isArray(result.assignments) || !Array.isArray(result.payments)) throw new Error('Phản hồi chi tiết hồ sơ không hợp lệ.');
     return result;
+  },
+  async latestFinalResult(projectId: string, signal: AbortSignal): Promise<VerificationFinalResult | null> {
+    for (let page = 1; !signal.aborted; page++) {
+      const history = await apiRequest<VerificationPage>(`${base()}/${id(projectId)}/verifications?page=${page}&pageSize=20`, { signal, feedback: false });
+      const concluded = history.verifications.find(verification => verification.status === 1 || verification.status === 2);
+      if (concluded) {
+        const result = await projectVerificationService.result(concluded.id, signal, false);
+        return result.status === 1 || result.status === 2 ? result : null;
+      }
+      if (page >= history.totalPages || !history.verifications.length) break;
+    }
+    return null;
   },
   contribution(projectId: string, signal?: AbortSignal) {
     return apiRequest<{ status: number }>(`${base()}/${id(projectId)}/contribution`, { signal });
