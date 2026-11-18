@@ -177,7 +177,7 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
       <View style={s.hero}>
         <View accessible={false} style={s.heroRing} />
         <View style={s.steps}>
-          <Text style={s.step}>✓ Chọn gói</Text>
+          <Text style={s.step}>✓ Phí dịch vụ</Text>
           <Text style={s.step}>{remaining > 0 || detail?.verification.bookingStatus === 2 ? '✓ Lịch hẹn' : 'Lịch hẹn'}</Text>
           <Text style={s.stepActive}>Thanh toán</Text>
         </View>
