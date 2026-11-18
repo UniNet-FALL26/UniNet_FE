@@ -26,6 +26,7 @@ const tabs: TabItem[] = [
 
 const shortcuts: Shortcut[] = [
   { label: 'Cơ hội', href: '/(tabs)/opportunities', icon: { ios: 'briefcase', android: 'business_center', web: 'business_center' }, tint: '#E34B66', background: '#FFF0F3' },
+  { label: 'Tìm đồng đội', href: '/(tabs)/find-teammates', icon: { ios: 'person.2', android: 'groups', web: 'groups' }, tint: '#1769E0', background: '#EAF1FF' },
 ];
 
 export function badgeLabel(count: number | undefined) {
