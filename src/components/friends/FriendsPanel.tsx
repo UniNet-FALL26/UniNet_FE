@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useAuthStore } from '@/store/auth.store';
 import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
 import { friendshipService } from '@/services/friendship.service';
@@ -10,8 +11,9 @@ import { PersonAvatar } from '@/components/projects/hub/PersonAvatar';
 import { HubAction, HubIcon, hubColors as c, ui } from '@/components/projects/hub/ProjectHubUI';
 import { ACCOUNT_ROLE } from '@/constants/roles';
 
-const tabs: { id: FriendList; label: string }[] = [{ id: 'friends', label: 'Bạn bè' }, { id: 'received', label: 'Lời mời đã nhận' }, { id: 'sent', label: 'Lời mời đã gửi' }, { id: 'people', label: 'Tìm bạn' }];
+const tabs: { id: FriendList; label: string }[] = [{ id: 'friends', label: 'Bạn bè' }, { id: 'received', label: 'Lời mời kết bạn' }];
 export function FriendsPanel() {
+  const compact = useWindowDimensions().width < 600;
   const { account } = useAuthStore(), { revision } = useNotificationUpdates();
   const [kind, setKind] = useState<FriendList>('friends'), [q, setQ] = useState(''), [page, setPage] = useState(1), [attempt, setAttempt] = useState(0);
   const [data, setData] = useState<FriendPage | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
@@ -25,17 +27,54 @@ export function FriendsPanel() {
     return () => { controller.abort(); clearTimeout(timer); };
   }, [account?.id, account?.role, kind, q, page, attempt, revision]);
   if (account?.role !== ACCOUNT_ROLE.STUDENT) return null;
-  return <ScrollView testID="friends-panel" style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.page} keyboardShouldPersistTaps="handled"><View style={s.intro}><View style={s.emblem}><HubIcon name="people" size={24} /></View><View style={{ flex: 1 }}><Text accessibilityRole="header" style={s.title}>Kết nối cùng UniNet</Text><Text style={s.hint}>Tìm người đồng hành, chia sẻ ý tưởng và xây dựng những dự án cùng nhau.</Text></View></View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>{tabs.map(tab => <Pressable key={tab.id} role="tab" accessibilityLabel={tab.label} aria-selected={kind === tab.id} onPress={() => { setKind(tab.id); setPage(1); setData(null); }} style={[s.tab, kind === tab.id && s.selected]}><Text style={{ color: kind === tab.id ? c.primary : c.textSecondary, fontSize: 13, fontWeight: '600' }}>{tab.label}</Text></Pressable>)}</ScrollView>
-    <View style={s.search}><HubIcon name="search" size={18} /><TextInput accessibilityLabel="Tìm bạn theo tên hoặc nickname" placeholder="Tìm theo tên hoặc nickname…" value={q} maxLength={100} onChangeText={value => { setQ(value); setPage(1); }} style={s.input} /></View>
-    {error ? <View style={s.empty}><Text accessibilityRole="alert" style={ui.error}>{error}</Text><HubAction compact title="Thử lại" onPress={() => setAttempt(v => v + 1)} /></View> : loading ? <ActivityIndicator color={c.primary} accessibilityLabel="Đang tải bạn bè" /> : <>
-      <Text style={s.count}>{data?.total ?? 0} {kind === 'friends' ? 'bạn bè' : 'người dùng'}</Text>
-      {!data?.items.length ? <View style={s.empty}><HubIcon name="people" size={34} /><Text style={s.hint}>{q ? 'Không tìm thấy người dùng phù hợp.' : kind === 'friends' ? 'Chưa có bạn bè. Hãy tìm và kết nối với người bạn muốn đồng hành.' : 'Chưa có lời mời trong danh sách này.'}</Text>{kind === 'friends' && <HubAction compact title="Tìm bạn mới" onPress={() => { setKind('people'); setPage(1); }} />}</View> : data.items.map(person => <View key={person.accountId} testID={`friend-person-${person.accountId}`} style={s.person}>
-        <Pressable accessibilityRole="link" accessibilityLabel={`Xem hồ sơ ${person.fullName}`} onPress={() => router.push({ pathname: '/profile/view/[id]', params: { id: person.profileId } } as never)} style={s.identity}><PersonAvatar person={person} size={44} /><View style={{ flex: 1, minWidth: 0 }}><Text style={s.name}>{person.fullName}</Text><Text style={s.hint}>@{person.nickname}</Text></View></Pressable>
-        <FriendActions person={person} onChanged={value => { setData(current => current && ({ ...current, items: current.items.map(item => item.accountId === value.accountId ? value : item) })); setAttempt(v => v + 1); }} />
-      </View>)}
-      {!!data && data.total > 20 && <View style={s.pagination}><HubAction compact title="Trang trước" disabled={page === 1} onPress={() => setPage(v => v - 1)} /><Text style={s.hint}>{page} / {Math.ceil(data.total / 20)}</Text><HubAction compact title="Trang sau" disabled={page * 20 >= data.total} onPress={() => setPage(v => v + 1)} /></View>}
-    </>}
+  return <ScrollView testID="friends-panel" style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
+    <View style={[s.header, compact && s.headerCompact]}>
+      {!compact && <View testID="friends-banner" style={s.intro}>
+        <Image pointerEvents="none" aria-hidden source={require('../../../assets/images/friends-banner-illustration.png')} style={s.art} contentFit="contain" contentPosition="right bottom" />
+        <View style={s.introCopy}><Text accessibilityRole="header" style={s.title}>Kết nối với bạn bè trên UniNet</Text><Text style={s.hint}>Tìm kiếm, kết bạn và mở rộng mạng lưới học tập, dự án và cơ hội nghề nghiệp.</Text></View>
+      </View>}
+      <View role="tablist" accessibilityLabel="Danh sách bạn bè" style={[s.tabs, compact && s.tabsCompact]}>{tabs.map(tab => <Pressable key={tab.id} role="tab" accessibilityLabel={tab.label} aria-selected={kind === tab.id} onPress={() => { if (kind !== tab.id) { setKind(tab.id); setPage(1); setData(null); } }} style={[s.tab, kind === tab.id && s.selected]}><Text style={[s.tabText, kind === tab.id && s.selectedText]}>{tab.label}</Text></Pressable>)}</View>
+    </View>
+    <View style={s.list}>
+      <View style={s.listHead}><Text accessibilityRole="header" aria-level={2} style={s.heading}>{kind === 'friends' ? 'Bạn bè' : 'Lời mời kết bạn'}{!loading && !error && data ? ` (${data.total})` : ''}</Text>
+        <View testID="friends-search" style={s.search}><HubIcon name="search" size={16} /><TextInput accessibilityLabel="Tìm bạn theo tên hoặc nickname" placeholder="Tìm kiếm…" placeholderTextColor={c.textSecondary} value={q} maxLength={100} onChangeText={value => { setQ(value); setPage(1); setData(null); }} style={s.input} /></View>
+      </View>
+      {error ? <View style={s.empty}><Text accessibilityRole="alert" style={ui.error}>{error}</Text><HubAction compact title="Thử lại" onPress={() => setAttempt(v => v + 1)} /></View> : loading ? <View style={s.empty}><ActivityIndicator color={c.primary} accessibilityLabel="Đang tải bạn bè" /></View> : <>
+        {!data?.items.length ? <View style={s.empty}><HubIcon name="people" size={34} /><Text style={s.hint}>{q ? 'Không tìm thấy người dùng phù hợp.' : kind === 'friends' ? 'Bạn chưa có bạn bè. Kết nối với mọi người từ trang hồ sơ của họ.' : 'Bạn chưa có lời mời kết bạn mới.'}</Text></View> : data.items.map(person => <View key={person.accountId} testID={`friend-person-${person.accountId}`} style={s.person}>
+          <Pressable accessibilityRole="link" accessibilityLabel={`Xem hồ sơ ${person.fullName}`} onPress={() => router.push({ pathname: '/profile/view/[id]', params: { id: person.profileId } } as never)} style={s.identity}><PersonAvatar person={person} size={48} /><View style={s.personInfo}><Text style={s.name}>{person.fullName}</Text><View style={s.mutual}><HubIcon name="people" size={15} color={c.textSecondary} /><Text style={s.mutualText}>{person.mutualFriendsCount ?? 0} bạn chung</Text></View></View></Pressable>
+          <FriendActions list person={person} onChanged={() => { setData(null); setAttempt(v => v + 1); }} />
+        </View>)}
+        {!!data && data.total > 20 && <View style={s.pagination}><HubAction compact title="Trang trước" disabled={page === 1} onPress={() => setPage(v => v - 1)} /><Text style={s.hint}>{page} / {Math.ceil(data.total / 20)}</Text><HubAction compact title="Trang sau" disabled={page * 20 >= data.total} onPress={() => setPage(v => v + 1)} /></View>}
+      </>}
+    </View>
   </ScrollView>;
 }
-const s = StyleSheet.create({ page: { padding: 18, gap: 16, paddingBottom: 32 }, intro: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 10 }, emblem: { width: 52, height: 52, borderRadius: 16, backgroundColor: c.blueWash, alignItems: 'center', justifyContent: 'center' }, title: { color: c.ink, fontSize: 22, fontWeight: '700', marginBottom: 6 }, hint: { color: c.textSecondary, fontSize: 12, lineHeight: 19 }, tabs: { gap: 8 }, tab: { paddingHorizontal: 13, paddingVertical: 11, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: c.line }, selected: { backgroundColor: c.blueWash, borderColor: '#BCD0FF' }, search: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: c.line, borderRadius: 11, backgroundColor: '#FFFFFF' }, input: { flex: 1, minWidth: 0, paddingVertical: 12, color: c.ink, fontSize: 13 }, count: { color: c.textSecondary, fontSize: 12 }, person: { padding: 16, borderWidth: 1, borderColor: c.line, borderRadius: 14, backgroundColor: '#FFFFFF', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14 }, identity: { flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', gap: 12 }, name: { color: c.ink, fontWeight: '600', fontSize: 14 }, empty: { alignItems: 'center', padding: 24, gap: 14, borderRadius: 14, backgroundColor: '#FFFFFF' }, pagination: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 12 } });
+const s = StyleSheet.create({
+  page: { padding: 16, gap: 16, paddingBottom: 32, backgroundColor: c.canvas },
+  header: { borderRadius: 14, backgroundColor: '#FFFFFF', overflow: 'hidden', borderWidth: 1, borderColor: c.line },
+  headerCompact: { borderRadius: 0, borderWidth: 0, backgroundColor: 'transparent' },
+  intro: { minHeight: 210, padding: 20, paddingBottom: 64, justifyContent: 'center', backgroundColor: '#E8F2FF', overflow: 'hidden' },
+  introCopy: { width: '53%', maxWidth: 420, gap: 8 },
+  art: { position: 'absolute', bottom: -30, right: 0, width: '100%', height: '135%' },
+  title: { color: c.ink, fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  hint: { color: c.textSecondary, fontSize: 13, lineHeight: 20 },
+  tabs: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingHorizontal: 12 },
+  tabsCompact: { position: 'relative', paddingHorizontal: 0 },
+  tab: { minHeight: 46, paddingHorizontal: 16, justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  selected: { borderBottomColor: c.primary },
+  tabText: { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  selectedText: { color: c.primary },
+  list: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, gap: 10, borderWidth: 1, borderColor: c.line },
+  listHead: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 },
+  heading: { color: c.ink, fontSize: 16, fontWeight: '700' },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: c.line, borderRadius: 8, backgroundColor: c.canvas, flexGrow: 1, flexBasis: 140, maxWidth: 200 },
+  input: { flex: 1, minWidth: 0, minHeight: 36, color: c.ink, fontSize: 12 },
+  person: { padding: 12, borderWidth: 1, borderColor: '#E6EDF8', borderRadius: 12, backgroundColor: '#FFFFFF', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  identity: { flex: 1, minWidth: 152, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  personInfo: { flex: 1, minWidth: 0, gap: 5 },
+  name: { color: c.ink, fontWeight: '600', fontSize: 14, lineHeight: 20 },
+  mutual: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  mutualText: { color: c.textSecondary, fontSize: 12, lineHeight: 18 },
+  empty: { alignItems: 'center', padding: 24, gap: 14 },
+  pagination: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 8 },
+});

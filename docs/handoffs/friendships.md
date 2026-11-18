@@ -1,5 +1,32 @@
 # Student friendships and project invitations
 
+## Friends redesign (2026-11-18)
+- FriendsPanel now has exactly two inner tabs: Bạn bè and Lời mời kết bạn
+  (received). Rows contain avatar, name and server-provided mutualFriendsCount.
+- Accepted rows expose an anchored ellipsis popup, followed by the existing
+  unfriend confirmation. Popup supports keyboard focus, Escape and outside dismissal.
+- Received rows expose Xác nhận (accept) and Xóa (reject); default public-profile
+  actions retain their labels. Failed actions retain their inline error when
+  relationship reconciliation returns unchanged state.
+- Banner now follows the supplied reference with a dedicated ImageGen 2D student
+  illustration (`assets/images/friends-banner-illustration.png`), live title/copy
+  with no Tìm bạn bè button (removed at user request). Both tabs overlay the banner bottom with no white strip.
+  Below 600px the banner is hidden and only the two tabs remain. Search is capped
+  at 200px wide with a 36px input height. Art prompt: ../specs/friends-banner-art.md.
+- Banner search CTA and its dedicated modal were removed. Browser checks assert
+  button absence and tab/banner bounding boxes. List search, pagination and
+  refresh on notification/focus remain.
+- Verification: 20 backend friendship cases and 3 client service cases passed.
+  Browser fixture passed two-tab/count checks, popup keyboard/dismissal, accept,
+  reject/retry, unfriend, empty/error/retry, pagination and profile/project flows;
+  layout checks cover 320/375/768/1024/1440px. Browser APIs are mocked.
+- TypeScript has existing errors in opportunities.tsx and AssessorProfilePosts.tsx;
+  no errors in modified files. ESLint is unavailable in local node_modules.
+- Production web export passed: `npx expo export --platform web --max-workers 2
+  --output-dir dist/friends-redesign-check` (115 static routes).
+- Spec and ordered tasks: ../specs/friends-redesign.md. Deploy backend alongside
+  frontend to populate mutualFriendsCount; no database migration required.
+
 ## Entry points and permissions
 - `/profile/friends` reuses the existing profile layout. Header tab Bạn bè sits
   immediately after Dự án; horizontal scrolling keeps it visible on mobile.
