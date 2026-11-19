@@ -1,7 +1,7 @@
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Linking, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Linking, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { assessorService, type AssignmentDetail, type AssessorMeeting } from '@/services/assessor.service';
 import { AssessorState, assessorDate, assessorStyles as s } from '@/components/assessor/assessor-ui';
 import { DetailHeader, AssessmentResults, ProjectInformation, AssignmentHistory, detailTabs, type DetailTab } from '@/components/assessor/AssignmentDetailContent';
@@ -12,30 +12,42 @@ import { AssessmentForm, emptyAssessment, assessmentError } from '@/components/a
 import { assessorReportDrafts, emptyAssessorDraft, type AssessorReportDraft } from '@/store/assessor-report-drafts';
 
 export default function AssessorAssignmentDetailScreen() {
-  const { id, tab: requestedTab } = useLocalSearchParams<{ id: string; tab?: string }>(); const { account } = useAuthStore(); const narrow = useWindowDimensions().width < 700;
+  const { id, tab: requestedTab } = useLocalSearchParams<{ id: string; tab?: string }>(); const { account } = useAuthStore();
   useEffect(() => { if (requestedTab === 'evidence' || requestedTab === 'Minh chứng') router.setParams({tab: 'info'}); }, [requestedTab]);
   const key = `${account?.id}:${id}`;
+  return <AssignmentDetails key={key} id={id} draftKey={key} />;
+}
+
+function AssignmentDetails({ id, draftKey: key }: { id: string; draftKey: string }) {
+  const narrow = useWindowDimensions().width < 700;
   const [room, setRoom] = useState<{ key: string; data: AssessorMeeting } | null>(null);
   const [loaded, setLoaded] = useState<{ key: string; data: AssignmentDetail } | null>(null), [error, setError] = useState(''), [actionError, setActionError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0);
   const [draft, setDraft] = useState(() => ({ key, fields: assessorReportDrafts.get(key) })), [confirmReport, setConfirmReport] = useState(false);
   const fields = draft.key === key ? draft.fields : assessorReportDrafts.get(key); const { summary, findings, recommendations } = fields;
   const changeDraft = (changes: Partial<AssessorReportDraft>) => { const next = { ...fields, ...changes }; assessorReportDrafts.set(key, next); setDraft({ key, fields: next }); setConfirmReport(false); };
-  const running = useRef(false); const identity = useRef(''); identity.current = key; const data = loaded?.key === key ? loaded.data : null;
+  const running = useRef(false);
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const data = loaded?.key === key ? loaded.data : null;
   useFocusEffect(useCallback(() => {
     const controller = new AbortController(); setError('');
     assessorService.detail(id, controller.signal).then(value => { if (!controller.signal.aborted) setLoaded({ key, data: value }); }).catch(e => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Không tải được phiên thẩm định.'); });
     assessorService.meeting(id, controller.signal).then(value => { if (!controller.signal.aborted) setRoom({ key, data: value }); }).catch(() => { if (!controller.signal.aborted) setRoom(null); });
     return () => controller.abort();
+  // Changing attempt intentionally reloads the detail and meeting while this screen is focused.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, id, attempt]));
-  useEffect(() => { setConfirmReport(false); setActionError(''); }, [key]);
   const mutate = async (operation: () => Promise<unknown>) => {
-    if (running.current) return; running.current = true; setBusy(true); setActionError(''); const actor = key;
-    try { await operation(); if (identity.current === actor) { setConfirmReport(false); setAttempt(v => v + 1); } }
-    catch (e) { if (identity.current === actor) { setActionError(e instanceof Error ? e.message : 'Chưa thực hiện được thao tác.'); if (e instanceof ApiError && e.status === 409) setAttempt(v => v + 1); } }
-    finally { running.current = false; if (identity.current === actor) setBusy(false); }
+    if (running.current) return; running.current = true; setBusy(true); setActionError('');
+    try { await operation(); if (mounted.current) { setConfirmReport(false); setAttempt(v => v + 1); } }
+    catch (e) { if (mounted.current) { setActionError(e instanceof Error ? e.message : 'Chưa thực hiện được thao tác.'); if (e instanceof ApiError && e.status === 409) setAttempt(v => v + 1); } }
+    finally { running.current = false; if (mounted.current) setBusy(false); }
   };
   const join = () => mutate(async () => {
-    const meeting = await assessorService.joinMeeting(id); if (identity.current !== key) return;
+    const meeting = await assessorService.joinMeeting(id); if (!mounted.current) return;
     const url = new URL(meeting.joinUrl);
     if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Đường dẫn phòng họp không hợp lệ.');
     await Linking.openURL(url.href);
@@ -44,13 +56,12 @@ export default function AssessorAssignmentDetailScreen() {
   const meeting = room?.key === key ? room.data : null;
   const meetingStartAt = assignment?.meetingStartAt || meeting?.meetingStartAt;
   const meetingEndAt = assignment?.meetingEndAt || meeting?.meetingEndAt;
-  const canReport = active && !!meetingStartAt && !!meetingEndAt && !data?.report;
+  const canReport = active && !!meetingStartAt && !data?.report;
   const rubric = data?.assessmentRubric;
   const assessment = rubric ? fields.assessment?.rubricVersion === rubric.version ? fields.assessment : emptyAssessment(rubric) : null;
   const [selectedTab, setSelectedTab] = useState<DetailTab | null>(null);
   const preferredTab = selectedTab || (data?.report ? 'results' : active ? 'schedule' : 'info');
   const tab = data && detailTabs(data, active, canReport).some(item => item.key === preferredTab) ? preferredTab : data?.report ? 'results' : 'info';
-  useEffect(() => { setSelectedTab(null); }, [key]);
   return <View style={s.page}><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, narrow && s.mobileContent]}>
     <DetailNavigation backLabel="Quay lại danh sách thẩm định" />
     {error ? <AssessorState error={error} retry={() => setAttempt(v => v + 1)} /> : !data || !assignment ? <AssessorState loading /> : <>
@@ -59,7 +70,7 @@ export default function AssessorAssignmentDetailScreen() {
       {tab === 'results' && <AssessmentResults key={`results:${key}`} data={data} />}
       {tab === 'info' && <ProjectInformation data={data} onLinkError={setActionError} />}
       {tab === 'history' && <AssignmentHistory data={data} />}
-      {tab === 'schedule' && <View style={s.detailMeetingCard}><SectionHeading number="03" title="Lịch và phòng thẩm định" caption="Trao đổi, xác minh và hoàn tất buổi thẩm định" /><Text style={s.muted}>{room?.key === key ? room.data.meetingEndAt ? 'Phòng họp đã kết thúc' : room.data.joinUrl ? 'Phòng họp đã sẵn sàng' : 'Chưa có đường dẫn tham gia' : 'Tạo / lấy phòng để chuẩn bị buổi thẩm định.'}</Text>{assignment.scheduledStartAt && <Text style={s.body}>Bắt đầu: {assessorDate(assignment.scheduledStartAt)}</Text>}{assignment.scheduledEndAt && <Text style={s.muted}>Kết thúc dự kiến: {assessorDate(assignment.scheduledEndAt)}</Text>}<Text style={s.muted}>Lịch dự kiến không phải thời lượng tối thiểu. Thoát phòng họp không tự kết thúc buổi thẩm định; hãy bấm “Kết thúc buổi thẩm định” để mở bước lập báo cáo.</Text>{meetingStartAt && <Text style={s.muted}>Đã bắt đầu: {assessorDate(meetingStartAt)}</Text>}{meetingEndAt && <Text style={s.muted}>Đã kết thúc: {assessorDate(meetingEndAt)}</Text>}
+      {tab === 'schedule' && <View style={s.detailMeetingCard}><SectionHeading number="03" title="Lịch và phòng thẩm định" caption="Trao đổi, xác minh và hoàn tất buổi thẩm định" /><Text style={s.muted}>{room?.key === key ? room.data.meetingEndAt ? 'Phòng họp đã kết thúc' : room.data.joinUrl ? 'Phòng họp đã sẵn sàng' : 'Chưa có đường dẫn tham gia' : 'Tạo / lấy phòng để chuẩn bị buổi thẩm định.'}</Text>{assignment.scheduledStartAt && <Text style={s.body}>Bắt đầu: {assessorDate(assignment.scheduledStartAt)}</Text>}{assignment.scheduledEndAt && <Text style={s.muted}>Kết thúc dự kiến: {assessorDate(assignment.scheduledEndAt)}</Text>}<Text style={s.muted}>Lịch dự kiến không phải thời lượng tối thiểu. Thoát phòng họp không tự kết thúc buổi thẩm định; hãy bấm “Kết thúc buổi thẩm định” khi hoàn tất trao đổi. Bạn có thể lập báo cáo ngay sau khi bắt đầu buổi thẩm định.</Text>{meetingStartAt && <Text style={s.muted}>Đã bắt đầu: {assessorDate(meetingStartAt)}</Text>}{meetingEndAt && <Text style={s.muted}>Đã kết thúc: {assessorDate(meetingEndAt)}</Text>}
         {active && !meetingEndAt && <View style={s.actions}><Button title="Tạo / lấy phòng họp" variant="outline" disabled={busy} onPress={() => void mutate(() => assessorService.createMeeting(id))} /><Button title="Tham gia phòng họp" disabled={busy} onPress={() => void join()} />{!meetingStartAt && <Button title="Bắt đầu buổi thẩm định" disabled={busy} onPress={() => void mutate(() => assessorService.meetingAction(id, 'start'))} />}<Button title="Kết thúc buổi thẩm định" variant="outline" disabled={busy || !meetingStartAt} onPress={() => void mutate(() => assessorService.meetingAction(id, 'end'))} /></View>}
       </View>}
       {tab === 'report' && canReport && <View style={s.detailReportCard}><SectionHeading number="04" title="Báo cáo thẩm định" caption="Tổng hợp nhận định và đánh giá chuyên môn" />
@@ -70,7 +81,7 @@ export default function AssessorAssignmentDetailScreen() {
         <View style={s.heading}><Text style={s.label}>Khuyến nghị</Text><Text style={s.muted}>{(recommendations ?? '').length.toLocaleString('vi-VN')}/10.000 ký tự</Text></View><TextInput placeholder="Đề xuất cải thiện và các bước tiếp theo cho dự án…" accessibilityLabel="Khuyến nghị" multiline maxLength={10000} value={recommendations} onChangeText={v => { changeDraft({ recommendations: v }); }} editable={!busy} style={[s.input, { minHeight: 90, textAlignVertical: 'top' }]} />
         {rubric && assessment ? <AssessmentForm rubric={rubric} value={assessment} onChange={assessment => changeDraft({ assessment })} disabled={busy} /> : <Text style={s.error}>Hồ sơ chưa được gắn rubric. Chưa thể gửi báo cáo.</Text>}
         {confirmReport && <Text style={s.muted}>Xác nhận gửi báo cáo chính thức? Kết quả được hệ thống tính từ điểm và các điều kiện. Báo cáo đã gửi không thể chỉnh sửa.</Text>}
-        <Button title={busy ? 'Đang gửi…' : confirmReport ? 'Xác nhận gửi báo cáo' : 'Gửi báo cáo'} disabled={busy || !rubric || !assessment || !summary.trim() || !findings.trim() || !recommendations.trim()} onPress={() => { if (!rubric || !assessment) return; const invalid = assessmentError(rubric, assessment); if (invalid) { setActionError(invalid); return; } if (!confirmReport) setConfirmReport(true); else void mutate(async () => { try { await assessorService.report(id, { summary: summary.trim(), findings: findings.trim(), recommendations: recommendations.trim(), assessment }); } catch (cause) { try { await assessorService.getReport(id); } catch { throw cause; } } assessorReportDrafts.remove(key); if (identity.current === key) setDraft({ key, fields: emptyAssessorDraft() }); }); }} />
+        <Button title={busy ? 'Đang gửi…' : confirmReport ? 'Xác nhận gửi báo cáo' : 'Gửi báo cáo'} disabled={busy || !rubric || !assessment || !summary.trim() || !findings.trim() || !recommendations.trim()} onPress={() => { if (!rubric || !assessment) return; const invalid = assessmentError(rubric, assessment); if (invalid) { setActionError(invalid); return; } if (!confirmReport) setConfirmReport(true); else void mutate(async () => { try { await assessorService.report(id, { summary: summary.trim(), findings: findings.trim(), recommendations: recommendations.trim(), assessment }); } catch (cause) { try { await assessorService.getReport(id); } catch { throw cause; } } assessorReportDrafts.remove(key); if (mounted.current) setDraft({ key, fields: emptyAssessorDraft() }); }); }} />
       </View>}
     </>}
   </ScrollView></View>;
