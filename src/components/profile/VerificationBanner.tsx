@@ -1,9 +1,9 @@
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-type Props = { compact: boolean; onVerify: () => void; onDismiss: () => void };
+type Props = { compact: boolean; onVerify: () => void; onDismiss: () => void; title?: string; description?: string; actionLabel?: string; showHint?: boolean };
 
-export function VerificationBanner({ compact, onVerify, onDismiss }: Props) {
+export function VerificationBanner({ compact, onVerify, onDismiss, title = 'Vui lòng xác minh tài khoản', description, actionLabel, showHint = true }: Props) {
   return <View testID="verification-banner" style={[s.banner, compact && s.compact]}>
     <View style={[s.artSlot, compact && s.compactArtSlot]}>
 <View accessible={false} aria-hidden style={[s.art, compact && s.compactArt]}>
@@ -18,15 +18,15 @@ export function VerificationBanner({ compact, onVerify, onDismiss }: Props) {
     </View>
     </View>
     <View style={s.copy}>
-      <Text accessibilityRole="header" style={[s.title, compact && s.compactTitle]}>Vui lòng xác minh tài khoản</Text>
-      <Text numberOfLines={2} style={[s.description, compact && s.compactDescription]}>{compact ? 'Hoàn thiện thông tin và bảo vệ tài khoản.' : 'Xác minh tài khoản để hoàn thiện thông tin, sử dụng đầy đủ tính năng và bảo vệ tài khoản của bạn.'}</Text>
+      <Text accessibilityRole="header" style={[s.title, compact && s.compactTitle]}>{title}</Text>
+      <Text numberOfLines={2} style={[s.description, compact && s.compactDescription]}>{description ?? (compact ? 'Hoàn thiện thông tin và bảo vệ tài khoản.' : 'Xác minh tài khoản để hoàn thiện thông tin, sử dụng đầy đủ tính năng và bảo vệ tài khoản của bạn.')}</Text>
     </View>
-    {!compact && <View style={s.hint}>
+    {!compact && showHint && <View style={s.hint}>
       <View accessible={false} style={s.infoIcon}><Text style={s.infoLetter}>i</Text></View>
       <Text style={s.hintText}>Việc xác minh chỉ mất vài phút{'\n'}và rất đơn giản.</Text>
     </View>}
-    <Pressable accessibilityRole="button" accessibilityLabel="Xác minh ngay" onPress={onVerify} style={({ pressed }) => [s.verify, compact && s.compactVerify, pressed && s.pressed]}>
-      <Text style={[s.verifyText, compact && s.compactVerifyText]}>{compact ? 'Xác minh' : 'Xác minh ngay'}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={actionLabel || 'Xác minh ngay'} onPress={onVerify} style={({ pressed }) => [s.verify, compact && s.compactVerify, pressed && s.pressed]}>
+      <Text style={[s.verifyText, compact && s.compactVerifyText]}>{actionLabel || (compact ? 'Xác minh' : 'Xác minh ngay')}</Text>
       {!compact && <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={14} tintColor="#FFFFFF" />}
     </Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Đóng thông báo xác minh" onPress={onDismiss} style={({ pressed }) => [s.close, compact && s.compactClose, pressed && s.pressed]}>

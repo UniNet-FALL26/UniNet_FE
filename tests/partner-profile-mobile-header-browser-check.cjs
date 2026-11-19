@@ -1,0 +1,92 @@
+const { chromium } = require('C:/Users/minec/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.setDefaultTimeout(10000);
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const profile = { id: 'partner-profile', fullName: 'SkillSnap', organizationName: 'SkillSnap', partnerType: 0, industry: 'Phát triển phần mềm', bio: 'Nền tảng nâng cao kỹ năng IT cho sinh viên', contactEmail: 'hello@skillsnap.test', phone: '0968110347', address: 'Phường Long Thạnh Mỹ, TP.HCM', avatarUrl: origin + '/profile-avatar.png', coverUrl: null, websites: ['https://www.facebook.com/LTKDZ', 'https://skillsnap.test/', 'https://www.youtube.com/@SkillSnap', 'https://www.tiktok.com/@skillsnap'], isVerified: false };
+    const account = { id: 'partner', email: 'partner@profile.test', role: 1, profileComplete: true, profile };
+    const verification = { id: null, status: null, rejectReason: null, submittedAt: null };
+    let coverBytes = fs.readFileSync('assets/images/student-starter-cover.png');
+    await page.route('**/profile-avatar.png', route => route.fulfill({ contentType: 'image/png', body: fs.readFileSync('assets/images/uninet-mark.png') }));
+    await page.route('**/account-cover.png*', route => route.fulfill({ contentType: 'image/png', body: coverBytes }));
+    await page.route('**/api/**', route => {
+      const req = route.request(), path = new URL(req.url()).pathname;
+      const ok = json => route.fulfill({ json });
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' } });
+      if (path.endsWith('/auth/login')) return ok({ account, accessToken: 'fixture-access', refreshToken: 'fixture-refresh', requiresProfileCompletion: false });
+      if (path.endsWith('/auth/me')) return ok(account);
+      if (path.endsWith('/profile/me')) return ok({ profile });
+      if (path.endsWith('/profile/portfolio/me')) return ok({ isOwner: true, profile });
+      if (path.endsWith('/partner/dashboard')) return ok({ organizationName: profile.organizationName, openJobs: [], totalJobs: 0, totalApplications: 0 });
+      if (path.endsWith('/partner/verification/me')) return ok(verification);
+      if (path.endsWith('/notifications/unread-count')) return ok({ count: 0 });
+      return ok([]);
+    });
+    await page.goto(origin + '/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('input')].length >= 2 && [...document.querySelectorAll('input')].every(input => Object.keys(input).some(key => key.startsWith('__reactProps') && typeof input[key]?.onChange === 'function')));
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email);
+    await page.getByRole('textbox', { name: 'Mật khẩu', exact: true }).fill('fixture-password');
+    await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await page.getByRole('tab', { name: 'Hồ sơ', exact: true }).click();
+    await page.getByText('Chỉnh sửa hồ sơ', { exact: true }).waitFor();
+
+    const hero = page.getByTestId('company-profile-hero');
+    const header = page.getByTestId('company-profile-mobile-header');
+    const edit = page.getByTestId('company-profile-edit-action');
+    const settings = page.getByTestId('company-profile-settings-action');
+    fs.mkdirSync('dist/partner-profile-mobile-header', { recursive: true });
+    await page.setViewportSize({ width: 390, height: 640 });
+    await header.waitFor();
+    assert.equal(await hero.getByTestId('company-verified-tick').count(), 0, 'unverified partners have no blue tick');
+    profile.organizationName = 'SkillSnap company';
+    profile.isVerified = true; verification.status = 1;
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+    await hero.getByTestId('company-profile-name').getByTestId('company-verified-tick').waitFor();
+    assert.equal(await hero.getByText('Đã xác minh', { exact: true }).count(), 0, 'verified profile shows only the inline tick, without the old green label');
+    for (const width of [320, 390, 600]) {
+      await page.setViewportSize({ width, height: 640 });
+      await page.getByTestId('company-profile-cover').scrollIntoViewIfNeeded();
+      const title = await hero.getByTestId('company-profile-name').getByText(profile.organizationName, { exact: true }).boundingBox();
+      const tick = await hero.getByTestId('company-verified-tick').boundingBox();
+      assert.ok(tick.x >= title.x + title.width - 1, 'blue tick sits beside the organization name');
+      assert.equal(await hero.getByText(/Ch.nh s.a h. s./).count(), 0, 'phone profile has no duplicate edit button in the hero');
+      const before = await header.boundingBox(), editBox = await edit.boundingBox(), settingsBox = await settings.boundingBox();
+      assert.equal(before.height, width < 600 ? 52 : 60, 'header matches Student compact sizing');
+      assert.ok(editBox.x + editBox.width <= settingsBox.x + 1, 'edit action sits before Settings');
+      assert.ok(editBox.y >= before.y && editBox.y + editBox.height <= before.y + before.height);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: `dist/partner-profile-mobile-header/top-${width}.png`, animations: 'disabled' });
+      const cover = page.getByTestId('company-profile-cover');
+      const coverBefore = await cover.boundingBox();
+      await page.mouse.move(width / 2, Math.min(coverBefore.y + 100, 400));
+      await page.mouse.wheel(0, 350);
+      await page.waitForFunction(top => document.querySelector('[data-testid="company-profile-cover"]').getBoundingClientRect().top < top - 20, coverBefore.y);
+      const after = await header.boundingBox();
+      assert.ok(Math.abs(after.y - before.y) <= 1, 'header stays fixed while profile content scrolls');
+      assert.ok(await edit.isVisible() && await settings.isVisible());
+      await page.screenshot({ path: `dist/partner-profile-mobile-header/scrolled-${width}.png`, animations: 'disabled' });
+      const url = page.url();
+      await edit.click();
+      const dialog = page.getByTestId('company-profile-edit-dialog');
+      await dialog.waitFor();
+      assert.equal(await dialog.getByRole('textbox').first().inputValue(), profile.organizationName);
+      assert.equal(page.url(), url, 'header action reuses the current edit dialog');
+      await dialog.getByRole('button').first().click();
+      await dialog.waitFor({ state: 'hidden' });
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await edit.waitFor({ state: 'hidden' });
+    assert.equal(await edit.count(), 0, 'desktop keeps its existing hero edit action');
+    await hero.getByText(/Ch.nh s.a h. s./).waitFor();
+    await hero.getByTestId('company-verified-tick').waitFor();
+    assert.deepEqual(errors, []);
+    console.log('Partner profile: verified-only inline blue tick, fixed phone header, edit/settings placement, no duplicate action, working edit dialog and desktop layout passed.');
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error.stack); process.exitCode = 1; });

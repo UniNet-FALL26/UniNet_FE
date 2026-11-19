@@ -1,5 +1,5 @@
-import { ProjectDetailScreen } from "@/components/projects/ProjectDetailView";
+import { ProjectHubDetailScreen } from '@/components/projects/hub/ProjectHubDetailScreen';
 
 export default function GroupDetailScreen() {
-  return <ProjectDetailScreen />;
+  return <ProjectHubDetailScreen />;
 }

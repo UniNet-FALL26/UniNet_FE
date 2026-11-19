@@ -27,6 +27,15 @@ async function projectMutation<T extends { id: string; status: number }>(path: s
 }
 
 export const projectService = {
+  async completeProject(projectId: string) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await apiRequest<{projectId: string; status: number; updatedAt: string; completedAt: string}>(`${projectsPath()}/status`, {method: 'PATCH', body: JSON.stringify({projectId, status: 2}), signal: controller.signal, feedback: false});
+      if (!response || response.projectId !== projectId || response.status !== 2 || !response.updatedAt || !response.completedAt) throw new Error('Phản hồi hoàn thành dự án không hợp lệ. Hãy tải lại trạng thái.');
+      return response;
+    } finally { clearTimeout(timer); }
+  },
   async updateProject(projectId: string, payload: UpdateProjectRequest): Promise<ProjectDetail> {
     const response = await apiRequest<ProjectDetail>(`${projectsPath()}/${requiredId(projectId)}`, { method: "PUT", body: JSON.stringify(payload) });
     if (!response || response.id !== projectId || !response.creator || !Array.isArray(response.roleRequirements) || !Array.isArray(response.skills) || !Array.isArray(response.members) || typeof response.isCreator !== "boolean" || typeof response.isMember !== "boolean") {

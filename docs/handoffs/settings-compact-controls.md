@@ -1,0 +1,6 @@
+# Compact Settings controls
+
+- Shared `SettingsPanel` rows: minimum height 80→72px, vertical padding 20→16px, gap 14→12px, icons 40→36px (glyph 21→19px), label 15→14px, description 13→12px. Applies to Student/Partner and embedded/standalone Settings.
+- Scoped Settings action buttons: minimum height 44px and text 14px. Both account dialogs use matching verification/retry controls; Student form footer height reduced 46→44px, preserving its existing 12px text. Close targets remain 44px. Global Button and partner verification form unchanged.
+- TypeScript and static export (`dist/settings-compact-web`, 86 routes) pass. Existing Student Settings browser regression passes at 320/768/1440px, including account/policy dialogs, portfolio saving and logout. Visually inspected the 320px Settings and Partner account screenshots.
+- The Partner account browser regression passes on an isolated dev preview at 8085. Its navigation now explicitly uses `/(company)/profile` to avoid the shared `/profile` route ambiguity in exported previews. The original dev server on 8081 intermittently stopped responding; an isolated static preview on 8084 encountered a React hydration error. No runtime routing/hydration behavior was changed.

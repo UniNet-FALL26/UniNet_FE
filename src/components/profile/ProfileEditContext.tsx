@@ -56,6 +56,7 @@ export function EditPhoto({ field = 'avatarUrl', color, right = 12, bottom = 12,
       if (index >= 0) editing.onPhoto({ section: entry.section, index });
     } else editing.onField(field);
   };
+  if (entry?.section === 'projects' && 'projectId' in entry.item && entry.item.projectId) return null;
   return <Pressable accessibilityRole="button" accessibilityLabel={entry ? `Đổi ảnh ${entry.label}` : field === 'avatarUrl' ? 'Đổi ảnh đại diện' : 'Đổi ảnh bìa'} disabled={editing.disabled} hitSlop={size < 36 ? 8 : 4} onPress={press} style={({ pressed }) => [s.camera, { right, bottom, width: size, height: size }, pressed && s.pressed]}><SymbolView name={{ ios: 'camera', android: 'photo_camera', web: 'photo_camera' }} size={size < 36 ? 14 : 20} tintColor={color} /></Pressable>;
 }
 export function SectionAdd({ title, theme }: { title: string; theme: ProfileTheme }) {

@@ -51,6 +51,24 @@ const messages: Record<string, string> = {
 /** Only localize project errors; user content and AI moderation reasons are untouched. */
 export function localizeProjectError(path: string, method: string, status: number, code: string | undefined, message: string): string {
   const route = path.split('?')[0].replace(/^\/api(?=\/)/, '');
+  if (/^\/(?:verificator\/)?assignments\/[^/]+\/meeting(?:\/|$)/.test(route)) {
+    if (status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+    if (status === 403) return 'Bạn không có quyền tham gia buổi thẩm định này.';
+    const meetingMessages: Record<string, string> = {
+      PROFILE_NOT_FOUND: 'Không tìm thấy hồ sơ tài khoản.',
+      ASSIGNMENT_NOT_FOUND: 'Không tìm thấy phân công. Vui lòng làm mới hồ sơ.',
+      ASSIGNMENT_LOCKED: 'Phân công đã hoàn tất, hủy hoặc thay thế. Vui lòng kiểm tra hồ sơ mới nhất.',
+      VERIFICATION_LOCKED: 'Hồ sơ không còn chờ thẩm định. Vui lòng xem kết quả hoặc hồ sơ.',
+      BOOKING_NOT_CONFIRMED: 'Lịch chưa được xác nhận. Vui lòng kiểm tra hồ sơ và thanh toán.',
+      INVALID_VERIFICATION_SCHEDULE: 'Lịch thẩm định không hợp lệ. Vui lòng liên hệ hỗ trợ.',
+      MEETING_ROOM_REQUIRED: 'Phòng họp chưa được chuẩn bị. Vui lòng thử lại.',
+      INVALID_MEETING_STATE: 'Trạng thái buổi thẩm định đã thay đổi. Vui lòng làm mới.',
+      CLOCK_CONFLICT: 'Chưa thể cập nhật thời điểm phiên. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
+      MEETING_CONFLICT: 'Phòng họp vừa thay đổi. Vui lòng làm mới trước khi thử lại.',
+      JITSI_NOT_CONFIGURED: 'Dịch vụ phòng họp chưa sẵn sàng. Vui lòng thử lại sau.',
+    };
+    return (code && meetingMessages[code]) || (/[À-ỹĐđ]/.test(message) ? message : 'Không thể truy cập phòng họp. Vui lòng thử lại.');
+  }
   if (!/^\/(?:moderator\/)?projects(?:\/|$)/.test(route)) return message;
   if (status === 401) return 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.';
   // Support older responses that contain a message without a code.

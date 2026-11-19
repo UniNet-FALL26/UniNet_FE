@@ -6,7 +6,7 @@ const sample = require('../src/data/profile-sample.json');
 const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
 const output = 'dist/student-verification';
 const emptyVerification = () => ({ id: null, status: null, isVerified: false, fullName: null, schoolName: null, studentCode: null, submittedAt: null, reviewedAt: null, rejectReason: null, documentName: null });
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=', 'base64');
+const png = fs.readFileSync('assets/images/icon.png');
 const pdf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n%%EOF');
 
 async function login(page, email) {
@@ -109,7 +109,7 @@ async function assertFits(page, width) {
     await field(page, 'Trường đại học / cao đẳng').fill('');
     await button(page, 'Gửi yêu cầu xác minh').click();
     await assertVisible(dialog(page).getByRole('alert'));
-    assert.equal(await dialog(page).getByRole('alert').count(), 4, 'each required field reports an accessible error');
+    assert.equal(await dialog(page).locator('[role="alert"]:not([data-testid="action-toast"])').count(), 4, 'each required field reports an accessible error independently of transient feedback');
     assert.equal(submissions, 0, 'required validation blocks requests');
     await chooseDocument(page, { name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from('invalid document') });
     await assertVisible(dialog(page).getByRole('alert').filter({ hasText: /JPG|PNG|PDF/ }));
@@ -122,6 +122,13 @@ async function assertFits(page, width) {
     await field(page, 'Mã số sinh viên').fill('bad<script>');
     await chooseDocument(page, { name: 'student.png', mimeType: 'image/png', buffer: png });
     await assertVisible(dialog(page).getByRole('img', { name: 'Xem trước giấy tờ đã chọn', exact: true }));
+    assert.equal(await dialog(page).getByText('student.png', { exact: true }).count(), 0, 'image preview replaces filename');
+    const previewBounds = await dialog(page).getByRole('img', { name: 'Xem trước giấy tờ đã chọn', exact: true }).boundingBox();
+    assert.ok(previewBounds && previewBounds.width >= 220 && previewBounds.height >= 180, 'selected image has a readable preview');
+    for (const width of [320, 440, 1440]) {
+      await page.setViewportSize({ width, height: 956 }); await assertFits(page, width);
+      await page.screenshot({ path: `${output}/image-preview-${width}.png`, animations: 'disabled' });
+    }
     await button(page, 'Xóa giấy tờ').click();
     assert.equal(await dialog(page).getByText('student.png', { exact: true }).count(), 0);
     await chooseDocument(page, { name: 'student.png', mimeType: 'image/png', buffer: png });
@@ -134,7 +141,7 @@ async function assertFits(page, width) {
     assert.equal(await field(page, 'Họ và tên').inputValue(), 'Trịnh Trọng Quyền');
     assert.equal(await field(page, 'Trường đại học / cao đẳng').inputValue(), 'Đại học Bách khoa');
     assert.equal(await field(page, 'Mã số sinh viên').inputValue(), 'SV-2026001');
-    await assertVisible(dialog(page).getByText('student.png', { exact: true }));
+    await assertVisible(dialog(page).getByRole('img', { name: 'Xem trước giấy tờ đã chọn', exact: true }));
     failSubmission = false;
     const beforeSubmitReads = reads;
     await button(page, 'Gửi yêu cầu xác minh').click();
@@ -194,6 +201,11 @@ async function assertFits(page, width) {
       assert.ok(!payload.body.includes('name="userId"'), 'ownership never posted from client');
     }
     await button(page, 'Đóng thông tin tài khoản').click();
+    if (process.env.VERIFICATION_PREVIEW_ONLY === '1') {
+      assert.deepEqual(errors, []);
+      console.log('PASS: image preview replaces filename, responsive 320/440/1440 layouts, remove/replace, PDF filename, submission and retry retention (mock API only).');
+      return;
+    }
     verification = { ...verification, status: 1, isVerified: true, reviewedAt: '2026-10-18T03:00:00Z' };
     await page.evaluate(() => { history.pushState({}, '', '/notifications'); dispatchEvent(new PopStateEvent('popstate')); });
     await button(page, notice.message).click();

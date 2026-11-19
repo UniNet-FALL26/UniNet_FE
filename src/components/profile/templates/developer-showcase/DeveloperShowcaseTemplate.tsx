@@ -12,7 +12,7 @@ export function DeveloperShowcaseTemplate(props: DeveloperModernTemplateProps) {
   const { data, theme, width, thumbnail, onSectionLayout } = props;
   const padding = width < 768 ? 18 : 40;
   const contentWidth = Math.max(0, width - padding * 2);
-  const shared = { portfolio: data.portfolio, theme, width: contentWidth, thumbnail };
+  const shared = { portfolio: data.portfolio, theme, width: contentWidth, thumbnail, demo: props.demo };
   const appearance = data.portfolio.appearance?.profile;
   const visible = (id: string) => !!editing || !appearance?.hiddenSections?.includes(id);
   const sections: Record<string, React.ReactNode> = {

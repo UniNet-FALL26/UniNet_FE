@@ -5,19 +5,31 @@ export function canCreateCheckout(detail: VerificationDetail, transaction: Verif
   return canChooseMeeting(detail, now) && holdSeconds(detail, now) > 0 &&
     (!transaction || (transaction.status === 2 && !transaction.requiresReview && !transaction.reconciliationRequired));
 }
-export function checkoutLink(transaction: VerificationTransaction | null, detail: VerificationDetail, now: number) {
+function canPresentPayment(transaction: VerificationTransaction | null, detail: VerificationDetail, now: number) {
   if (!transaction || transaction.status !== 0 || transaction.requiresReview || transaction.reconciliationRequired ||
     detail.verification.status !== 0 || !(holdSeconds(detail, now) > 0) ||
     detail.payments.some(p => p.status === 1 || p.requiresManualReview) ||
     !transaction.expiredAt || !(Date.parse(transaction.expiredAt) > now) ||
-    Date.parse(transaction.expiredAt) !== Date.parse(detail.verification.reservedUntil ?? '') || !transaction.checkoutUrl) return null;
+    Date.parse(transaction.expiredAt) !== Date.parse(detail.verification.reservedUntil ?? '')) return false;
+  return true;
+}
+
+export function checkoutLink(transaction: VerificationTransaction | null, detail: VerificationDetail, now: number) {
+  if (!canPresentPayment(transaction, detail, now) || !transaction?.checkoutUrl) return null;
   try {
     const url = new URL(transaction.checkoutUrl);
     return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
+export function paymentQrPayload(transaction: VerificationTransaction | null, detail: VerificationDetail, now: number) {
+  if (!canPresentPayment(transaction, detail, now)) return null;
+  const payload = transaction?.qrCode;
+  return typeof payload === 'string' && payload.trim().length > 0 && payload.length <= 4096 ? payload : null;
+}
 export function paymentPresentation(detail: VerificationDetail, transaction: VerificationTransaction | null, now: number) {
-  if (transaction?.requiresReview || transaction?.reconciliationRequired || detail.payments.some(p => p.requiresManualReview)) return { title: 'Thanh toán cần đối soát', message: 'Hệ thống đang kiểm tra giao dịch. Không thanh toán thêm; hãy kiểm tra lại trạng thái hoặc liên hệ hỗ trợ.' };
+  if (transaction?.requiresReview || transaction?.reconciliationRequired || detail.payments.some(p => p.requiresManualReview)) return { title: 'Thanh toán cần đối soát', message: transaction?.status === 1 || detail.payments.some(p => p.status === 1)
+    ? 'Đã ghi nhận thanh toán nhưng lịch hẹn cần được hỗ trợ xử lý. Vui lòng liên hệ hỗ trợ, không thanh toán thêm.'
+    : 'Giao dịch cần được hỗ trợ đối soát và xử lý lịch hẹn. Vui lòng liên hệ hỗ trợ, không thanh toán thêm.' };
   const paid = transaction?.status === 1 || detail.payments.some(p => p.status === 1);
   if (paid) return detail.verification.bookingStatus === 2
     ? { title: 'Thanh toán thành công', message: 'Hệ thống đã xác nhận thanh toán và lịch hẹn. Hồ sơ đang chờ bước xác minh tiếp theo.' }

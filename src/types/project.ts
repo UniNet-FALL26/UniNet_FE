@@ -1,3 +1,5 @@
+import type { DraftData } from '@/types/external-project-draft';
+export type ProjectLeader = { userId: string | null; fullName: string; nickname: string | null; avatarUrl: string | null; role?: string | null; status?: number | null; joinedAt?: string | null };
 export type ProjectStatus =
   | "Private"
   | "Public"
@@ -40,16 +42,18 @@ export type UpdateProjectRequest = {
   projectField: string;
   description: string;
   recruitmentDeadline: string;
-  expectedOutput: string;
 };
 export type ProjectListItem = {
+  ownerUserId?: string | null;
+  leader?: ProjectLeader | null;
   id: string;
   title: string;
   projectField: string;
   description: string;
-  memberTarget: number;
+  memberTarget: number | null;
+  minimumQuantity: number | null;
   currentMemberCount: number;
-  recruitmentDeadline: string;
+  recruitmentDeadline: string | null;
   visibility: ProjectVisibility;
   recruitmentStatus: ApiRecruitmentStatus;
   status?: ApiProjectStatus;
@@ -71,9 +75,9 @@ export type ProjectListParams = {
   recruitmentStatus?: ApiRecruitmentStatus;
 };
 export type ProjectDetail = ProjectListItem & {
+  externalDetails?: DraftData | null;
   status: ApiProjectStatus;
   updatedAt: string | null;
-  expectedOutput: string | null;
   roleRequirements: {
     id: string;
     roleName: string;
@@ -171,6 +175,7 @@ export type Project = {
   description: string;
   technologies: string[];
   memberTarget: number;
+  minimumQuantity: number;
   currentMemberCount: number;
   creator: {
     id: string;
@@ -179,7 +184,6 @@ export type Project = {
   };
   roles: ProjectRoleRequirement[];
   recruitmentDeadline: string;
-  expectedOutput?: string;
   status: ProjectStatus;
   recruitmentStatus: RecruitmentStatus;
   createdAt: string;
@@ -187,11 +191,12 @@ export type Project = {
 
 export type CreateProjectRequest = {
   title: string;
+  specializationId: string;
   projectField: string;
   description: string;
   memberTarget: number;
+  minimumQuantity: number;
   recruitmentDeadline: string;
-  expectedOutput: string;
   visibility: ProjectVisibility;
   roleRequirements: { role: string; quantity: number; requirements: string }[];
   skillIds: string[];

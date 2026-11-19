@@ -87,3 +87,12 @@ test('server failures and cancellation propagate without retrying or confirming'
   const cancelled = setup(() => { assert.fail('aborted image must not reach API'); });
   await assert.rejects(cancelled.service().process(cancelled.asset, controller.signal), error => error === failure);
 });
+
+test('occlusion warning reaches the portrait form without creating a preview or confirming', async () => {
+  const warning = new Error('Ảnh chân dung có nhiều vật thể hoặc bị che khuất quá nhiều nên không thể cắt và xóa nền đầy đủ. Vui lòng chọn ảnh rõ người.');
+  warning.code = 'PORTRAIT_TOO_OCCLUDED';
+  let calls = 0;
+  const env = setup(async route => { calls++; assert.equal(route, '/ai-images/remove-background'); throw warning; });
+  await assert.rejects(env.service().process(env.asset), error => error === warning);
+  assert.equal(calls, 1);
+});

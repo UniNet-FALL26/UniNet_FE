@@ -36,7 +36,7 @@ const data = { profile: { ...account.profile, avatarUrl: null, coverUrl: null },
   const respond = async error => {
     await page.waitForFunction(() => !!document.querySelector('[data-testid="portrait-processing"]'));
     const item = pending.shift(); assert.ok(item);
-    try { await (error ? item.route.fulfill({ status: 503, json: { code: 'PORTRAIT_PROVIDER_BUSY', message: 'Dịch vụ tách nền đang tạm thời quá tải. Vui lòng thử lại sau ít phút. Ảnh của bạn chưa được lưu vào hồ sơ.' } }) : replyPreview(item.route)); }
+    try { await (error === 'occluded' ? item.route.fulfill({ status: 422, json: { code: 'PORTRAIT_TOO_OCCLUDED', message: 'Ảnh chân dung có nhiều vật thể hoặc bị che khuất quá nhiều nên không thể cắt và xóa nền đầy đủ. Vui lòng chọn ảnh rõ người, ít vật thể che phía trước.' } }) : error ? item.route.fulfill({ status: 503, json: { code: 'PORTRAIT_PROVIDER_BUSY', message: 'Dịch vụ tách nền đang tạm thời quá tải. Vui lòng thử lại sau ít phút. Ảnh của bạn chưa được lưu vào hồ sơ.' } }) : replyPreview(item.route)); }
     finally { item.resolve(); }
   };
   const choose = async (expectMotion = true) => {
@@ -56,7 +56,7 @@ const data = { profile: { ...account.profile, avatarUrl: null, coverUrl: null },
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.waitForURL(url => !url.pathname.includes('/login'));
     await page.getByRole('tab', { name: 'Cá nhân', exact: true }).click();
-    await page.getByRole('button', { name: 'Mẫu hồ sơ', exact: true }).click();
+    await page.getByRole('button', { name: /Đổi mẫu hồ sơ/ }).click();
     await page.getByRole('button', { name: 'Xem Developer Landscape màu Pink Sunset', exact: true }).click();
     await page.getByRole('button', { name: 'Chọn mẫu này', exact: true }).click();
     await choose();
@@ -76,6 +76,13 @@ const data = { profile: { ...account.profile, avatarUrl: null, coverUrl: null },
     await respond(true);
     await page.getByText('Dịch vụ tách nền đang tạm thời quá tải. Vui lòng thử lại sau ít phút. Ảnh của bạn chưa được lưu vào hồ sơ.', { exact: true }).waitFor();
     assert.equal(await page.getByTestId('portrait-processing').count(), 0);
+    await page.getByRole('button', { name: 'Thử tách nền lại', exact: true }).click();
+    await page.getByTestId('portrait-processing').waitFor();
+    await respond('occluded');
+    await page.getByText('Ảnh chân dung có nhiều vật thể hoặc bị che khuất quá nhiều nên không thể cắt và xóa nền đầy đủ. Vui lòng chọn ảnh rõ người, ít vật thể che phía trước.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Xác nhận', exact: true }).isDisabled(), true);
+    await page.getByRole('button', { name: 'Chọn ảnh khác', exact: true }).waitFor();
+    assert.equal(confirms, 0); assert.equal(writes, 0);
     await page.getByRole('button', { name: 'Thử tách nền lại', exact: true }).click();
     await page.getByTestId('portrait-processing').waitFor();
     await respond(false);

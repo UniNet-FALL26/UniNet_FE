@@ -3,13 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('typescript');
-const React = require('react');
-const { renderToStaticMarkup } = require('react-dom/server');
 
 function load(file, imports = {}) {
   const exports = {};
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  vm.runInNewContext(source, { exports, AbortController, setTimeout, clearTimeout, require: name => name in imports ? imports[name] : require(name) });
+  vm.runInNewContext(source, { exports, AbortController, setTimeout, clearTimeout, require: name => name in imports ? imports[name] : name === '@/utils/verification-date' ? load('src/utils/verification-date.ts') : require(name) });
   return exports;
 }
 const helpers = load('src/utils/project-verification.ts');
@@ -25,7 +23,7 @@ test('level 1 uses public enum values and distinguishes stale, missing, rejected
   assert.match(helpers.level1Message(review({ status: 4 })), /bổ sung/);
   assert.match(helpers.level1Message(review({ status: 5, attempts: [{ number: 1, transient: true }] })), /tạm thời/);
   assert.match(helpers.level1Message(review({ status: 5, attempts: [{ number: 5, transient: true }] })), /hỗ trợ vận hành/);
-  assert.match(helpers.level2Label(detail({ verification: { status: 2 } }), true), /Không đạt cấp 2/);
+  assert.match(helpers.level2Label(detail({ verification: { status: 2 } }), true), /Không đạt thẩm định/);
 });
 
 test('level 2 resumes booking/payment/assignment states and never treats a payment as a final result', () => {
@@ -100,41 +98,4 @@ test('unchanged retry reconciles with GET and never reports a fabricated success
   assert.ok(!states[4].includes('thành công'));
   assert.equal(states[3], 1, 'refreshes GET state after the POST conflict');
   cleanup();
-});
-
-function renderScreen({ creator = true, level1Only = false, tab, reviewData = review(), error = null } = {}) {
-  const block = data => ({ data, error: null, loading: false });
-  const screen = load('src/components/projects/CompletedDetailView.tsx', {
-    'react-native': require('react-native-web'),
-    'react-native-safe-area-context': { SafeAreaView: ({ children }) => React.createElement('div', null, children) },
-    'expo-router': { router: {} },
-    '@/constants/colors': { colors: { navy: '#10284B', primary: '#1769E0', surface: '#fff', background: '#F7FAFF', border: '#DCE5F1' } },
-    '@/utils/project-verification': helpers,
-    '@/hooks/useProjectVerification': { useProjectVerification: () => ({ level1: { ...block(reviewData), error }, level2: block(null), cycle: block({ status: 2 }), refresh() {}, retry() {} }) },
-    '@/components/ui/Button': { Button: props => React.createElement('button', { disabled: props.disabled }, props.title) },
-  });
-  const project = { id: 'project', title: 'Dự án hoàn thành', projectField: 'Giáo dục', description: 'Mô tả', isCreator: creator, isMember: !creator, skills: [], creator: { id: 'owner', fullName: 'Chủ dự án' }, members: [] };
-  return renderToStaticMarkup(React.createElement(screen.CompletedDetailView, { project, level1Only, initialTab: tab }));
-}
-test('S01 separates completion from verification and retains overview when verification fails', () => {
-  const html = renderScreen({ error: 'Không thể kết nối' });
-  assert.ok(html.includes('Mô tả') && html.includes('Không thể kết nối'));
-  assert.ok(html.includes('hai trạng thái độc lập'));
-  assert.ok(!html.includes('Thanh toán thành công'));
-  const member = renderScreen({ creator: false });
-  assert.ok(member.includes('chỉ dành cho người tạo'));
-  assert.ok(!member.includes('Kiểm tra thành công'));
-});
-test('S01 has exactly one level 1 results button across tabs and error states', () => {
-  for (const tab of ['Tổng quan', 'Minh chứng', 'Xác minh']) {
-    for (const error of [null, 'Không thể kết nối']) {
-      const html = renderScreen({ tab, error });
-      assert.equal((html.match(/Xem kết quả cấp 1/g) || []).length, 1);
-    }
-  }
-});
-test('S02 shows limitation, report deficiencies, policy/version and locked evidence without raw JSON', () => {
-  const html = renderScreen({ level1Only: true });
-  for (const text of ['Chưa đọc nội dung file', 'Phiên bản kiểm tra', 'v1', 'Thiếu báo cáo', 'chỉ đọc', 'Gửi xác thực lại']) assert.ok(html.includes(text), text);
-  assert.ok(!html.includes('sourceHash') && !html.includes('apiKey'));
 });

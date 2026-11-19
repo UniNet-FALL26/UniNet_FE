@@ -1,13 +1,17 @@
 import { API_URL } from '@/constants/config';
 import type { ImageUploadResponse } from '@/types/task-report';
 import { Platform } from 'react-native';
+import { apiMultipartRequest, ApiError } from '@/services/api';
+import { toast } from '@/store/toast.store';
+import { tokenStorage } from '@/utils/storage';
 
 export async function uploadReportFile(
   file: { uri: string; name: string; mimeType?: string | null; file?: File | null },
-  accessToken: string,
+  _accessToken: string,
 ): Promise<ImageUploadResponse> {
+  const sessionGeneration = tokenStorage.getSession()?.generation;
   const base = (API_URL ?? '').replace(/\/$/, '');
-  if (!base) throw new Error('Chưa cấu hình EXPO_PUBLIC_API_URL.');
+  if (!base) throw new Error('Dịch vụ tải tệp hiện chưa khả dụng. Vui lòng thử lại sau.');
   // API_URL có thể đã kết thúc bằng /api, giống quy ước trong workspaceService.
   const apiPrefix = base.endsWith('/api') ? '' : '/api';
 
@@ -39,33 +43,13 @@ export async function uploadReportFile(
     } as unknown as Blob);
   }
 
-  let response: Response;
-  try {
-    response = await fetch(`${base}${apiPrefix}/images`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        // Do not set Content-Type manually; fetch adds the multipart boundary.
-      },
-      body: form,
-    });
-  } catch {
-    throw new Error(`Upload thất bại với tệp ${file.name}. Hãy kiểm tra kết nối.`);
-  }
-
-  if (!response.ok) {
-    let message = `Upload thất bại (${response.status}).`;
-    try {
-      const body = await response.json();
-      if (typeof body?.message === 'string') message = body.message;
-    } catch { /* ignore empty response */ }
-    throw new Error(message);
-  }
-
-  const result = (await response.json()) as ImageUploadResponse;
-  if (!result.imageUrl || !result.publicId || !result.resourceType || !result.fileName || !result.format) {
-    throw new Error('API upload không trả về đủ thông tin file hợp lệ.');
+  // Shared multipart transport retains session rotation and account-change checks.
+  if (tokenStorage.getSession()?.generation !== sessionGeneration) throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng chọn lại tài liệu.', 401);
+  const result = await apiMultipartRequest<ImageUploadResponse>(`${apiPrefix}/images`, { method: 'POST', body: form });
+  if (!result || !result.imageUrl || !result.publicId || !result.resourceType || !result.fileName || !result.format) {
+    const message = 'Không nhận được tệp tải lên hợp lệ. Vui lòng thử lại.';
+    toast.error(message);
+    throw new ApiError(message, 502);
   }
   return result;
 }

@@ -1,5 +1,35 @@
 import type { PortfolioContent, PortfolioResponse } from '@/types/portfolio';
 
+export type ProfileSkillSort = 'name' | 'name-desc' | 'category';
+export function profileSkillOptions(catalog: NonNullable<PortfolioResponse['skillCatalog']>, search: string, sort: ProfileSkillSort) {
+  const normalize = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  const query = normalize(search.trim());
+  return catalog.filter(item => normalize(item.name + ' ' + item.category).includes(query)).sort((a, b) => {
+    const names = a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }) || a.id.localeCompare(b.id);
+    return sort === 'name-desc' ? -names : sort === 'category' ? a.category.localeCompare(b.category, 'vi') || names : names;
+  });
+}
+export function addProfileSkills(content: PortfolioContent, skillIds: readonly string[], catalog: NonNullable<PortfolioResponse['skillCatalog']>): PortfolioContent {
+  const ids = [...new Set(skillIds)];
+  if (!ids.length) throw new Error('Vui lòng chọn ít nhất một kỹ năng.');
+  return ids.reduce((next, skillId) => addProfileEntry(next, 'skills', { skillId }, catalog), content);
+}
+
+export function profileSkillSelection(content: PortfolioContent, catalog: NonNullable<PortfolioResponse['skillCatalog']>) {
+  return content.skills.map((skill, index) => {
+    const match = catalog.find(item => item.id === skill.skillId || item.name.trim().toLowerCase() === skill.name.trim().toLowerCase());
+    return { id: match?.id ?? skill.skillId ?? 'saved-skill:' + index, name: skill.name, category: skill.category ?? '', iconUrl: match?.iconUrl ?? skill.iconUrl ?? null };
+  });
+}
+export function updateProfileSkills(content: PortfolioContent, skillIds: readonly string[], catalog: NonNullable<PortfolioResponse['skillCatalog']>): PortfolioContent {
+  const saved = profileSkillSelection(content, catalog), selected = new Set(skillIds);
+  let next = { ...content, skills: content.skills.filter((_, index) => selected.has(saved[index].id)) };
+  for (const id of selected) {
+    if (!saved.some(item => item.id === id)) next = addProfileEntry(next, 'skills', { skillId: id }, catalog);
+  }
+  return next;
+}
+
 export type ProfileSectionId = 'basic' | 'skills' | 'projects' | 'education' | 'experience' | 'certificates' | 'activities' | 'languages' | 'articles' | 'socialLinks';
 export type ProfileFormField = { key: string; label: string; kind?: 'url' | 'email' | 'number' | 'list' | 'boolean' | 'skill'; required?: boolean; multiline?: boolean; max?: number; min?: number; integer?: boolean };
 export type ProfileEditorSection = { id: ProfileSectionId; title: string; fields: ProfileFormField[]; limit?: number };

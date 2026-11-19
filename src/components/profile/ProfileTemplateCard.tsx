@@ -16,7 +16,7 @@ export function ProfileTemplateCard({ template }: { template: typeof profileTemp
     <Pressable accessibilityRole="button" accessibilityLabel={`Xem trước mẫu ${template.name}, màu ${theme.name}`} onPress={() => open(theme.id)} style={({ pressed }) => [s.previewButton, pressed && s.pressed]}>
       <View style={s.paper} onLayout={event => setThumbnailWidth(event.nativeEvent.layout.width)}>
         <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden style={[s.canvas, { transform: [{ scale: thumbnailWidth / 1000 }] }]}>
-          {thumbnailWidth > 0 && <ProfileTemplateRenderer templateId={template.id} data={sample} theme={theme} width={1000} thumbnail />}
+          {thumbnailWidth > 0 && <ProfileTemplateRenderer templateId={template.id} data={sample} theme={theme} width={1000} thumbnail demo />}
         </View>
       </View>
     </Pressable>

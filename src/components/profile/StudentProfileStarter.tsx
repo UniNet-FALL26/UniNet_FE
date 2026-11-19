@@ -12,12 +12,12 @@ export function StudentProfileStarter({ profile, width, onChooseTemplate, onChan
   const [failedCover, setFailedCover] = useState<string | null>(null);
   const initials = profile.fullName.trim().split(/\s+/).slice(-2).map(word => word[0]).join('').toUpperCase() || 'U';
   return <View testID="student-profile-starter" style={[s.content, compact && s.compactContent]}>
-    <View style={s.identityCard}>
-      <View style={[s.cover, { height: compact ? 164 : 240 }]}>
+    <View style={[s.identityCard, compact && s.flatPanel]}>
+      <View style={[s.cover, compact && s.flatPanel, { height: compact ? 164 : 240 }]}>
         {profile.coverUrl && failedCover !== profile.coverUrl
           ? <><Image source={profileMedia(profile.coverUrl)} contentFit="cover" blurRadius={24} style={StyleSheet.absoluteFill} accessible={false} importantForAccessibility="no-hide-descendants" /><Image source={profileMedia(profile.coverUrl)} contentFit="contain" style={StyleSheet.absoluteFill} accessibilityLabel="Ảnh bìa của bạn" onError={() => setFailedCover(profile.coverUrl)} /></>
           : <Image source={require('../../../assets/images/student-starter-cover.png')} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel="Ảnh bìa mặc định UniNet" />}
-        {onChangePhoto && <Pressable accessibilityRole="button" accessibilityLabel="Đổi ảnh bìa" disabled={changingPhoto} onPress={() => onChangePhoto('coverUrl')} style={[s.camera, s.coverCamera, changingPhoto && s.disabled]}><SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={16} tintColor={colors.textPrimary} /><Text style={s.cameraLabel}>Thay đổi ảnh bìa</Text></Pressable>}
+        {onChangePhoto && <Pressable accessibilityRole="button" accessibilityLabel="Đổi ảnh bìa" hitSlop={compact ? 8 : undefined} disabled={changingPhoto} onPress={() => onChangePhoto('coverUrl')} style={[s.camera, s.coverCamera, compact && s.compactCoverCamera, changingPhoto && s.disabled]}><SymbolView name={{ ios: 'camera', android: 'photo_camera', web: 'photo_camera' }} size={compact ? 12 : 14} tintColor={colors.textPrimary} /><Text style={[s.cameraLabel, compact && s.compactCameraLabel]}>Chỉnh sửa ảnh bìa</Text></Pressable>}
       </View>
       <View style={[s.identity, { paddingHorizontal: compact ? 22 : 32 }]}>
         <View style={s.avatar}>
@@ -33,7 +33,7 @@ export function StudentProfileStarter({ profile, width, onChooseTemplate, onChan
       </View>
     </View>
     {onChooseTemplate && <>
-      <View style={[s.invitation, !compact && s.wideInvitation]} testID="starter-introduction">
+      <View style={[s.invitation, !compact && s.wideInvitation, compact && s.flatPanel]} testID="starter-introduction">
         <View pointerEvents="none" style={s.invitationWave} />
         <View style={[s.intro, !compact && s.desktopIntroCopy]}>
           <Text style={s.eyebrow}>BẮT ĐẦU CÂU CHUYỆN CỦA BẠN</Text>
@@ -53,12 +53,12 @@ export function StudentProfileStarter({ profile, width, onChooseTemplate, onChan
         {!compact && <Image source={require('../../../assets/images/student-starter-intro.png')} contentFit="contain" style={s.desktopIntroArt} accessible={false} importantForAccessibility="no-hide-descendants" />}
       </View>
       <View style={[s.benefits, !compact && s.wideBenefits]}>
-        <View testID="starter-strengths" style={[s.benefit, s.strengthCard]}>
+        <View testID="starter-strengths" style={[s.benefit, s.strengthCard, compact && s.flatPanel]}>
           <View style={[s.icon, s.strengthIcon]}><SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} size={25} tintColor="#9254EF" /></View>
           <View style={s.benefitCopy}><Text style={[s.eyebrow, s.purpleEyebrow]}>THỂ HIỆN THẾ MẠNH</Text><Text style={s.benefitTitle}>Giới thiệu kỹ năng, kinh nghiệm</Text><Text style={s.benefitText}>Cho mọi người biết bạn giỏi gì, đã học gì và đang theo đuổi những điều gì. Tạo hồ sơ nổi bật với các mẫu chuyên nghiệp.</Text></View>
           <Image source={require('../../../assets/images/student-starter-strengths.png')} contentFit="contain" style={[s.benefitArt, compact && s.compactBenefitArt]} accessible={false} importantForAccessibility="no-hide-descendants" />
         </View>
-        <View testID="starter-projects" style={[s.benefit, s.projectCard]}>
+        <View testID="starter-projects" style={[s.benefit, s.projectCard, compact && s.flatPanel]}>
           <View style={s.icon}><SymbolView name={{ ios: 'folder', android: 'folder_open', web: 'folder_open' }} size={25} tintColor={colors.primary} /></View>
           <View style={s.benefitCopy}><Text style={s.eyebrow}>KỂ CHUYỆN QUA DỰ ÁN</Text><Text style={s.benefitTitle}>Đưa bài tập, ý tưởng và sản phẩm của bạn</Text><Text style={s.benefitText}>Lưu lại những dự án, sản phẩm bạn tự hào vào cùng một nơi. Biến hành trình học tập và làm việc thành câu chuyện truyền cảm hứng.</Text></View>
           <Image source={require('../../../assets/images/student-starter-projects.png')} contentFit="contain" style={[s.benefitArt, compact && s.compactBenefitArt]} accessible={false} importantForAccessibility="no-hide-descendants" />
@@ -77,10 +77,11 @@ function ResumeArtwork() {
 }
 
 const s = StyleSheet.create({
-  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24, gap: 12 }, compactContent: { paddingHorizontal: 16 },
+  compactCoverCamera: { minHeight: 28, height: 28, paddingHorizontal: 8, gap: 4, borderRadius: 14 }, compactCameraLabel: { fontSize: 9, lineHeight: 12 },
+  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24, gap: 12 }, compactContent: { paddingHorizontal: 0, paddingTop: 0 }, flatPanel: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
   identityCard: { backgroundColor: colors.surface, borderRadius: 16, overflow: 'hidden' }, cover: { backgroundColor: '#DCEAFF', overflow: 'hidden', borderRadius: 14 },
   identity: { paddingBottom: 12 }, avatar: { width: 96, height: 96, borderRadius: 48, marginTop: -48, borderWidth: 4, borderColor: colors.surface, backgroundColor: colors.surface }, avatarClip: { flex: 1, borderRadius: 44, overflow: 'hidden' }, avatarImage: { width: '100%', height: '100%' }, initials: { flex: 1, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }, initialsText: { color: colors.primaryDark, fontSize: 30, fontWeight: '700' },
-  camera: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, coverCamera: { position: 'absolute', bottom: 12, right: 12, width: 'auto', minHeight: 44, height: 44, borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', gap: 6 }, cameraLabel: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' }, avatarCamera: { position: 'absolute', bottom: -6, right: -8, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.65)', borderColor: 'rgba(170,190,220,0.45)' }, disabled: { opacity: 0.55 },
+  camera: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, coverCamera: { position: 'absolute', bottom: 12, right: 12, width: 'auto', minHeight: 32, height: 32, borderRadius: 18, borderWidth: 0, backgroundColor: 'rgba(255,255,255,0.65)', paddingHorizontal: 10, flexDirection: 'row', gap: 5 }, cameraLabel: { color: colors.textPrimary, fontSize: 10, fontWeight: '700' }, avatarCamera: { position: 'absolute', bottom: -6, right: -8, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.65)', borderColor: 'rgba(170,190,220,0.45)' }, disabled: { opacity: 0.55 },
   identityCopy: { marginTop: 10, gap: 3 }, name: { color: colors.navy, fontWeight: '800' }, nickname: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
   invitation: { borderRadius: 20, backgroundColor: '#F0F7FF', padding: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E5EFFF' }, wideInvitation: { padding: 32, minHeight: 310 }, invitationWave: { position: 'absolute', right: -100, bottom: -170, width: 580, height: 320, borderRadius: 290, backgroundColor: '#E4F0FF', transform: [{ rotate: '-18deg' }] }, intro: { minWidth: 0, gap: 12, zIndex: 1 }, eyebrow: { color: '#4B78C4', fontSize: 9, lineHeight: 14, fontWeight: '800', letterSpacing: 1.1 }, title: { color: colors.navy, fontSize: 25, lineHeight: 29, fontWeight: '800', letterSpacing: -0.6 }, titleAccent: { color: '#1674FF' }, description: { color: '#61708B', fontSize: 12, lineHeight: 19, maxWidth: 560 },
   desktopIntroCopy: { width: '65%' }, wideTitle: { fontSize: 32, lineHeight: 39 }, valueRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }, values: { flex: 1, gap: 14 }, wideValues: { flexDirection: 'row', gap: 14 }, value: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'flex-start', minWidth: 0 }, valueIcon: { width: 30, height: 30, borderRadius: 9, justifyContent: 'center', alignItems: 'center' }, valueCopy: { flex: 1, minWidth: 0, gap: 3 }, valueTitle: { color: colors.navy, fontSize: 11, fontWeight: '800', lineHeight: 16 }, valueDescription: { color: '#61708B', fontSize: 11, lineHeight: 17 }, mobileIntroArt: { width: '40%', maxWidth: 170, height: 190 }, desktopIntroArt: { position: 'absolute', right: 4, top: 4, bottom: 4, width: '35%' }, benefitArt: { width: 90, height: 112 }, compactBenefitArt: { width: 64, height: 90 },

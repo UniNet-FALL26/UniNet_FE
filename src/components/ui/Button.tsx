@@ -6,6 +6,7 @@ type Props = { title: string; onPress: () => void; variant?: 'primary' | 'second
 export function Button({ title, onPress, variant = 'primary', loading, disabled, style, textStyle, accessibilityLabel, leadingIcon }: Props) {
   const inactive = disabled || loading;
   return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? title} accessibilityState={{ disabled: inactive, busy: loading }} disabled={inactive} onPress={onPress}
+    android_ripple={{ color: '#E2E8F0' }}
     style={({ pressed }) => [styles.base, variant === 'primary' ? styles.primary : variant === 'secondary' ? styles.secondary : styles.outline, pressed && (variant === 'primary' ? styles.primaryPressed : styles.outlinePressed), inactive && styles.disabled, style]}>
     {loading && <ActivityIndicator color={variant === 'primary' ? colors.surface : colors.primary} />}
     {!loading && leadingIcon}

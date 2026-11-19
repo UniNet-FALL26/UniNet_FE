@@ -1,4 +1,40 @@
 const test = require('node:test');
+test('saved skills can be removed while retaining metadata, inactive catalog entries and unrelated profile content', () => {
+  const { updateProfileSkills, profileSkillSelection } = editor(); const data = real().portfolio;
+  const original = { ...data, skills: [{ skillId: 'a', name: 'React', level: 2, yearsOfExperience: 3 }, { name: 'Legacy', level: 1 }] };
+  const catalog = [{ id: 'a', name: 'React', category: 'Frontend', iconUrl: null }, { id: 'b', name: 'Python', category: 'Backend', iconUrl: null }];
+  const selection = profileSkillSelection(original, catalog);
+  const changed = updateProfileSkills(original, [selection[1].id, 'b'], catalog);
+  assert.equal(changed.skills.length, 2); assert.equal(changed.skills[0], original.skills[1]);
+  assert.equal(changed.skills[1].name, 'Python'); assert.equal(original.skills.length, 2);
+  assert.equal(updateProfileSkills(original, ['a'], catalog).skills[0], original.skills[0]);
+  assert.equal(updateProfileSkills(original, [], catalog).skills.length, 0);
+  assert.throws(() => updateProfileSkills(original, ['unknown'], catalog));
+});
+test('multiple catalog skills are added atomically without level/years input', () => {
+  const { addProfileSkills } = editor(); const data = real().portfolio;
+  const catalog = [{ id: 'a', name: 'React', category: 'Frontend', iconUrl: 'https://example.test/react.png' }, { id: 'b', name: 'Python', category: 'Backend', iconUrl: null }];
+  const next = addProfileSkills(data, ['a', 'b', 'a'], catalog);
+  assert.equal(next.skills.length, 2); assert.equal(data.skills.length, 0);
+  assert.equal(next.skills[0].iconUrl, catalog[0].iconUrl);
+  assert.equal(next.skills[0].level, null); assert.equal(next.skills[0].yearsOfExperience, null);
+  assert.throws(() => addProfileSkills(data, ['a', 'unknown'], catalog));
+  assert.equal(data.skills.length, 0);
+  assert.throws(() => addProfileSkills(next, ['a'], catalog));
+  assert.throws(() => addProfileSkills(data, [], catalog));
+  const nearLimit = { ...data, skills: Array.from({ length: 99 }, (_, index) => ({ skillId: 'existing-' + index, name: 'Existing ' + index })) };
+  assert.throws(() => addProfileSkills(nearLimit, ['a', 'b'], catalog));
+  assert.equal(nearLimit.skills.length, 99);
+});
+
+test('skill options search and sorting preserve the original catalog', () => {
+  const { profileSkillOptions } = editor();
+  const catalog = [{ id: 'b', name: 'Zustand', category: 'Frontend', iconUrl: null }, { id: 'a', name: 'Python', category: 'Backend', iconUrl: null }];
+  assert.deepEqual(Array.from(profileSkillOptions(catalog, '', 'name'), s => s.id), ['a', 'b']);
+  assert.deepEqual(Array.from(profileSkillOptions(catalog, '', 'name-desc'), s => s.id), ['b', 'a']);
+  assert.deepEqual(Array.from(profileSkillOptions(catalog, 'back', 'category'), s => s.id), ['a']);
+  assert.equal(catalog[0].id, 'b');
+});
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -91,9 +127,14 @@ test('remaining forms append correctly to each corresponding content array', () 
 });
 test('service submits only owner content to the existing endpoint and forwards cancellation', async () => {
   const exports = {}; const requests = [];
+  const draft = {};
+  const draftSource = fs.readFileSync(path.join(__dirname, '../src/utils/profile-draft.ts'), 'utf8');
+  vm.runInNewContext(ts.transpileModule(draftSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+    exports: draft, require: () => ({}),
+  });
   const source = fs.readFileSync(path.join(__dirname, '../src/services/portfolio.service.ts'), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
-    exports, require: () => ({ apiRequest: async (url, options) => { requests.push({ url, options }); return real(); } }),
+    exports, require: name => name === '@/utils/profile-draft' ? draft : { apiRequest: async (url, options) => { requests.push({ url, options }); return real(); } },
   });
   const controller = new AbortController(); const data = real();
   await exports.portfolioService.getMine(controller.signal);
@@ -103,4 +144,15 @@ test('service submits only owner content to the existing endpoint and forwards c
   assert.equal(requests[1].options.signal, controller.signal);
   assert.deepEqual(JSON.parse(requests[1].options.body), data.portfolio);
   assert.equal(JSON.parse(requests[1].options.body).profile, undefined);
+
+  const manual = { title: 'Manual project', technologies: ['React'], featured: false };
+  const linked = { projectId: 'project-id', title: 'Source project', technologies: [], featured: true, personalContribution: 'Built the UI', verification: { status: 1 } };
+  data.portfolio.projects = [linked, manual];
+  await exports.portfolioService.getEligibleProjects(controller.signal);
+  await exports.portfolioService.saveEditor(data, controller.signal);
+  assert.equal(requests[2].url, '/profile/portfolio/me/eligible-projects');
+  assert.equal(requests[2].options.signal, controller.signal);
+  assert.deepEqual(JSON.parse(requests[3].options.body).portfolio.projects, [
+    { projectId: 'project-id', personalContribution: 'Built the UI', featured: true }, manual,
+  ]);
 });

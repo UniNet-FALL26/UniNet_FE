@@ -29,7 +29,7 @@ export default function PartnerDetailsScreen() {
       setError('Vui lòng điền đầy đủ và kiểm tra lại thông tin.'); return;
     }
     setError('');
-    if (await registerPartner({ organizationName: name.trim(), email: normalizeEmail(email), password, confirmPassword: confirm, partnerType: selectedType })) router.replace('/(company)');
+    if (await registerPartner({ organizationName: name.trim(), email: normalizeEmail(email), password, confirmPassword: confirm, partnerType: selectedType })) router.replace('/(company)/company-community');
   }
   return <PartnerAuthScreen stage="account" backTo="/(auth)/register-partner" title="Tạo tài khoản đối tác" subtitle={`${type ?? 'Đối tác'} cùng cộng đồng UniNet.`}>
     <View style={[authStyles.form, dense && { gap: 7, marginTop: 12 }]}>

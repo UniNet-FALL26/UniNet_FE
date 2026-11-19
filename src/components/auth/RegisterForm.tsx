@@ -30,7 +30,7 @@ export function RegisterForm() {
       terms: !terms ? 'Vui lòng đồng ý với điều khoản.' : undefined,
     };
     setErrors(next); if (Object.values(next).some(Boolean)) return;
-    if (await register({ fullName: values.fullName.trim(), email: normalizeEmail(values.email), password: values.password, confirmPassword: values.confirm })) router.replace('/(tabs)');
+    if (await register({ fullName: values.fullName.trim(), email: normalizeEmail(values.email), password: values.password, confirmPassword: values.confirm })) router.replace({ pathname: '/(auth)/login', params: { registered: '1' } });
   }
   return <AuthScreen compact title="Tạo tài khoản UniNet" subtitle="Bắt đầu hành trình học tập, kết nối và phát triển sự nghiệp của bạn.">
     <View style={authStyles.form}>

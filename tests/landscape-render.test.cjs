@@ -29,8 +29,20 @@ const { DeveloperLandscapeTemplate } = load(path.join(__dirname, '../src/compone
 const { developerLandscapeThemes } = load(path.join(__dirname, '../src/components/profile/templates/developer-landscape/DeveloperLandscapeThemes.ts'));
 const { LandscapeHero } = load(path.join(__dirname, '../src/components/profile/templates/developer-landscape/LandscapeHero.tsx'));
 const { LandscapeProjects } = load(path.join(__dirname, '../src/components/profile/templates/developer-landscape/LandscapeSections.tsx'));
-const render = (data = sample, extra = {}) => renderToStaticMarkup(React.createElement(DeveloperLandscapeTemplate, { data, theme: developerLandscapeThemes[0], width: 1120, thumbnail: true, ...extra }));
+const render = (data = sample, extra = {}) => renderToStaticMarkup(React.createElement(DeveloperLandscapeTemplate, { data, theme: developerLandscapeThemes[0], width: 1120, thumbnail: true, demo: true, ...extra }));
 const renderHero = (data = sample, extra = {}) => renderToStaticMarkup(React.createElement(LandscapeHero, { data, theme: developerLandscapeThemes[0], width: 1120, thumbnail: true, ...extra }));
+test('real profile missing skill icon uses blue default while demo keeps its bundled logo', () => {
+  const data = structuredClone(sample);
+  data.portfolio.skills = [{ name: 'React', category: 'Frontend', iconUrl: null }];
+  const real = render(data, { demo: false });
+  assert.ok(real.includes('Icon mặc định React')); assert.ok(!real.includes('react.svg'));
+  assert.ok(render(data, { demo: true }).includes('react.svg'));
+  data.portfolio.skills[0].iconUrl = 'https://res.cloudinary.com/fixture/image/upload/react.png';
+  const custom = render(data, { demo: false });
+  assert.ok(custom.includes('https://res.cloudinary.com/fixture/image/upload/react.png'));
+  assert.ok(!custom.includes('Icon mặc định React'));
+});
+
 test('empty and hidden sections are omitted and profile data is never mutated', () => {
   const data = structuredClone(sample);
   for (const key of ['projects', 'skills', 'experience', 'education', 'articles', 'certificates']) data.portfolio[key] = [];

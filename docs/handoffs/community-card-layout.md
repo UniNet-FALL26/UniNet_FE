@@ -1,0 +1,12 @@
+# Community cards — 2026-11-07
+
+- Shared feed used by Student, Partner and Assessor: ordinary posts show `N lượt thích · M bình luận` aligned right above a separate Like / Comment / Share row. No icons in the statistics row or invented share counts.
+- Advertisements use separate rounded media and destination/CTA panels. Ads have no like, comment or share controls, per user direction. Backend unchanged.
+- Share uses the device/browser share sheet or web clipboard fallback. `/post/[id]` routes authenticated readers to their role's community with the selected post; direct lookup supports posts outside the loaded feed page. Unauthenticated readers use the existing login flow.
+- Existing contained media retains the blurred same-image backdrop. Fixed backdrop styling for React Native 0.86 (`StyleSheet.absoluteFill`).
+- `CommunityPostMedia` owns feed galleries: 2 images use equal columns; 3 use a larger first image plus two tiles; 4+ use a larger first image plus three tiles and an overflow count. Every tile contains its full image above a blurred same-source cover layer. Responsive aspect ratios and height bounds replace the old short, cropped previews. Clicks retain the original lightbox indexes.
+- Gallery validation: unit coverage for 0/1/2/3/4/7 images, full-image/backdrop pairing, overflow counts and click indexes; Chrome screenshots at 320/390/768/1440px for 2/3/4/7-image posts.
+- Below 1024px, CommentModal uses a bottom sheet with slide animation, dimmed dismissible backdrop, close control, comments and composer. Post media, author header, description and reaction statistics appear only in the desktop modal. Existing comment/reply/edit/delete handlers remain shared.
+- Mobile sheet is 78% of viewport height with a scrollable list and fixed composer. Chrome checks at 320/390/768px cover bottom placement, hidden post content, comment submission and switching between posts without mixing comments; desktop retains its media viewer and blurred backdrop. Native keyboard behavior needs device validation.
+- Validation: footer unit tests and focused Chrome fixture at 320/390/768/1440px; likes, comment modal, shared link, ad CTA and absent social controls. Screenshots inspected under ignored `dist/community-cards`.
+- Existing broader partner-community browser fixture fails on its outdated notification badge mock. Full TypeScript check still reports existing opportunities/assessor profile errors.

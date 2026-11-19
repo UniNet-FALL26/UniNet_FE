@@ -61,17 +61,25 @@ export function useVerificationDossier(id: string, withResult = false) {
         inFlight = false;
         if (!controller.signal.aborted) {
           setLoading(false);
-          if (pending && failures < 3 && !denied && visible()) timer = setTimeout(() => { void load(); }, 12000);
+          if (pending && !denied && failures < 3) timer = setTimeout(() => { void load(); }, 12000);
         }
       }
     }
     void load();
-    const foreground = () => { if (timer) clearTimeout(timer); if (visible()) void load(); };
+    const foreground = () => { if (timer) clearTimeout(timer); if (visible()) { failures = 0; void load(); } };
     const subscription = AppState.addEventListener('change', foreground);
-    if (Platform.OS === 'web' && typeof document !== 'undefined') { document.addEventListener('visibilitychange', foreground); window.addEventListener('focus', foreground); }
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', foreground);
+      window.addEventListener('focus', foreground);
+    }
     return () => {
-      controller.abort(); if (timer) clearTimeout(timer); subscription.remove();
-      if (Platform.OS === 'web' && typeof document !== 'undefined') { document.removeEventListener('visibilitychange', foreground); window.removeEventListener('focus', foreground); }
+      controller.abort();
+      if (timer) clearTimeout(timer);
+      subscription.remove();
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', foreground);
+        window.removeEventListener('focus', foreground);
+      }
     };
   }, [key, id, revision, withResult]));
   return { detail, result, error, resultError, loading, refresh };

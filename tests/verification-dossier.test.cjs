@@ -29,6 +29,17 @@ test('payment success and a cancelled assignment never fabricate completed verif
   assert.equal(steps[2].done, false);
   assert.equal(steps[4].done, false);
 });
+
+test('paid progress distinguishes pending booking, manual review and confirmed booking', () => {
+  const step = (bookingStatus, status = 1, requiresManualReview = false) => helper.dossierSteps(detail({ verification: { status: 0, bookingStatus }, payments: [{ status, requiresManualReview }] }))[1];
+  assert.equal(step(3).done, false);
+  assert.equal(step(3).statusText, 'Đã thanh toán · Chờ xác nhận lịch');
+  assert.match(step(3, 1, true).statusText, /Đã thanh toán · Cần hỗ trợ/);
+  assert.equal(step(2, 1, true).done, false);
+  assert.equal(step(2).done, true);
+  assert.equal(step(2).statusText, 'Đã thanh toán và xác nhận lịch');
+  assert.doesNotMatch(step(3, 0, true).statusText, /Đã thanh toán/);
+});
 test('result and cancellation use actual backend routes, body and abort signal', async () => {
   const calls = [];
   const api = load('src/services/project-verification.service.ts', {
@@ -43,6 +54,28 @@ test('result and cancellation use actual backend routes, body and abort signal',
   assert.equal(calls[1][0], '/projects/verifications/v%2F1/cancel');
   assert.equal(calls[1][1].method, 'PATCH');
   assert.deepEqual(JSON.parse(calls[1][1].body), { reason: 'Không còn nhu cầu' });
+});
+test('project details find a final report behind pending or cancelled dossiers', async () => {
+  const signal = new AbortController().signal;
+  for (const status of [0, 1, 2, 3]) {
+    const calls = [];
+    const result = { status, finalizedAt: '2026-11-18', reports: [] };
+    const api = load('src/services/project-verification.service.ts', {
+      '@/constants/config': { API_URL: 'https://test/api' },
+      '@/services/api': { apiRequest: async (url, options) => {
+        assert.equal(options.signal, signal);
+        assert.equal(options.feedback, false);
+        calls.push(url);
+        if (url.endsWith('page=1&pageSize=20')) return { totalPages: 2, verifications: [{ id: 'pending', status: 0 }, { id: 'cancelled', status: 3 }] };
+        if (url.endsWith('page=2&pageSize=20')) return { totalPages: 2, verifications: [{ id: 'older', status }] };
+        assert.equal(url, '/projects/verifications/older/result');
+        return result;
+      } },
+    }).projectVerificationService;
+    const final = status === 1 || status === 2;
+    assert.equal(await api.latestFinalResult('project', signal), final ? result : null);
+    assert.equal(calls.length, final ? 3 : 2);
+  }
 });
 test('history requests the selected page without discarding server pagination', async () => {
   const api = load('src/services/verification-payment.service.ts', {
@@ -65,10 +98,10 @@ function renderResult(snapshot) {
 test('S09 separates failed, passed, waiting and unavailable result reports', () => {
   const report = { id: 'r', summary: 'Tóm tắt thật', findings: 'Phát hiện thật', recommendations: 'Khuyến nghị thật', submittedAt: '2026-10-22' };
   const failed = renderResult({ detail: detail({ verification: { status: 2 } }), result: { status: 2, reports: [report], finalizedAt: '2026-10-22' } });
-  for (const text of ['Không đạt xác minh cấp 2', 'Tóm tắt thật', 'Phát hiện thật', 'Khuyến nghị thật', 'hai trạng thái độc lập']) assert.ok(failed.includes(text));
+  for (const text of ['Không đạt thẩm định', 'Tóm tắt thật', 'Phát hiện thật', 'Khuyến nghị thật', 'hai trạng thái độc lập']) assert.ok(failed.includes(text));
   const waiting = renderResult({ detail: detail({ payments: [{ status: 1 }] }), result: null });
-  assert.ok(waiting.includes('Đang chờ kết luận cấp 2'));
-  assert.ok(!waiting.includes('✓ Đạt xác minh cấp 2'));
+  assert.ok(waiting.includes('Đang chờ kết luận thẩm định'));
+  assert.ok(!waiting.includes('✓ Đạt thẩm định'));
   const partial = renderResult({ detail: detail(), result: { status: 0, reports: [report] } });
   assert.ok(partial.includes('chưa phải kết luận cuối cùng'));
   const denied = renderResult({ detail: null, result: null, error: 'Không có quyền' });
@@ -96,12 +129,12 @@ test('S07 resumes existing dossier, hides locked cancellation and exposes final 
   }
   const pending = render(detail());
   assert.ok(pending.includes('Chưa chọn lịch') && pending.includes('Chọn lịch xác minh') && pending.includes('Hủy hồ sơ'));
-  assert.ok(!pending.includes('Chọn gói cấp 2'));
+  assert.ok(!pending.includes('Chọn gói thẩm định'));
   const assigned = render(detail({ assignments: [{ id: 'a', status: 0, assignedAt: '2026-10-22' }] }));
   assert.ok(assigned.includes('Đã phân công'));
   assert.ok(!assigned.includes('Hủy hồ sơ'));
   const final = render(detail({ verification: { status: 2 } }));
-  assert.ok(final.includes('Không đạt cấp 2') && final.includes('Xem kết quả cấp 2'));
+  assert.ok(final.includes('Không đạt thẩm định') && final.includes('Xem kết quả thẩm định'));
   assert.ok(!final.includes('Hủy hồ sơ') && !final.includes('Chọn lịch xác minh'));
 });
 

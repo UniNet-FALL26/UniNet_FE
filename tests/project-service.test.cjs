@@ -111,7 +111,7 @@ test('my projects rejects malformed responses', async () => {
 
 function projectDetail(overrides = {}) {
   return {
-    id: 'real-project', title: 'EduConnect', visibility: 1, status: 1, recruitmentStatus: 0,
+    id: 'real-project', title: 'EduConnect', minimumQuantity: 2, visibility: 1, status: 1, recruitmentStatus: 0,
     creator: { id: 'creator', fullName: 'Nguyen Minh Duy', nickname: 'Noobmaster69', avatarUrl: null },
     roleRequirements: [{ id: 'role', roleName: 'Mobile Developer', quantity: 1, requirements: 'API integration' }],
     skills: [{ skillId: 'skill', skillName: 'React Native', iconUrl: null }],
@@ -153,7 +153,7 @@ test('project detail rejects missing ids, mismatched projects and malformed resp
 });
 
 test('creation posts the API contract and preserves the returned project', async () => {
-  const payload = { title: 'Test', projectField: 'IT', description: 'Test', memberTarget: 2, roleRequirements: [{ role: 'Dev', quantity: 1, requirements: 'React' }], skillIds: ['skill-id'], visibility: 0, recruitmentDeadline: '2026-12-01T12:00:00.000Z', expectedOutput: '2027-01-01T12:00:00.000Z' };
+  const payload = { title: 'Test', projectField: 'IT', description: 'Test', memberTarget: 2, minimumQuantity: 2, roleRequirements: [{ role: 'Dev', quantity: 1, requirements: 'React' }], skillIds: ['skill-id'], visibility: 0, recruitmentDeadline: '2026-12-01T12:00:00.000Z', expectedOutput: '2027-01-01T12:00:00.000Z' };
   for (const apiUrl of ['https://example.com', 'https://example.com/api']) {
     const response = projectDetail();
     const service = offlineService(async (url, options) => {

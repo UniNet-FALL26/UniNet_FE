@@ -1,10 +1,9 @@
-import { ModulePage } from '@/components/ui/ModulePage';
-import { StudentVerificationNotifications } from '@/components/settings/StudentVerificationNotifications';
-import { useAuthStore } from '@/store/auth.store';
-import { ACCOUNT_ROLE } from '@/constants/roles';
+import { StyleSheet, View } from 'react-native';
+import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
+import { notificationTheme } from '@/constants/notification-presentation';
 
 export default function NotificationsScreen() {
-  const { account, isAuthenticated } = useAuthStore();
-  if (isAuthenticated && account?.role === ACCOUNT_ROLE.STUDENT) return <StudentVerificationNotifications key={account.id} accountId={account.id} />;
-  return <ModulePage title="Thông báo" description="Theo dõi những cập nhật liên quan đến bạn." sections={['Tất cả', 'Chưa đọc']} />;
+  return <View style={styles.page}><NotificationsPanel /></View>;
 }
+
+const styles = StyleSheet.create({ page: { flex: 1, minHeight: 0, paddingHorizontal: 10, backgroundColor: notificationTheme.page } });

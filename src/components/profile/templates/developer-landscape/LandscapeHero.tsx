@@ -9,13 +9,13 @@ import { EditField, EditPhoto, useProfileEditing } from '@/components/profile/Pr
 import { profileMedia, isSampleLink } from '@/components/profile/profile-media';
 
 export type LandscapeProps = Omit<DeveloperModernTemplateProps, 'theme'> & { theme: LandscapeTheme; portraitMode?: PortraitMode; showTemplateFooter?: boolean };
-export function LandscapeHero({ data, theme, width, portraitMode }: LandscapeProps) {
+export function LandscapeHero({ data, theme, width, portraitMode, heroAction }: LandscapeProps) {
   const editing = useProfileEditing();
   const compact = width < 768;
   const wide = width >= 1000;
   const words = data.profile.fullName.trim().split(/\s+/);
   const nickname = data.profile.nickname?.trim();
-  const title = <View style={s.titles}>
+  const title = <View style={[s.titles, compact && !!heroAction && { paddingRight: 40 }]}>
     <EditField overlay field="fullName" label="Họ và tên" color={theme.heroText}><Text role="heading" aria-level={1} style={[s.name, { color: theme.heroText, fontSize: compact ? 36 : 42, lineHeight: compact ? 46 : 52 }]}>{words.slice(0, -1).join(' ')}{words.length > 1 ? ' ' : ''}<Text style={{ color: theme.accent }}>{words.at(-1)}</Text></Text></EditField>
     {(nickname || editing) && <EditField overlay field="nickname" label="Biệt danh" color={theme.heroMuted}><Text testID="landscape-nickname" style={[s.nickname, { color: theme.heroMuted }]}>{nickname || 'Biệt danh'}</Text></EditField>}
     {(data.portfolio.headline || editing) && <EditField overlay field="headline" label="Chức danh" color={theme.heroText}><Text style={[s.headline, { color: theme.heroText }]}>{data.portfolio.headline || 'Thêm chức danh'}</Text></EditField>}
@@ -24,6 +24,7 @@ export function LandscapeHero({ data, theme, width, portraitMode }: LandscapePro
     {(data.profile.bio || data.portfolio.careerObjective || editing) && <EditField overlay field="bio" label="Giới thiệu" color={theme.heroMuted}><Text style={[s.bio, { color: theme.heroMuted }]}>{data.profile.bio || data.portfolio.careerObjective || 'Thêm giới thiệu về bạn'}</Text></EditField>}
   </View>;
   return <View testID="landscape-hero" style={[s.hero, { backgroundColor: theme.heroBackground, paddingHorizontal: compact ? 22 : 40 }]}>
+    {heroAction && <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>{heroAction}</View>}
     <Image source={(!isSampleLink(data.profile.coverUrl) && profileMedia(data.profile.coverUrl)) || theme.heroBackgroundImage} style={StyleSheet.absoluteFill} contentFit="cover" priority="high" loading="eager" accessible={false} />
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.heroOverlay }]} />
     <View style={[s.composition, { flexDirection: compact ? 'column' : 'row' }]}>

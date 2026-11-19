@@ -1,19 +1,14 @@
+import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { colors } from '@/constants/colors';
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileTemplateCard } from '@/components/profile/ProfileTemplateCard';
 import { profileTemplates } from '@/data/profile-templates';
 
 export default function ProfileTemplatesScreen() {
   return <SafeAreaView style={styles.safe}>
-    <View style={styles.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Quay lại trang cá nhân" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-        <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={24} tintColor={colors.textPrimary} />
-      </Pressable>
-      <Text role="heading" aria-level={1} style={styles.title}>Mẫu hồ sơ</Text>
-    </View>
+    <DetailNavigation title="Mẫu hồ sơ" backLabel="Quay lại trang cá nhân" onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')} />
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.description}>Một hồ sơ mang dấu ấn của bạn. Chọn mẫu hoặc màu sắc để xem trước.</Text>
       <View style={styles.grid}>{profileTemplates.map(template => <ProfileTemplateCard key={template.id} template={template} />)}</View>
