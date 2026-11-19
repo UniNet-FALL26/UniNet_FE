@@ -8,17 +8,17 @@ function load(file, imports) {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, { exports, URL, require: name => imports[name] || {} });
   return exports;
 }
-function render(start, end, status = 0) {
+function render(start, end, status = 0, report = null) {
   const key = 'user:assignment';
-  const states = [{ key, data: { meetingStartAt: start, meetingEndAt: end, joinUrl: 'https://meet.example' } }, { key, data: { assignment: { id: 'assignment', status }, project: { title: 'Project', projectField: 'Field' } } }, '', '', false, 0, { key, fields: {} }, false];
+  const states = [{ key, data: { meetingStartAt: start, meetingEndAt: end, joinUrl: 'https://meet.example' } }, { key, data: { assignment: { id: 'assignment', status }, report, project: { title: 'Project', projectField: 'Field' } } }, '', '', false, 0, { key, fields: {} }, false];
   const calls = [];
   const element = (type, props) => ({ type, props });
   const screen = load('src/app/(assessor)/assessor-assessments/[id].tsx', {
-    react: { useState: () => [states.shift(), () => {}], useRef: () => ({ current: false }), useCallback: fn => fn, useEffect: () => {} },
+    react: { useState: () => [states.shift(), () => {}], useRef: () => ({ current: false }), useCallback: fn => fn, useEffect: () => {}, useLayoutEffect: () => {} },
     'react/jsx-runtime': { jsx: element, jsxs: element },
     'expo-router': { useLocalSearchParams: () => ({ id: 'assignment' }), useFocusEffect: () => {} },
     'react-native': { useWindowDimensions: () => ({ width: 1000 }) },
-    '@/components/assessor/AssignmentDetailContent': { detailTabs: () => [{ key: 'schedule' }, { key: 'info' }] },
+    '@/components/assessor/AssignmentDetailContent': { DetailHeader: 'DetailHeader', detailTabs: () => [{ key: 'schedule' }, { key: 'info' }] },
     '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'user' } }) },
     '@/components/assessor/assessor-ui': { assessorStyles: {}, assessorDate: () => '' },
     '@/services/assessor.service': { assessorService: { meetingAction: async (...args) => { calls.push(args); } } },
@@ -26,7 +26,8 @@ function render(start, end, status = 0) {
   }).default;
   const nodes = [];
   function walk(node) { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === 'object') { nodes.push(node); walk(node.props?.children); } }
-  walk(screen());
+  const detail = screen();
+  walk(detail.type(detail.props));
   return { nodes, calls };
 }
 test('end button is visible but disabled before starting', () => {
@@ -43,6 +44,15 @@ test('meeting API start enables end action even if assignment timestamps are mis
 });
 test('ended or inactive assignments do not offer end action', () => {
   for (const args of [['start', 'end'], ['start', null, 3]]) assert.equal(render(...args).nodes.some(n => n.props?.title === 'Kết thúc buổi thẩm định'), false);
+});
+test('report is available once an active meeting starts, until a report exists', () => {
+  const canReport = (...args) => render(...args).nodes.find(n => n.type === 'DetailHeader').props.canReport;
+  assert.equal(canReport(null, null), false);
+  assert.equal(canReport('start', null), true);
+  assert.equal(canReport('start', 'end'), true);
+  assert.equal(canReport('start', null, 2), true);
+  assert.equal(canReport('start', null, 3), false);
+  assert.equal(canReport('start', null, 0, { summary: 'Submitted' }), false);
 });
 test('end action posts to verificator meeting endpoint without a body', async () => {
   const calls = [];
