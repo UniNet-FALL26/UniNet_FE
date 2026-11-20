@@ -19,8 +19,14 @@ const origin = process.env.FIND_TEAMMATES_TEST_ORIGIN || 'http://localhost:8095'
       { id: 'design', name: 'UI Designer', quantity: 1, technologies: ['Figma'], skills: [], requirements: [], jobDescription: '', benefits: [] },
     ] }, myReview: null, chatRoomId: null, createdAt: '2026-11-18T08:00:00Z', updatedAt: '2026-11-18T08:00:00Z', ...extra });
   const posts = [project('study-buddy', 'Study Buddy'), project('design-studio', 'Design Studio'), project('own-project', 'Dự án của tôi', { isOwner: true }), project('member-project', 'Dự án đang tham gia', { isMember: true })];
+  const member = (userId, status = 0) => ({ id: `membership-${userId}`, userId, fullName: userId, avatarUrl: null, role: '', positionId: 'backend', status, joinedAt: '2026-11-18T08:00:00Z' });
+  posts[0].members = [member(posts[0].creator.id), member('accepted-applicant'), member('kicked-applicant', 1), member('left-applicant', 2)];
+  posts[0].logoUrl = 'https://fixture.test/technology/project-cover.svg';
+  posts[1].members = [member(posts[1].creator.id)];
+  const logoUrl = name => `https://fixture.test/technology/${encodeURIComponent(name)}.svg`;
   try {
     page.on('pageerror', error => errors.push(error.message));
+    await page.route('https://fixture.test/technology/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="#1689ff"/></svg>' }));
     await page.route('**/api/**', async route => {
       const url = new URL(route.request().url()), path = url.pathname, method = route.request().method();
       const ok = json => route.fulfill({ json });
@@ -28,7 +34,7 @@ const origin = process.env.FIND_TEAMMATES_TEST_ORIGIN || 'http://localhost:8095'
       if (path.endsWith('/auth/login')) return ok({ account, accessToken: 'fixture-access', refreshToken: 'fixture-refresh', requiresProfileCompletion: false });
       if (path.endsWith('/auth/me')) return ok(account);
       if (path.endsWith('/profile/portfolio/me')) return ok(data);
-      if (path.endsWith('/profile/skills')) return ok(['C#', 'Git', 'Figma'].map(name => ({ id: name, name, iconUrl: null, category: 'Backend' })));
+      if (path.endsWith('/profile/skills')) return ok(['React', 'C#', 'Git', 'Figma'].map(name => ({ id: name, name, iconUrl: logoUrl(name), category: 'Backend' })));
       if (path.endsWith('/project-hub/mine')) return ok({ items: [], total: 0, page: 1, pageSize: 12 });
       if (path.endsWith('/project-hub/discover')) {
         queries.push(url.searchParams.toString());
@@ -60,7 +66,7 @@ const origin = process.env.FIND_TEAMMATES_TEST_ORIGIN || 'http://localhost:8095'
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.waitForURL(url => !url.pathname.includes('/login'));
     await page.goto(origin + '/profile/projects', { waitUntil: 'domcontentloaded' });
-    const header = page.getByRole('tab', { name: 'Tìm đồng đội', exact: true });
+    const header = page.getByRole('tab', { name: 'Hợp tác', exact: true });
     await header.waitFor();
     assert.equal(await header.count(), 1, 'Student header must expose Find teammates');
     await header.click(); await page.waitForURL('**/find-teammates');
@@ -69,6 +75,23 @@ const origin = process.env.FIND_TEAMMATES_TEST_ORIGIN || 'http://localhost:8095'
     const card = id => page.getByTestId('recruitment-post-' + id);
     await card('study-buddy').getByText('Study Buddy', { exact: true }).waitFor();
     await card('study-buddy').getByText('Tìm đồng đội xây dựng ứng dụng học tập cho sinh viên.', { exact: true }).waitFor();
+    const projectImage = card('study-buddy').getByRole('img', { name: 'Ảnh dự án Study Buddy', exact: true });
+    await projectImage.waitFor({ state: 'attached' });
+    await projectImage.evaluate(image => image.decode());
+    const imageBounds = await projectImage.boundingBox();
+    assert.ok(imageBounds.width >= 55 && imageBounds.height >= 55, 'project cover must have a visible frame on recruitment cards');
+    assert.equal(await projectImage.getAttribute('src'), posts[0].logoUrl);
+    assert.match(await card('study-buddy').textContent(), /Tuyển: 3 thành viên/);
+    assert.match(await card('study-buddy').textContent(), /Đã tham gia: 1 thành viên/);
+    assert.match(await card('study-buddy').textContent(), /Đã có 1 thành viên tham gia/);
+    assert.match(await card('design-studio').textContent(), /Đã tham gia: 0 thành viên/);
+    assert.match(await card('design-studio').textContent(), /Trở thành đồng đội đầu tiên/);
+    for (const name of ['React', 'C#', 'Git', 'Figma']) {
+      const logo = card('study-buddy').getByRole('img', { name: `Icon ${name}`, exact: true });
+      await logo.waitFor();
+      await logo.evaluate(image => image.decode());
+      assert.equal(await logo.getAttribute('src'), logoUrl(name));
+    }
     await page.screenshot({ path: 'C:/Users/minec/UniNet/find-teammates-desktop.png', animations: 'disabled' });
     await page.getByRole('button', { name: 'Trang sau', exact: true }).click();
     await card('last-post').waitFor();
@@ -84,37 +107,52 @@ const origin = process.env.FIND_TEAMMATES_TEST_ORIGIN || 'http://localhost:8095'
     const overview = page.getByRole('dialog', { name: 'Thông tin tuyển thành viên', exact: true });
     const closeOverview = () => overview.getByRole('button', { name: 'Đóng', exact: true }).last().click();
     for (const id of ['own-project', 'member-project']) {
-      await card(id).getByRole('button', { name: 'Xem bài tuyển', exact: true }).click();
+      await card(id).getByRole('button', { name: 'Tham gia', exact: true }).click();
       await overview.getByText('Backend Developer', { exact: true }).waitFor();
+      if (id === 'own-project') await overview.screenshot({ path: 'C:/Users/minec/UniNet/recruitment-popup-desktop.png', animations: 'disabled' });
       assert.equal(await overview.getByRole('button', { name: 'Xin tham gia', exact: true }).count(), 0);
       assert.equal(await overview.getByRole('button', { name: 'Chỉnh sửa', exact: true }).count(), 0);
       await closeOverview();
     }
     posts[0].recruitment.status = 2;
-    await card('study-buddy').getByRole('button', { name: 'Xem bài tuyển', exact: true }).click();
+    await card('study-buddy').getByRole('button', { name: 'Tham gia', exact: true }).click();
     await overview.getByText('Đã đóng tuyển', { exact: true }).waitFor();
     assert.equal(await overview.getByRole('button', { name: 'Xin tham gia', exact: true }).count(), 0);
     await closeOverview(); posts[0].recruitment.status = 1;
-    await card('study-buddy').getByRole('button', { name: 'Xem bài tuyển', exact: true }).click();
+    await card('study-buddy').getByRole('button', { name: 'Tham gia', exact: true }).click();
     await overview.getByRole('button', { name: 'Xin tham gia', exact: true }).click();
     const apply = page.getByRole('dialog', { name: 'Ứng tuyển vào dự án', exact: true });
     await apply.getByRole('radio').filter({ hasText: 'UI Designer' }).click();
     await apply.getByRole('textbox', { name: 'Lời nhắn ứng tuyển', exact: true }).fill('  Em muốn tham gia thiết kế.  ');
+    await apply.screenshot({ path: 'C:/Users/minec/UniNet/project-apply-desktop.png', animations: 'disabled' });
+    await page.setViewportSize({ width: 375, height: 812 });
+    assert.equal(await apply.getByRole('radio').filter({ hasText: 'UI Designer' }).getAttribute('aria-checked'), 'true');
+    const applyBounds = await apply.boundingBox();
+    assert.ok(applyBounds.width <= 355 && applyBounds.height <= 792);
+    await apply.screenshot({ path: 'C:/Users/minec/UniNet/project-apply-mobile.png', animations: 'disabled' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await apply.getByRole('button', { name: 'Gửi ứng tuyển', exact: true }).click();
     await overview.getByText('Bạn đã gửi yêu cầu tham gia, đang chờ phản hồi.', { exact: true }).waitFor();
     assert.equal(writes.length, 1); assert.equal(writes[0].requestType, 0); assert.equal(writes[0].positionId, 'design'); assert.equal(writes[0].message, 'Em muốn tham gia thiết kế.');
     await closeOverview();
-    await card('study-buddy').getByRole('button', { name: 'Xem bài tuyển', exact: true }).click();
+    await card('study-buddy').getByRole('button', { name: 'Tham gia', exact: true }).click();
     await overview.getByText('Bạn đã gửi yêu cầu tham gia, đang chờ phản hồi.', { exact: true }).waitFor();
     await page.keyboard.press('Escape'); await overview.waitFor({ state: 'hidden' });
     await page.setViewportSize({ width: 1024, height: 800 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.getByRole('button', { name: 'Mở menu', exact: true }).click();
-    await page.getByRole('button', { name: 'Tìm đồng đội', exact: true }).click();
+    await page.getByRole('button', { name: 'Hợp tác', exact: true }).click();
     await card('study-buddy').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: 'C:/Users/minec/UniNet/find-teammates-mobile.png', animations: 'disabled' });
+    await card('own-project').getByRole('button', { name: 'Tham gia', exact: true }).click();
+    await overview.getByText('Backend Developer', { exact: true }).waitFor();
+    const popupBounds = await overview.boundingBox();
+    assert.ok(popupBounds.width <= 355 && popupBounds.height <= 792);
+    await overview.getByRole('button', { name: 'Xem dự án', exact: true }).waitFor({ state: 'visible' });
+    await overview.screenshot({ path: 'C:/Users/minec/UniNet/recruitment-popup-mobile.png', animations: 'disabled' });
+    await closeOverview();
     assert.ok(queries.some(q => q.includes('page=2')));
     assert.deepEqual(errors, []);
     console.log('Find teammates checks passed: header/menu, browse/search/page, empty/retry, fresh status, application/pending, owner/member, responsive.');

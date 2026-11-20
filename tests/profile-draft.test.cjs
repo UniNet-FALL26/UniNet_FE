@@ -13,7 +13,7 @@ function load(relative) {
   return exports;
 }
 const original = () => ({ profile: { id: 'owner', fullName: 'Owner', nickname: 'Owner', avatarUrl: null, coverUrl: null, bio: null, isVerified: true }, isOwner: true,
-  portfolio: { headline: 'Developer', careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null, isPublic: false,
+  portfolio: { headline: 'Developer', careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null,
     appearance: { profile: { template: 'developer-modern', theme: 'blue', font: 'Inter', sectionOrder: ['skills'], hiddenSections: ['languages'], showPortfolio: false } },
     skills: [], projects: [{ title: 'Keep', technologies: [] }], experience: [], education: [], certificates: [], articles: [], socialLinks: [], activities: [{ title: 'Keep activity' }], languages: [{ name: 'Vietnamese', level: 'Native' }] } });
 

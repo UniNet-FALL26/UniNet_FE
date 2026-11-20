@@ -21,6 +21,7 @@ const names = {
   invite: ['person.badge.plus', 'person_add'], chevron: ['chevron.down', 'expand_more'], warning: ['exclamationmark.triangle', 'warning_amber'],
   tag: ['tag', 'sell'], save: ['square.and.arrow.down', 'save'],
   globe: ['globe', 'language'], code: ['chevron.left.forwardslash.chevron.right', 'code'],
+  message: ['bubble.left', 'chat_bubble_outline'],
 } as const;
 export type HubIconName = keyof typeof names;
 export function HubIcon({ name, size = 20, color = colors.primary }: { name: HubIconName; size?: number; color?: string }) {

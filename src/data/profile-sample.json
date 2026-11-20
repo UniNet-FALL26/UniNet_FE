@@ -19,7 +19,6 @@
     "availability": "Sẵn sàng cho cơ hội mới",
     "contactEmail": "quyen.dev@example.com",
     "cvUrl": null,
-    "isPublic": false,
     "appearance": { "profile": { "template": "developer-modern", "theme": "blue", "font": "Inter", "sectionOrder": ["featured-projects", "stats", "skills", "journey", "other-projects", "certificates", "activities", "languages", "articles"], "hiddenSections": [] } },
     "skills": [
       { "name": "React", "category": "Frontend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },

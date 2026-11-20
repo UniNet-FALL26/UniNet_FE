@@ -1,4 +1,4 @@
-﻿// Isolated UI verification. All API calls are mocked; no real profile data is written.
+// Isolated UI verification. All API calls are mocked; no real profile data is written.
 const { chromium } = require('C:/Users/minec/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,7 +7,7 @@ const account = { id: 'editor-test-owner', email: 'editor@example.org', role: 0,
 let real = {
   profile: { ...account.profile, avatarUrl: null, coverUrl: null, bio: null, universityName: null, major: null }, isOwner: true,
   skillCatalog: [{ id: '11111111-1111-1111-1111-111111111111', name: 'React', category: 'Frontend', iconUrl: null }],
-  portfolio: { headline: null, careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null, isPublic: false, appearance: { profile: { template: 'developer-landscape', theme: 'pink', font: 'Inter', sectionOrder: [], hiddenSections: ['skills', 'languages'] } }, skills: [], projects: [], education: [], experience: [], certificates: [], activities: [{ title: 'Existing activity' }], languages: [{ name: 'Existing language', level: 'Native' }], articles: [], socialLinks: [] },
+  portfolio: { headline: null, careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null, appearance: { profile: { template: 'developer-landscape', theme: 'pink', font: 'Inter', sectionOrder: [], hiddenSections: ['skills', 'languages'] } }, skills: [], projects: [], education: [], experience: [], certificates: [], activities: [{ title: 'Existing activity' }], languages: [{ name: 'Existing language', level: 'Native' }], articles: [], socialLinks: [] },
 };
 (async () => {
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
@@ -152,7 +152,7 @@ let real = {
     assert.equal(confirms,2,'Failed confirm retries once, cancellation never uploads');
     assert.equal(real.portfolio.yearsOfExperience, 5.5); assert.equal(real.portfolio.gpa, '8.5/10'); assert.equal(real.portfolio.projects.length, 1); assert.equal(real.portfolio.skills.length, 1);
     assert.equal(real.portfolio.projects[0].coverUrl, `${origin}/editor-avatar.png`); assert.equal(real.portfolio.articles[0].coverUrl, `${origin}/editor-avatar.png`);
-    assert.equal(real.portfolio.activities[0].title, 'Existing activity'); assert.equal(real.portfolio.languages[0].name, 'Existing language'); assert.equal(real.portfolio.isPublic, false);
+    assert.equal(real.portfolio.activities[0].title, 'Existing activity'); assert.equal(real.portfolio.languages[0].name, 'Existing language');
     assert.deepEqual(real.portfolio.appearance.profile.hiddenSections, ['skills', 'languages']);
     await page.getByRole('button', { name: 'Quay lại xem mẫu', exact: true }).click(); await page.getByRole('button', { name: 'Quay lại mẫu hồ sơ', exact: true }).click();
     for (const [template, name] of Object.entries(templates)) for (const width of [320, 768, 1440]) {

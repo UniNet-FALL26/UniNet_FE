@@ -10,7 +10,7 @@ const longText = count => Array.from({ length: count }, (_, index) => `Dòng ${i
       const errors = []; page.on('pageerror', error => errors.push(error.message));
       const profile = { id: 'profile', fullName: 'Student Fixture', nickname: 'student', displayName: 'student', avatarUrl: null, coverUrl: null, bio: longText(8), universityName: 'University', major: 'Software', organizationName: null, isVerified: false };
       const account = { id: 'student', email: 'student@fixture.test', role: 0, status: 1, profileComplete: true, profile };
-      let data = { profile, isOwner: true, skillCatalog: [], portfolio: { headline: 'Software Developer', careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null, isPublic: false,
+      let data = { profile, isOwner: true, skillCatalog: [], portfolio: { headline: 'Software Developer', careerObjective: null, location: null, availability: null, contactEmail: null, cvUrl: null,
         appearance: { profile: { template, theme: 'blue', font: 'Inter', sectionOrder: [], hiddenSections: [] } }, skills: [], education: [], experience: [], projects: [], certificates: [], activities: [], languages: [], articles: [], socialLinks: [] } };
       let writes = 0, saved;
       await page.routeWebSocket('**/hubs/notifications**', socket => socket.onMessage(value => { if (String(value).includes('"protocol"')) socket.send('{}\x1e'); }));

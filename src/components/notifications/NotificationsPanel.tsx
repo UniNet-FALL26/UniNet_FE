@@ -26,7 +26,7 @@ export function NotificationsPanel({ description = 'Những cập nhật dành c
         })}
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Đánh dấu tất cả đã đọc" disabled={inbox.busy || unreadCount === 0} onPress={() => { void inbox.readAll(); }} style={({ hovered, pressed }) => [s.readAll, narrow && s.mobileReadAll, (hovered || pressed) && s.hovered, (inbox.busy || unreadCount === 0) && s.disabled]}>
-        <SymbolView name={{ ios: 'checkmark.circle', android: 'task_alt', web: 'task_alt' }} size={18} tintColor={theme.blue} />
+        <SymbolView name={{ ios: 'checkmark.circle', android: 'task_alt', web: 'task_alt' }} size={16} tintColor={theme.blue} />
         {!narrow && <Text style={s.actionText}>Đánh dấu tất cả đã đọc</Text>}
       </Pressable>
     </View>
@@ -47,10 +47,10 @@ export function NotificationsPanel({ description = 'Những cập nhật dành c
 const s = StyleSheet.create({
   panel: { flex: 1, minHeight: 0, width: '100%', maxWidth: 1080, alignSelf: 'center', backgroundColor: '#FAFCFF', borderWidth: 1, borderColor: theme.border, borderRadius: 20, marginVertical: 20, overflow: 'hidden', paddingHorizontal: 18, paddingBottom: 14 },
   mobilePanel: { marginVertical: 10, borderRadius: 16, paddingHorizontal: 10, paddingBottom: 8 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: theme.divider, minHeight: 58, gap: 12 }, mobileToolbar: { gap: 2 },
-  tabs: { flexDirection: 'row', alignItems: 'stretch', minWidth: 0 }, tab: { minHeight: 58, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 2, borderBottomColor: 'transparent' }, mobileTab: { paddingHorizontal: 8, gap: 5 }, selectedTab: { borderBottomColor: theme.active },
-  tabLabel: { fontSize: 14, fontWeight: '700', color: theme.title }, selectedLabel: { color: theme.blue },
-  readAll: { minHeight: 44, paddingHorizontal: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, mobileReadAll: { width: 36, justifyContent: 'center', paddingHorizontal: 0 }, actionText: { color: theme.blue, fontSize: 12, fontWeight: '700' }, disabled: { opacity: 0.4 }, hovered: { backgroundColor: theme.hovered },
-  scroll: { flex: 1, minHeight: 0 }, list: { flexGrow: 1, paddingBottom: 10 }, mobileList: { paddingBottom: 4 }, groupTitle: { paddingTop: 16, paddingBottom: 9, fontSize: 14, fontWeight: '700', color: theme.title },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: theme.divider, minHeight: 46, gap: 12 }, mobileToolbar: { gap: 2 },
+  tabs: { flexDirection: 'row', alignItems: 'stretch', minWidth: 0 }, tab: { minHeight: 46, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 7, borderBottomWidth: 2, borderBottomColor: 'transparent' }, mobileTab: { paddingHorizontal: 8, gap: 5 }, selectedTab: { borderBottomColor: theme.active },
+  tabLabel: { fontSize: 12, fontWeight: '600', color: theme.title }, selectedLabel: { color: theme.blue },
+  readAll: { minHeight: 36, paddingHorizontal: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 5 }, mobileReadAll: { width: 36, justifyContent: 'center', paddingHorizontal: 0 }, actionText: { color: theme.blue, fontSize: 11, fontWeight: '600' }, disabled: { opacity: 0.4 }, hovered: { backgroundColor: theme.hovered },
+  scroll: { flex: 1, minHeight: 0 }, list: { flexGrow: 1, paddingBottom: 10 }, mobileList: { paddingBottom: 4 }, groupTitle: { paddingTop: 13, paddingBottom: 7, fontSize: 12, fontWeight: '600', color: theme.title },
   state: { flex: 1, minHeight: 240, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 12 }, emptyIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: theme.badge, alignItems: 'center', justifyContent: 'center' }, emptyTitle: { fontSize: 16, fontWeight: '700', color: theme.title, textAlign: 'center' }, emptyCopy: { fontSize: 13, color: theme.secondary, textAlign: 'center' }, error: { color: theme.error, fontSize: 13, lineHeight: 20, padding: 12 }, retry: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center' }, loadMore: { minHeight: 52, alignItems: 'center', justifyContent: 'center' },
 });

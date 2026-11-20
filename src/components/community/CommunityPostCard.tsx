@@ -1,6 +1,7 @@
 import { colors } from '@/constants/colors';
 import type { PostResponse } from '@/services/community.service';
 import { SymbolView } from 'expo-symbols';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CommunityPostFooter } from './CommunityPostFooter';
@@ -39,8 +40,8 @@ export function CommunityPostCard({ post, menuOpen, onMenuChange, onOpen, onOpen
   ];
   return <View testID={`community-post-${post.id}`} style={[s.card, menuOpen && s.raised]}>
     <View style={[s.header, menuOpen && s.raised]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Mở bài viết của ${name}`} onPress={onOpen} style={s.author}>
-        <View style={s.avatar}>{post.authorAvatar ? <Image source={{ uri: post.authorAvatar }} style={StyleSheet.absoluteFill} /> : <Text style={s.initial}>{name?.charAt(0)?.toUpperCase()}</Text>}</View>
+      <Pressable accessibilityRole="link" accessibilityLabel={`Xem hồ sơ của ${name}`} onPress={() => router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } })} style={s.author}>
+        <View testID="community-author-avatar" style={s.avatar}>{post.authorAvatar ? <Image source={{ uri: post.authorAvatar }} style={StyleSheet.absoluteFill} /> : <Text style={s.initial}>{name?.charAt(0)?.toUpperCase()}</Text>}</View>
         <View style={s.authorCopy}><Text style={s.name}>{name}</Text><Text style={s.date}>{new Date(post.createdAt).toLocaleDateString('vi-VN')}</Text></View>
       </Pressable>
       <View style={s.menuAnchor}>

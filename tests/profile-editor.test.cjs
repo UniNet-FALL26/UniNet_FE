@@ -65,7 +65,7 @@ test('adding project appends real content, preserves privacy/appearance/empty se
   assert.equal(content.projects[0].title, 'Ứng dụng của tôi');
   assert.deepEqual(Array.from(content.projects[0].technologies), ['React', 'TypeScript']);
   assert.equal(content.projects[0].featured, true);
-  assert.equal(content.isPublic, data.portfolio.isPublic);
+  assert.equal('isPublic' in content, false);
   assert.equal(content.appearance, data.portfolio.appearance);
   assert.equal(content.skills.length, 0);
   assert.equal(content.headline, null);
@@ -122,7 +122,7 @@ test('remaining forms append correctly to each corresponding content array', () 
     assert.equal(next[section].length, 1);
     assert.equal(next[section][0].title ?? next[section][0].label, values.title ?? values.label);
     assert.equal(data[section].length, 0);
-    assert.equal(next.isPublic, false);
+    assert.equal('isPublic' in next, false);
   }
 });
 test('service submits only owner content to the existing endpoint and forwards cancellation', async () => {

@@ -88,16 +88,36 @@ export function ApplyProjectModal({ project, onClose, onApplied }: { project: Hu
     try { await projectHubService.sendRequest(project.id, { requestType: 0, positionId, message: message.trim() || undefined }); onApplied(); onClose(); }
     catch (cause) { setError(messageOf(cause)); } finally { setBusy(false); }
   }
-  return <HubModal wide={false} title="Ứng tuyển vào dự án" subtitle={project.title} onClose={busy ? () => undefined : onClose} footer={<><HubAction title="Hủy" disabled={busy} onPress={onClose} /><HubAction title="Gửi ứng tuyển" variant="primary" busy={busy} onPress={() => void apply()} /></>}>
-    <PositionChoices project={project} selected={positionId} onSelect={setPositionId} /><Field label="Lời nhắn ứng tuyển" value={message} onChange={setMessage} multiline maxLength={2000} placeholder="Giới thiệu kinh nghiệm và lý do bạn muốn tham gia…" />{!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}
+  return <HubModal compact wide={false} maxWidth={520} icon="invite" title="Ứng tuyển vào dự án" subtitle={project.title} onClose={busy ? () => undefined : onClose} footer={<><HubAction compact title="Hủy" disabled={busy} onPress={onClose} /><HubAction compact title="Gửi ứng tuyển" variant="primary" busy={busy} onPress={() => void apply()} /></>}>
+    <View style={applyStyles.body}>
+      <PositionChoices project={project} selected={positionId} onSelect={setPositionId} />
+      <View style={applyStyles.message}><Field compact label="Lời nhắn ứng tuyển" value={message} onChange={setMessage} multiline maxLength={2000} placeholder="Chia sẻ kinh nghiệm và lý do bạn muốn tham gia…" /><View style={applyStyles.messageFoot}><Text style={applyStyles.hint}>Một lời giới thiệu ngắn giúp nhóm hiểu bạn hơn.</Text><Text style={applyStyles.counter}>{message.length}/2000</Text></View></View>
+      {!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}
+    </View>
   </HubModal>;
 }
 function PositionChoices({ project, selected, onSelect }: { project: HubProject; selected: string; onSelect: (value: string) => void }) {
-  return project.recruitment?.positions.length ? <View style={ui.field}><Text style={ui.label}>Vị trí</Text><View style={{ gap: 9 }}>{project.recruitment.positions.map(item => <Pressable key={item.id} accessibilityRole="radio" accessibilityState={{ checked: selected === item.id }} onPress={() => onSelect(item.id)} style={[styles.position, selected === item.id && { borderColor: c.primary, backgroundColor: c.blueWash }]}><View style={{ flex: 1, gap: 5 }}><Text style={{ color: c.ink, fontWeight: '600' }}>{item.name}</Text><Text style={ui.muted}>Tuyển {item.quantity} thành viên</Text>{!!item.jobDescription && <Text style={ui.muted}>{item.jobDescription}</Text>}</View><HubIcon name={selected === item.id ? 'check' : 'person'} /></Pressable>)}</View></View> : null;
+  return project.recruitment?.positions.length ? <View style={applyStyles.positions}><View style={applyStyles.sectionHead}><Text style={applyStyles.label}>Vị trí ứng tuyển</Text><Text style={applyStyles.hint}>Chọn một vị trí phù hợp với bạn</Text></View><View accessibilityRole="radiogroup" accessibilityLabel="Vị trí ứng tuyển" style={applyStyles.options}>{project.recruitment.positions.map(item => {
+    const checked = selected === item.id;
+    return <Pressable key={item.id} accessibilityRole="radio" accessibilityState={{ checked }} aria-checked={checked} onPress={() => onSelect(item.id)} style={({ pressed }) => [applyStyles.option, checked && applyStyles.selected, pressed && { opacity: 0.8 }]}>
+      <View style={[applyStyles.emblem, checked && applyStyles.selectedEmblem]}><HubIcon name="person" size={18} color={checked ? c.primary : '#8190AA'} /></View>
+      <View style={applyStyles.optionContent}><Text style={applyStyles.name}>{item.name}</Text><Text style={applyStyles.hint}>Tuyển {item.quantity} thành viên</Text>{!!item.jobDescription && <Text style={applyStyles.hint}>{item.jobDescription}</Text>}</View>
+      <View style={[applyStyles.radio, checked && applyStyles.radioSelected]}>{checked && <View style={applyStyles.radioDot} />}</View>
+    </Pressable>;
+  })}</View></View> : null;
 }
+const applyStyles = StyleSheet.create({
+  body: { gap: 22, paddingVertical: 2 }, positions: { gap: 12 }, sectionHead: { gap: 4 },
+  label: { color: c.ink, fontSize: 13, lineHeight: 19, fontWeight: '600' }, hint: { color: c.textSecondary, fontSize: 11, lineHeight: 17 },
+  options: { gap: 9 }, option: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderWidth: 1, borderColor: '#E1E7F2', borderRadius: 12, backgroundColor: '#FFFFFF' },
+  selected: { borderColor: '#8BAFFF', backgroundColor: '#F0F5FF' }, emblem: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F3F5F9', alignItems: 'center', justifyContent: 'center' }, selectedEmblem: { backgroundColor: '#DFEAFF' },
+  optionContent: { flex: 1, minWidth: 0, gap: 3 }, name: { color: c.ink, fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: '#CDD6E6', alignItems: 'center', justifyContent: 'center' }, radioSelected: { borderColor: c.primary }, radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary },
+  message: { gap: 0 }, messageFoot: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6 }, counter: { color: '#8190AA', fontSize: 10, lineHeight: 17, fontVariant: ['tabular-nums'] },
+});
 export function ProjectRequestsModal({ project, onClose, onChanged, onInvite, onRecruit }: { project: HubProject; onClose: () => void; onChanged: () => void; onInvite: () => void; onRecruit?: () => void }) {
   const compact = useWindowDimensions().width < 800;
-  const actionStyle = compact ? { minHeight: 30, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7 } : undefined;
+  const actionStyle = requestStyles.action;
   const [items, setItems] = useState<HubRequest[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState('');
   useEffect(() => { const controller = new AbortController(); projectHubService.requests(project.id, controller.signal).then(result => { if (!controller.signal.aborted) setItems(result.items); }).catch(cause => { if (!controller.signal.aborted) setError(messageOf(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); }); return () => controller.abort(); }, [project.id]);
   async function decide(item: HubRequest, decision: 'accept' | 'reject' | 'cancel') {
@@ -105,17 +125,27 @@ export function ProjectRequestsModal({ project, onClose, onChanged, onInvite, on
     try { const saved = await projectHubService.decide(item.id, decision); setItems(old => old.map(row => row.id === saved.id ? saved : row)); onChanged(); }
     catch (cause) { setError(messageOf(cause)); } finally { setBusy(''); }
   }
-  return <HubModal compact wide={false} icon="invite" title="Lời mời" subtitle="Danh sách người xin tham gia và người được mời vào dự án." onClose={busy ? () => undefined : onClose} footer={<HubAction compact title="Đóng" onPress={onClose} disabled={!!busy} />}>
-    <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap' }]}><Text style={ui.muted}>{items.length} yêu cầu & lời mời</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' }}><HubAction compact title="Mời" icon={compact ? undefined : 'invite'} style={actionStyle} variant="primary" disabled={!!busy || !canInviteProjectFriends(project)} onPress={onInvite} />{onRecruit && <HubAction compact title="Tuyển" icon={compact ? undefined : 'people'} style={actionStyle} variant="primary" disabled={!!busy} onPress={onRecruit} />}</View></View>
+  return <HubModal compact wide={false} maxWidth={560} icon="invite" title="Lời mời" subtitle="Danh sách người xin tham gia và người được mời vào dự án." onClose={busy ? () => undefined : onClose} footer={<HubAction compact title="Đóng" style={actionStyle} onPress={onClose} disabled={!!busy} />}>
+    <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap' }]}><Text style={requestStyles.muted}>{items.length} yêu cầu & lời mời</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 'auto' }}><HubAction compact title="Mời" icon={compact ? undefined : 'invite'} style={actionStyle} disabled={!!busy || !canInviteProjectFriends(project)} onPress={onInvite} />{onRecruit && <HubAction compact title="Tuyển" icon={compact ? undefined : 'people'} style={actionStyle} variant="primary" disabled={!!busy} onPress={onRecruit} />}</View></View>
     {!!error && <Text accessibilityRole="alert" style={[ui.error, { marginBottom: 16 }]}>{error}</Text>}
-    {loading ? <ActivityIndicator color={c.primary} /> : !items.length ? <View style={styles.empty}><HubIcon name="people" size={34} /><Text style={ui.muted}>Chưa có yêu cầu tham gia hoặc lời mời.</Text></View> : <View style={{ gap: 12 }}>{items.map(item => <View key={item.id} testID={`project-request-${item.id}`} style={styles.request}>
-      <View style={[styles.row, { gap: 6 }]}><HubIcon name={item.requestType === 0 ? 'person' : 'invite'} size={15} /><Text style={{ color: c.primary, fontSize: 12, fontWeight: '600' }}>{item.requestType === 0 ? 'Xin tham gia' : 'Được mời'}</Text></View>
-      <View style={styles.row}><PersonAvatar person={{ fullName: item.fullName, avatarUrl: item.avatarUrl }} /><View style={{ flex: 1 }}><Text style={styles.name}>{item.fullName}</Text><Text style={ui.muted}>{item.role}</Text></View><Text style={styles.requestStatus}>{['Đang chờ', 'Đã chấp nhận', 'Đã từ chối', 'Đã hủy', 'Hết hạn'][item.status]}</Text></View>
-      {!!item.message && <Text style={[ui.muted, { paddingLeft: 52 }]}>{item.message}</Text>}
-      {item.status === 0 && <View style={[styles.row, { justifyContent: 'flex-end', flexWrap: 'wrap' }]}>{item.requestType === 0 ? <><HubAction title="Từ chối" disabled={!!busy} onPress={() => void decide(item, 'reject')} /><HubAction title="Chấp nhận" variant="primary" busy={busy === item.id} disabled={!!busy && busy !== item.id} onPress={() => void decide(item, 'accept')} /></> : <HubAction title="Hủy lời mời" disabled={!!busy} busy={busy === item.id} onPress={() => void decide(item, 'cancel')} />}</View>}
+    {loading ? <ActivityIndicator color={c.primary} /> : !items.length ? <View style={styles.empty}><HubIcon name="people" size={34} /><Text style={ui.muted}>Chưa có yêu cầu tham gia hoặc lời mời.</Text></View> : <View style={{ gap: 10 }}>{items.map(item => <View key={item.id} testID={`project-request-${item.id}`} style={requestStyles.card}>
+      <View style={requestStyles.heading}><PersonAvatar person={item} size={34} /><View style={requestStyles.identity}><Text style={requestStyles.name}>{item.fullName}</Text><View style={requestStyles.details}><Text style={requestStyles.type}>{item.requestType === 0 ? 'Xin tham gia' : 'Được mời'}</Text>{!!item.role && <Text style={requestStyles.muted}>· {item.role}</Text>}</View></View><Text style={[requestStyles.status, item.status === 0 && requestStyles.pending, item.status === 1 && requestStyles.accepted]}>{['Đang chờ', 'Đã chấp nhận', 'Đã từ chối', 'Đã hủy', 'Hết hạn'][item.status]}</Text></View>
+      {!!item.message && <View style={requestStyles.message}><Text style={requestStyles.messageText}>{item.message}</Text></View>}
+      {item.status === 0 && <View style={requestStyles.actions}>{item.requestType === 0 ? <><HubAction compact style={actionStyle} title="Từ chối" disabled={!!busy} onPress={() => void decide(item, 'reject')} /><HubAction compact style={actionStyle} title="Chấp nhận" variant="primary" busy={busy === item.id} disabled={!!busy && busy !== item.id} onPress={() => void decide(item, 'accept')} /></> : <HubAction compact style={actionStyle} title="Hủy lời mời" disabled={!!busy} busy={busy === item.id} onPress={() => void decide(item, 'cancel')} />}</View>}
     </View>)}</View>}
   </HubModal>;
 }
+const requestStyles = StyleSheet.create({
+  action: { minHeight: 30, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7 },
+  card: { gap: 11, padding: 13, borderWidth: 1, borderColor: '#E2E8F4', borderRadius: 12, backgroundColor: '#FFFFFF' },
+  heading: { flexDirection: 'row', alignItems: 'center', gap: 10 }, identity: { flex: 1, minWidth: 0, gap: 3 },
+  name: { color: c.ink, fontSize: 13, fontWeight: '600', lineHeight: 19 }, details: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5 },
+  type: { color: c.primary, fontSize: 11, lineHeight: 17 }, muted: { color: c.textSecondary, fontSize: 11, lineHeight: 17 },
+  status: { flexShrink: 0, color: '#68778E', fontSize: 10, lineHeight: 16, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#F1F4F9', borderRadius: 20 },
+  pending: { color: '#92631A', backgroundColor: '#FFF5DF' }, accepted: { color: '#208056', backgroundColor: '#EAF7F0' },
+  message: { backgroundColor: '#F7F9FD', borderRadius: 8, paddingHorizontal: 11, paddingVertical: 9 }, messageText: { color: '#52617E', fontSize: 12, lineHeight: 19 },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 7 },
+});
 export function MemberRoleModal({ project, member, onSaved, onClose }: SavedProps & { member: HubMember }) {
   const [role, setRole] = useState(member.role), [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmKick, setConfirmKick] = useState(false);
   async function save(kick = false) { if (!kick && !role.trim()) { setError('Nhập vai trò của thành viên.'); return; } setBusy(true); setError(''); try { onSaved(await projectHubService.updateMember(project.id, member.userId, kick ? { status: 1 } : { role: role.trim() })); onClose(); } catch (cause) { setError(messageOf(cause)); } finally { setBusy(false); } }
