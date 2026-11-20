@@ -19,7 +19,7 @@ export type PortfolioArticle = { title: string; date?: string | null; coverUrl?:
 export type PortfolioContent = {
   yearsOfExperience?: number | null; gpa?: string | null;
   headline: string | null; careerObjective: string | null; location: string | null; availability: string | null;
-  contactEmail: string | null; cvUrl: string | null; isPublic: boolean;
+  contactEmail: string | null; cvUrl: string | null;
   appearance: { profile: { template: string; theme: string; font: string; sectionOrder: string[]; hiddenSections: string[]; showPortfolio?: boolean | null } };
   skills: PortfolioSkill[]; projects: PortfolioProject[]; experience: PortfolioMilestone[]; education: PortfolioMilestone[];
   certificates: PortfolioCertificate[]; articles: PortfolioArticle[]; socialLinks: { label: string; url: string }[];

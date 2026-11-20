@@ -26,7 +26,10 @@ const origin = process.env.PROJECT_RECRUITMENT_TEST_ORIGIN || 'http://localhost:
         if (catalogFails) { catalogFails = false; return route.fulfill({ status: 503, json: { message: 'Catalog unavailable' } }); }
         return ok(['C#', 'PostgreSQL', 'Git', 'REST API', 'Docker'].map(name => ({ id: name, name, iconUrl: null, category: 'Backend' })));
       }
-      if (path.endsWith('/project-hub/' + project.id + '/requests')) return ok({ items: [] });
+      if (path.endsWith('/project-hub/' + project.id + '/requests')) return ok({ items: [
+        { id: 'applicant', fullName: 'Nguyễn Minh Anh', avatarUrl: null, role: 'Backend Developer', requestType: 0, status: 0, message: 'Mình có kinh nghiệm và muốn cùng nhóm phát triển dự án.' },
+        { id: 'invited', fullName: 'Trần Ngọc Linh', avatarUrl: null, role: 'UI Designer', requestType: 1, status: 0, message: '' },
+      ] });
       if (path.endsWith('/project-hub/' + project.id + '/recruitment')) {
         assert.equal(method, 'PUT');
         const body = route.request().postDataJSON(); writes.push(body);
@@ -54,6 +57,22 @@ const origin = process.env.PROJECT_RECRUITMENT_TEST_ORIGIN || 'http://localhost:
     await page.goto(origin + '/group/' + project.id, { waitUntil: 'domcontentloaded' });
     await page.getByRole('tab', { name: /Thành viên/ }).click();
     await page.getByRole('button', { name: 'Lời mời', exact: true }).click();
+    const requests = page.getByRole('dialog', { name: 'Lời mời', exact: true });
+    await requests.getByTestId('project-request-applicant').waitFor();
+    for (const name of ['Chấp nhận', 'Từ chối', 'Hủy lời mời']) {
+      const bounds = await requests.getByRole('button', { name, exact: true }).boundingBox();
+      assert.ok(bounds.height <= 32);
+    }
+    await requests.screenshot({ path: 'C:/Users/minec/UniNet/project-requests-desktop.png', animations: 'disabled' });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await requests.screenshot({ path: 'C:/Users/minec/UniNet/project-requests-mobile.png', animations: 'disabled' });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    if (process.env.PROJECT_REQUESTS_ONLY === '1') {
+      assert.deepEqual(errors, []);
+      console.log('Request cards passed: applicants, invitations, compact actions, desktop/mobile.');
+      return;
+    }
     const open = () => page.getByRole('button', { name: 'Tuyển', exact: true }).click();
     await open();
     const overview = page.getByRole('dialog', { name: 'Thông tin tuyển thành viên', exact: true });

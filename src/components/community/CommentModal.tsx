@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -23,6 +24,8 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { CommentItem } from "./CommentItem";
+
+const COMMENT_REPORT_REASONS = ['Spam hoặc quảng cáo', 'Quấy rối hoặc bắt nạt', 'Ngôn từ thù ghét', 'Nội dung không phù hợp', 'Thông tin sai lệch', 'Lý do khác'];
 
 interface CommentModalProps {
   post: PostResponse | null;
@@ -73,6 +76,29 @@ export function CommentModal({
 
   const abortController = useRef<AbortController | null>(null);
   const textInputRef = useRef<TextInput>(null);
+  const [reportingComment, setReportingComment] = useState<CommentResponse | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+  const [reportError, setReportError] = useState('');
+
+  const openCommentReport = (comment: CommentResponse) => {
+    setReportReason('');
+    setReportError('');
+    setReportingComment(comment);
+  };
+  const submitCommentReport = async () => {
+    if (!post || !reportingComment || !reportReason || reportSending) return;
+    setReportSending(true);
+    setReportError('');
+    try {
+      await communityService.reportComment(post.id, reportingComment, reportReason);
+      setReportingComment(null);
+    } catch {
+      setReportError('Không thể gửi báo cáo. Vui lòng thử lại.');
+    } finally {
+      setReportSending(false);
+    }
+  };
 
   const isPostOwner =
     account?.id === post?.authorUserId ||
@@ -190,6 +216,7 @@ export function CommentModal({
         onCommentCountChange(post.id, 1); // <--- THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ
       }
       setInputText("");
+      if (Platform.OS !== "web") Keyboard.dismiss();
     } catch {
       Alert.alert("Lỗi", "Không thể gửi bình luận.");
     } finally {
@@ -226,8 +253,12 @@ export function CommentModal({
         animationType={isDesktop ? "fade" : "slide"}
         onRequestClose={onClose}
       >
-        <View style={[styles.modalContainer, !isDesktop && styles.mobileModalContainer]}>
-          {!isDesktop && <Pressable accessibilityRole="button" accessibilityLabel="Đóng bình luận" onPress={onClose} style={StyleSheet.absoluteFill} />}
+        <KeyboardAvoidingView
+          style={[styles.modalContainer, !isDesktop && styles.mobileModalContainer]}
+          enabled={!isDesktop && Platform.OS !== "web"}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} />
           {/* Đưa nút X ra ngoài cùng của màn hình */}
           {isDesktop && <Pressable accessibilityRole="button" accessibilityLabel="Đóng bình luận" style={styles.globalCloseBtn} onPress={onClose}>
             <SymbolView
@@ -237,7 +268,7 @@ export function CommentModal({
             />
           </Pressable>}
 
-          <KeyboardAvoidingView
+          <View
             testID={!isDesktop ? "community-comments-sheet" : undefined}
             accessibilityViewIsModal
             role="dialog"
@@ -247,7 +278,6 @@ export function CommentModal({
               isDesktop ? styles.contentWrapper : styles.mobileSheet,
               { flexDirection: isDesktop ? "row" : "column" },
             ]}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
             {/* CỘT TRÁI: Media Viewer */}
             {isDesktop && <View
@@ -523,6 +553,7 @@ export function CommentModal({
                             setOptionsCommentId={setOptionsCommentId}
                             onEdit={handleEditComment}
                             onDelete={(id) => setDeleteConfirmCommentId(id)}
+                            onReport={openCommentReport}
                             onReply={handleReplyComment}
                           />
                         </View>
@@ -565,6 +596,7 @@ export function CommentModal({
                   accessibilityLabel="Viết bình luận"
                   style={styles.input}
                   placeholder="Viết bình luận..."
+                  placeholderTextColor={colors.textSecondary}
                   value={inputText}
                   onChangeText={setInputText}
                   multiline
@@ -596,7 +628,30 @@ export function CommentModal({
                 </Pressable>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={!!reportingComment} transparent animationType="fade" onRequestClose={() => { if (!reportSending) setReportingComment(null); }}>
+        <View style={styles.popupOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Đóng báo cáo bình luận" disabled={reportSending} onPress={() => setReportingComment(null)} />
+          <View style={[styles.popupContent, { maxWidth: 380, maxHeight: '85%' }]} accessibilityViewIsModal>
+            <Text style={styles.popupTitle}>Báo cáo bình luận</Text>
+            <Text style={styles.popupMessage}>Vui lòng chọn lý do báo cáo:</Text>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {COMMENT_REPORT_REASONS.map(reason => <Pressable key={reason} accessibilityRole="radio" accessibilityState={{ checked: reportReason === reason }} disabled={reportSending} onPress={() => setReportReason(reason)} style={styles.reportReason}>
+                <SymbolView name={reportReason === reason ? { ios: 'largecircle.fill.circle', android: 'radio_button_checked', web: 'radio_button_checked' } : { ios: 'circle', android: 'radio_button_unchecked', web: 'radio_button_unchecked' }} size={20} tintColor={reportReason === reason ? colors.primary : colors.textSecondary} />
+                <Text style={styles.reportReasonText}>{reason}</Text>
+              </Pressable>)}
+            </ScrollView>
+            {!!reportError && <Text accessibilityRole="alert" style={styles.errorText}>{reportError}</Text>}
+            <View style={[styles.popupActions, { marginTop: 16 }]}>
+              <Pressable accessibilityRole="button" disabled={reportSending} style={styles.popupBtn} onPress={() => setReportingComment(null)}><Text style={{ color: colors.textSecondary }}>Hủy</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Gửi báo cáo bình luận" disabled={!reportReason || reportSending} onPress={() => void submitCommentReport()} style={[styles.popupBtn, { backgroundColor: colors.primary, opacity: !reportReason || reportSending ? 0.5 : 1 }]}>
+                <Text style={{ color: colors.surface, fontWeight: '600' }}>{reportSending ? 'Đang gửi…' : 'Gửi báo cáo'}</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -605,8 +660,9 @@ export function CommentModal({
         visible={!!deleteConfirmCommentId}
         transparent
         animationType="fade"
-      >
+       onRequestClose={() => setDeleteConfirmCommentId(null)}>
         <View style={styles.popupOverlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setDeleteConfirmCommentId(null)} />
           <View style={styles.popupContent}>
             <Text style={styles.popupTitle}>Xóa bình luận?</Text>
             <Text style={styles.popupMessage}>
@@ -659,6 +715,8 @@ export function CommentModal({
 }
 
 const styles = StyleSheet.create({
+  reportReason: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 10 },
+  reportReasonText: { flex: 1, color: colors.textPrimary, fontSize: 14 },
   mobileModalContainer: { justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.45)' },
   mobileSheet: { width: '100%', alignSelf: 'center', flexShrink: 0, height: '78%', maxHeight: '90%', maxWidth: 700, backgroundColor: '#FFF', borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
   sheetHeader: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB', paddingTop: 9, paddingHorizontal: 16 },
@@ -818,6 +876,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    color: colors.textPrimary,
     minHeight: 38,
     maxHeight: 100,
     backgroundColor: "#F3F4F6",

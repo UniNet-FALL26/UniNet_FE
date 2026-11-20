@@ -64,6 +64,7 @@ export function PartnerIntroductionEditor({ section, profile, onSaved, onClose }
   </View>;
   return <Modal transparent visible animationType="fade" onRequestClose={close}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} />
       <View role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel={'Chỉnh sửa ' + introductionTitles[section]} style={s.dialog}>
         <View style={s.header}><View style={s.heading}><Text role="heading" style={s.title}>{introductionTitles[section]}</Text><Text style={s.hint}>Cập nhật thông tin hiển thị trên hồ sơ tổ chức.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Đóng chỉnh sửa" disabled={busy || choosing} onPress={close} style={s.close}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} /></Pressable></View>
         <ScrollView style={s.scroll} contentContainerStyle={s.form} keyboardShouldPersistTaps="handled">

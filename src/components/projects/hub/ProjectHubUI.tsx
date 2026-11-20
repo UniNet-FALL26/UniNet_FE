@@ -5,6 +5,8 @@ import { colors } from '@/constants/colors';
 import { FullProjectImage } from './FullProjectImage';
 const modalStack: object[] = [];
 const ModalAppearance = createContext(false);
+const ChatAppearance = createContext(false);
+export const HubPagePresentation = createContext(false);
 
 export const hubColors = { ...colors, ink: '#111A36', canvas: '#F8FAFE', line: '#E2E8F3', blueWash: '#EAF1FF' };
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
@@ -21,6 +23,7 @@ const names = {
   invite: ['person.badge.plus', 'person_add'], chevron: ['chevron.down', 'expand_more'], warning: ['exclamationmark.triangle', 'warning_amber'],
   tag: ['tag', 'sell'], save: ['square.and.arrow.down', 'save'],
   globe: ['globe', 'language'], code: ['chevron.left.forwardslash.chevron.right', 'code'],
+  message: ['bubble.left', 'chat_bubble_outline'],
 } as const;
 export type HubIconName = keyof typeof names;
 export function HubIcon({ name, size = 20, color = colors.primary }: { name: HubIconName; size?: number; color?: string }) {
@@ -31,10 +34,11 @@ export function HubAction({ title, onPress, icon, variant = 'secondary', busy, d
   title: string; onPress: () => void; icon?: HubIconName; variant?: 'primary' | 'secondary' | 'quiet' | 'danger'; busy?: boolean; disabled?: boolean; testID?: string; compact?: boolean; style?: StyleProp<ViewStyle>;
 }) {
   const inModal = useContext(ModalAppearance);
+  const inChat = useContext(ChatAppearance);
   const primary = variant === 'primary';
   const tint = primary ? '#FFFFFF' : variant === 'danger' ? colors.error : colors.primary;
   return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress}
-    hitSlop={compact ? 4 : undefined} style={({ pressed }) => [ui.action, compact && { minHeight: 36, paddingHorizontal: 13, paddingVertical: 7, gap: 6, borderRadius: 8 }, inModal && modalStyles.action, primary && ui.actionPrimary, inModal && primary && modalStyles.primary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, style, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
+    hitSlop={compact ? 4 : undefined} style={({ pressed }) => [ui.action, compact && { minHeight: 36, paddingHorizontal: 13, paddingVertical: 7, gap: 6, borderRadius: 8 }, inModal && modalStyles.action, primary && ui.actionPrimary, inModal && primary && modalStyles.primary, inChat && chatModalStyles.action, inChat && primary && chatModalStyles.primary, variant === 'quiet' && ui.actionQuiet, variant === 'danger' && { borderColor: '#F0C6CC' }, style, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.72 }]}>
     {busy ? <ActivityIndicator size="small" color={tint} /> : icon && <HubIcon name={icon} color={tint} size={compact ? 16 : 18} />}
     <Text style={[ui.actionText, (compact || inModal) && { fontSize: 13 }, { color: inModal && variant === 'secondary' ? hubColors.ink : tint }]}>{title}</Text>
   </Pressable>;
@@ -55,13 +59,15 @@ export function ProjectCover({ url, title, height = 160, style, hideTitle = fals
 export function HubPanel({ title, icon, children, style, compact = false, action }: { title?: string; icon?: HubIconName; children: ReactNode; style?: StyleProp<ViewStyle>; compact?: boolean; action?: ReactNode }) {
   return <View style={[ui.panel, compact && { padding: 16, gap: 10, borderRadius: 11 }, style]}>{title && <View style={[ui.sectionTitle, compact && { gap: 8 }, !!action && { alignItems: 'center' }]}>{icon && <HubIcon name={icon} size={compact ? 18 : 20} />}<Text accessibilityRole="header" aria-level={2} style={[ui.heading, compact && { fontSize: 15 }, !!action && { flex: 1, minWidth: 0 }]}>{title}</Text>{action}</View>}{children}</View>;
 }
-export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder', maxWidth }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName; maxWidth?: number }) {
+export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder', maxWidth, appearance = 'default', dismissControl = 'close', contentContainerStyle }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName; maxWidth?: number; appearance?: 'default' | 'chat'; dismissControl?: 'close' | 'back'; contentContainerStyle?: StyleProp<ViewStyle> }) {
+  const page = useContext(HubPagePresentation);
+  const chat = appearance === 'chat';
   const { width, height } = useWindowDimensions();
   const frame = useRef<View>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (page || Platform.OS !== 'web') return;
     const previous = document.activeElement as HTMLElement | null;
     const node = frame.current as unknown as HTMLElement | null;
     const marker = {}; modalStack.push(marker);
@@ -83,17 +89,48 @@ export function HubModal({ title, subtitle, onClose, children, footer, wide = tr
     document.addEventListener('keydown', handle, true);
     document.addEventListener('keyup', handleKeyUp, true);
     return () => { cancelAnimationFrame(timer); document.removeEventListener('keydown', handle, true); document.removeEventListener('keyup', handleKeyUp, true); const index = modalStack.indexOf(marker); if (index !== -1) modalStack.splice(index, 1); if (previous?.isConnected) previous.focus(); };
-  }, []);
-  return <ModalAppearance.Provider value={true}><Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, { padding: width < 600 ? 10 : 28 }]}>
-    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, modalStyles.frame, { maxWidth: maxWidth ?? (wide ? compact ? 880 : 960 : 600), maxHeight: height - (width < 600 ? 20 : 56) }]}>
-      <View style={[ui.modalHead, modalStyles.head, width < 600 && { paddingHorizontal: 16 }]}>
-        <View style={modalStyles.emblem}><HubIcon name={icon} size={18} /></View><View style={{ flex: 1, minWidth: 0, gap: 3 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, modalStyles.title, width < 600 && { fontSize: 16, lineHeight: 22 }]}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} hitSlop={6} style={[ui.iconButton, modalStyles.close]}><HubIcon name="close" color={colors.textSecondary} size={17} /></Pressable>
+  }, [page]);
+  if (page) return <ModalAppearance.Provider value={true}><ChatAppearance.Provider value={chat}>
+    <View testID="hub-settings-page" style={pageStyles.page}>
+      <View style={pageStyles.header}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={onClose} style={pageStyles.back}><HubIcon name="back" size={22} /></Pressable>
+        <View style={pageStyles.heading}><Text accessibilityRole="header" style={pageStyles.title}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View>
       </View>
-      <ScrollView style={{ flexShrink: 1, backgroundColor: '#FCFDFF' }} contentContainerStyle={[ui.modalBody, { padding: 18 }, width < 600 && { padding: 16 }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-      {footer && <View style={[ui.modalFoot, modalStyles.foot, width < 600 && { paddingHorizontal: 16 }]}>{footer}</View>}
+      <ScrollView style={pageStyles.body} contentContainerStyle={[pageStyles.content, contentContainerStyle]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      {footer && <View style={pageStyles.footer}>{footer}</View>}
     </View>
-  </View></Modal></ModalAppearance.Provider>;
+  </ChatAppearance.Provider></ModalAppearance.Provider>;
+  return <ModalAppearance.Provider value={true}><ChatAppearance.Provider value={chat}><Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, chat && chatModalStyles.scrim, { padding: width < 600 ? 10 : 28 }]}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} />
+    <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, modalStyles.frame, chat && chatModalStyles.frame, { maxWidth: maxWidth ?? (wide ? compact ? 880 : 960 : 600), maxHeight: height - (width < 600 ? 20 : 56) }]}>
+      <View style={[ui.modalHead, modalStyles.head, chat && chatModalStyles.head, width < 600 && { paddingHorizontal: 16 }]}>
+        {dismissControl === 'back' || (chat && icon === 'back') ? <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={onClose} style={[modalStyles.emblem, chat && chatModalStyles.emblem]}><HubIcon name="back" size={18} /></Pressable> : <View style={[modalStyles.emblem, chat && chatModalStyles.emblem]}><HubIcon name={icon} size={chat ? 19 : 18} /></View>}<View style={{ flex: 1, minWidth: 0, gap: 3 }}><Text accessibilityRole="header" aria-level={2} style={[ui.modalTitle, modalStyles.title, chat && chatModalStyles.title, width < 600 && { fontSize: 16, lineHeight: 22 }]}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View>{dismissControl !== 'back' && <Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} hitSlop={6} style={[ui.iconButton, modalStyles.close, chat && chatModalStyles.close]}><HubIcon name="close" color={colors.textSecondary} size={17} /></Pressable>}
+      </View>
+      <ScrollView style={{ flexShrink: 1, backgroundColor: chat ? '#FFFFFF' : '#FCFDFF' }} contentContainerStyle={[ui.modalBody, { padding: chat ? 20 : 18 }, width < 600 && { padding: 16 }, contentContainerStyle]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      {footer && <View style={[ui.modalFoot, modalStyles.foot, chat && chatModalStyles.foot, width < 600 && { paddingHorizontal: 16 }]}>{footer}</View>}
+    </View>
+  </View></Modal></ChatAppearance.Provider></ModalAppearance.Provider>;
 }
+const pageStyles = StyleSheet.create({
+  page: { flex: 1, minHeight: 0, backgroundColor: '#FFFFFF' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 6, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E2E8F2', backgroundColor: '#FFFFFF' },
+  back: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  heading: { flex: 1, minWidth: 0, gap: 3, paddingRight: 16 },
+  title: { fontSize: 18, lineHeight: 25, fontWeight: '600', color: '#172B49' },
+  body: { flex: 1 }, content: { padding: 16 },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F2' },
+});
+const chatModalStyles = StyleSheet.create({
+  scrim: { backgroundColor: 'rgba(23,35,58,0.42)' },
+  frame: { borderRadius: 20, borderColor: '#E2E8F2', backgroundColor: '#FFFFFF', boxShadow: '0 20px 64px rgba(15,35,70,0.2)' },
+  head: { paddingHorizontal: 20, paddingVertical: 15, gap: 12, backgroundColor: '#FBFCFF', borderColor: '#EDF1F7' },
+  emblem: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#EAF2FF' },
+  title: { fontSize: 18, lineHeight: 25, fontWeight: '700', color: '#172B49' },
+  close: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#F0F3F8' },
+  foot: { paddingHorizontal: 20, paddingVertical: 14, flexWrap: 'wrap', backgroundColor: '#FBFCFF', borderColor: '#EDF1F7', gap: 9 },
+  action: { minHeight: 38, borderRadius: 10, paddingHorizontal: 15, paddingVertical: 8, borderColor: '#DCE5F2' },
+  primary: { backgroundColor: '#1769FF', borderColor: '#1769FF', experimental_backgroundImage: undefined, boxShadow: '0 3px 8px rgba(23,105,255,0.14)' },
+});
 const modalStyles = StyleSheet.create({
   frame: { borderRadius: 16, borderColor: '#E4E9F7', backgroundColor: '#FCFDFF', boxShadow: '0 18px 60px rgba(23, 42, 88, 0.18)' },
   head: { paddingVertical: 14, paddingHorizontal: 18, gap: 10, backgroundColor: '#FBFCFF', borderColor: '#E9EDF5' },

@@ -1,6 +1,6 @@
 import { ToastHost } from '@/components/ui/ToastHost';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { ProfileTextInput } from './ProfileTextInput';
 import { Button } from '@/components/ui/Button';
 import { colors } from '@/constants/colors';
@@ -14,7 +14,8 @@ export function ProfileFieldForm({ data, field, onConfirm, onClose, label }: { d
   const numeric = 'kind' in definition && definition.kind === 'number';
   const image = field === 'avatarUrl' || field === 'coverUrl';
   const confirm = () => { try { onConfirm(updateProfileField(data, field, value)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Thông tin không hợp lệ.'); } };
-  return <Modal visible transparent animationType="fade" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.overlay}><ToastHost modal /><View style={s.dialog} accessibilityViewIsModal>
+  return <Modal visible transparent animationType="fade" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.overlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} /><ToastHost modal /><View style={s.dialog} accessibilityViewIsModal>
     <View style={s.header}><Text role="heading" aria-level={2} style={s.title}>{label || definition.label}</Text></View>
     <ScrollView style={s.scroll} contentContainerStyle={s.fields} keyboardShouldPersistTaps="handled">
     <ProfileTextInput label={image ? 'Liên kết ảnh' : definition.label} value={value} onChangeText={next => { setValue(next); setError(''); }} autoFocus multiline={!numeric} minimumHeight={'multiline' in definition && definition.multiline ? 88 : 46} keyboardType={numeric ? 'decimal-pad' : image ? 'url' : field === 'contactEmail' ? 'email-address' : 'default'} autoCapitalize={image || field === 'contactEmail' ? 'none' : 'sentences'} maxLength={numeric ? undefined : definition.max} />

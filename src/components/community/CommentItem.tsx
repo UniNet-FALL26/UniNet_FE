@@ -3,7 +3,7 @@ import { type CommentResponse } from "@/services/community.service";
 import { useAuthStore } from "@/store/auth.store";
 import { SymbolView } from "expo-symbols";
 import React from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Keyboard, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface CommentItemProps {
   comment: CommentResponse;
@@ -12,6 +12,7 @@ interface CommentItemProps {
   setOptionsCommentId: React.Dispatch<React.SetStateAction<string | null>>;
   onEdit: (comment: CommentResponse) => void;
   onDelete: (commentId: string) => void;
+  onReport?: (comment: CommentResponse) => void;
   onReply: (
     commentId: string,
     authorName: string,
@@ -26,6 +27,7 @@ export function CommentItem({
   setOptionsCommentId,
   onEdit,
   onDelete,
+  onReport,
   onReply,
 }: CommentItemProps) {
   const { account } = useAuthStore();
@@ -93,7 +95,14 @@ export function CommentItem({
               },
             ]}
           >
-            <View style={styles.bubble}>
+            <Pressable
+              style={styles.bubble}
+              onLongPress={() => { Keyboard.dismiss(); setOptionsCommentId(comment.id); }}
+              delayLongPress={400}
+              accessibilityHint={"Nhấn giữ để mở tùy chọn bình luận"}
+              accessibilityActions={[{ name: 'longpress', label: 'Tùy chọn bình luận' }]}
+              onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') { Keyboard.dismiss(); setOptionsCommentId(comment.id); } }}
+            >
               <Text style={styles.authorName}>{displayName}</Text>
               <Text style={styles.commentContent}>
                 {replyToName && (
@@ -101,80 +110,9 @@ export function CommentItem({
                 )}
                 {comment.content}
               </Text>
-            </View>
+            </Pressable>
 
-            {isOwner && (
-              <View
-                style={[
-                  styles.menuAnchor,
-                  optionsCommentId === comment.id && {
-                    zIndex: 9999,
-                    elevation: 10,
-                  },
-                ]}
-              >
-                <Pressable
-                  onPress={() =>
-                    setOptionsCommentId((prev) =>
-                      prev === comment.id ? null : comment.id,
-                    )
-                  }
-                  style={styles.iconBtnSmall}
-                >
-                  <SymbolView
-                    name={{
-                      ios: "ellipsis",
-                      android: "more_horiz",
-                      web: "more_horiz",
-                    }}
-                    size={18}
-                    tintColor={colors.textSecondary}
-                  />
-                </Pressable>
 
-                {optionsCommentId === comment.id && (
-                  <>
-                    <Pressable
-                      style={styles.dropdownBackdrop}
-                      onPress={() => setOptionsCommentId(null)}
-                    />
-                    <View style={styles.dropdownContainer}>
-                      <View style={styles.tooltipArrow} />
-                      <View style={styles.dropdownMenu}>
-                        <Pressable
-                          onPress={() => {
-                            setOptionsCommentId(null);
-                            onEdit(comment);
-                          }}
-                          style={({ pressed }) => [
-                            styles.dropdownItem,
-                            pressed && styles.dropdownItemPressed,
-                          ]}
-                        >
-                          <Text style={styles.optionText}>Sửa bình luận</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => {
-                            setOptionsCommentId(null);
-                            onDelete(comment.id);
-                          }}
-                          style={({ pressed }) => [
-                            styles.dropdownItem,
-                            pressed && styles.dropdownItemPressed,
-                          ]}
-                        >
-                          <Text
-                            style={[styles.optionText, { color: colors.error }]}
-                          >
-                            Xóa bình luận
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  </>
-                )}
-              </View>
-            )}
           </View>
           <View style={styles.actionRow}>
             <Text style={styles.timeText}>
@@ -213,17 +151,47 @@ export function CommentItem({
                 setOptionsCommentId={setOptionsCommentId}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onReport={onReport}
                 onReply={onReply}
               />
             </View>
           ))}
         </View>
       )}
+      {isThisCommentOpen && <Modal transparent visible animationType="fade" onRequestClose={() => setOptionsCommentId(null)}>
+        <View style={styles.mobileMenuOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Đóng tùy chọn bình luận" onPress={() => setOptionsCommentId(null)} />
+          <View style={styles.mobileMenu} accessibilityViewIsModal>
+            <Text style={styles.mobileMenuTitle}>Bình luận của {displayName}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Phản hồi bình luận" style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} onPress={() => { setOptionsCommentId(null); onReply(comment.id, displayName, comment.authorUserId); }}>
+              <SymbolView name={{ ios: 'arrowshape.turn.up.left', android: 'reply', web: 'reply' }} size={20} tintColor={colors.textPrimary} />
+              <Text style={styles.optionText}>Phản hồi</Text>
+            </Pressable>
+            {isOwner && <>
+              <Pressable accessibilityRole="button" accessibilityLabel="Sửa bình luận" style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} onPress={() => { setOptionsCommentId(null); onEdit(comment); }}>
+                <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={20} tintColor={colors.textPrimary} />
+                <Text style={styles.optionText}>Sửa bình luận</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Xóa bình luận" style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} onPress={() => { setOptionsCommentId(null); onDelete(comment.id); }}>
+                <SymbolView name={{ ios: 'trash', android: 'delete_outline', web: 'delete_outline' }} size={20} tintColor={colors.error} />
+                <Text style={[styles.optionText, { color: colors.error }]}>Xóa bình luận</Text>
+              </Pressable>
+            </>}
+            {!isOwner && onReport && <Pressable accessibilityRole="button" accessibilityLabel="Báo cáo bình luận" style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} onPress={() => { setOptionsCommentId(null); onReport(comment); }}>
+              <SymbolView name={{ ios: 'flag', android: 'outlined_flag', web: 'outlined_flag' }} size={20} tintColor={colors.error} />
+              <Text style={[styles.optionText, { color: colors.error }]}>Báo cáo bình luận</Text>
+            </Pressable>}
+          </View>
+        </View>
+      </Modal>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mobileMenuOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: 'rgba(15,23,42,0.45)' },
+  mobileMenu: { width: '100%', maxWidth: 340, backgroundColor: colors.surface, borderRadius: 16, padding: 8 },
+  mobileMenuTitle: { color: colors.textSecondary, fontSize: 13, padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, marginBottom: 4 },
   commentRow: { gap: 8 },
   commentMain: { flexDirection: "row", gap: 10 },
   avatarPlaceholder: {
@@ -289,7 +257,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E7EB",
   },
   menuAnchor: { position: "relative" },
-  iconBtnSmall: { padding: 4 },
   dropdownBackdrop: {
     position: "absolute",
     top: -1000,
@@ -326,6 +293,10 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 48,
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 8,

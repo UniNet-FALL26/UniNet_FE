@@ -77,7 +77,8 @@ export function StudentVerificationModal({ account, name, schoolName, value, loa
     }
   };
   return <Modal visible transparent animationType="fade" onRequestClose={close} accessibilityLabel={stage === 'form' ? 'Xác minh sinh viên' : 'Thông tin tài khoản'}>
-    <KeyboardAvoidingView style={s.scrim} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}><ToastHost modal /><View testID="student-verification-panel" accessibilityViewIsModal style={s.dialog}>
+    <KeyboardAvoidingView style={s.scrim} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} /><ToastHost modal /><View testID="student-verification-panel" accessibilityViewIsModal style={s.dialog}>
       <View style={s.heading}><Text role="heading" aria-level={2} style={s.title}>{stage === 'form' ? 'Xác minh sinh viên' : 'Thông tin tài khoản'}</Text><Pressable ref={closeButton} accessibilityRole="button" accessibilityLabel={stage === 'form' ? 'Đóng xác minh sinh viên' : 'Đóng thông tin tài khoản'} onPress={close} disabled={submitting} style={s.close}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={19} tintColor={colors.navy} /></Pressable></View>
       <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {stage === 'form' ? <>

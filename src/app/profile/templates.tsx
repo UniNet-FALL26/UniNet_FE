@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { colors } from '@/constants/colors';
 import { router } from 'expo-router';
@@ -7,7 +8,8 @@ import { ProfileTemplateCard } from '@/components/profile/ProfileTemplateCard';
 import { profileTemplates } from '@/data/profile-templates';
 
 export default function ProfileTemplatesScreen() {
-  return <SafeAreaView style={styles.safe}>
+  const safeAreaEdges = useScreenSafeAreaEdges();
+  return <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
     <DetailNavigation title="Mẫu hồ sơ" backLabel="Quay lại trang cá nhân" onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')} />
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.description}>Một hồ sơ mang dấu ấn của bạn. Chọn mẫu hoặc màu sắc để xem trước.</Text>

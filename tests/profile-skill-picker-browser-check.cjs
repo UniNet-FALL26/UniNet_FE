@@ -9,7 +9,7 @@ const catalog = [
   { id: '44444444-4444-4444-4444-444444444444', name: 'Tool chưa có logo', category: 'Tools & Other', iconUrl: null },
 ];
 const account = { id: 'skill-picker-owner', email: 'picker@fixture.test', role: 0, profileComplete: true, profile: { id: 'picker-profile', fullName: 'Picker Fixture', displayName: 'Picker', showPortfolio: true } };
-const data = { profile: account.profile, isOwner: true, skillCatalog: catalog, portfolio: { headline: null, isPublic: false, appearance: { profile: { template: 'developer-landscape', theme: 'pink', font: 'Inter', sectionOrder: [], hiddenSections: [] } }, skills: [{ skillId: catalog[0].id, name: 'React', category: 'Frontend', iconUrl: null, level: 2, yearsOfExperience: 3 }], projects: [], education: [], experience: [], certificates: [], activities: [], languages: [], articles: [], socialLinks: [] } };
+const data = { profile: account.profile, isOwner: true, skillCatalog: catalog, portfolio: { headline: null, appearance: { profile: { template: 'developer-landscape', theme: 'pink', font: 'Inter', sectionOrder: [], hiddenSections: [] } }, skills: [{ skillId: catalog[0].id, name: 'React', category: 'Frontend', iconUrl: null, level: 2, yearsOfExperience: 3 }], projects: [], education: [], experience: [], certificates: [], activities: [], languages: [], articles: [], socialLinks: [] } };
 (async () => {
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });

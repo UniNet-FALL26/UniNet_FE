@@ -38,8 +38,8 @@ export function RecruitmentPostDialog({ projectId, onClose }: { projectId: strin
   const canApply = !project.isOwner && !project.isMember && !pending && (project.status === 0 || project.status === 1) && project.recruitment.status === 1 && (!deadline || Date.parse(deadline) > Math.max(now, Date.now()));
   if (applying) return <ApplyProjectModal project={project} onClose={() => setApplying(false)} onApplied={() => { setPending(true); setApplying(false); }} />;
   return <ProjectRecruitmentOverview project={project} onClose={onClose} footerAction={<>
-    <HubAction compact title="Xem dự án" onPress={() => { onClose(); router.push({ pathname: '/group/[id]', params: { id: project.id } }); }} />
-    {pending && <Text role="status" style={{ color: c.primary, fontSize: 12, lineHeight: 18, maxWidth: 300 }}>Bạn đã gửi yêu cầu tham gia, đang chờ phản hồi.</Text>}
+    <HubAction compact title="Xem dự án" icon="external" variant="primary" onPress={() => { onClose(); router.push({ pathname: '/group/[id]', params: { id: project.id } }); }} />
+    {pending && <Text role="status" style={{ color: c.primary, fontSize: 12, lineHeight: 18, width: '100%', textAlign: 'right' }}>Bạn đã gửi yêu cầu tham gia, đang chờ phản hồi.</Text>}
     {project.isOwner && <Text style={ui.muted}>Đây là dự án của bạn.</Text>}
     {!project.isOwner && project.isMember && <Text style={ui.muted}>Bạn đang là thành viên dự án.</Text>}
     {canApply && <HubAction compact title="Xin tham gia" icon="people" variant="primary" onPress={() => { setNow(Date.now()); if (!deadline || Date.parse(deadline) > Date.now()) setApplying(true); }} />}

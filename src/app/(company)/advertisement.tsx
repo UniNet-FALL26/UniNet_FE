@@ -648,6 +648,7 @@ export default function CompanyAdvertisementScreen() {
         onRequestClose={handleCancel}
       >
         <View style={styles.modalOverlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={handleCancel} />
           {modalStep > 0 && <ToastHost modal />}
           <View
             style={[styles.modalContent, modalStep === 2 && { height: "80%" }]}
@@ -952,6 +953,9 @@ export default function CompanyAdvertisementScreen() {
         }
       >
         <View style={styles.modalOverlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() =>
+          setPaymentPopup((prev) => ({ ...prev, visible: false }))
+        } />
           <View style={styles.resultPopupCard}>
             <View
               style={[

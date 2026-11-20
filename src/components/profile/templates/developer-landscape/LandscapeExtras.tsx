@@ -1,4 +1,4 @@
-import { EditPhoto, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { EditCertificateEntry, EditPhoto, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 import { isSampleLink, profileMedia } from '@/components/profile/profile-media';
@@ -9,9 +9,9 @@ export function LandscapeCertificates({ portfolio, theme, width, thumbnail }: Se
   const editing = useProfileEditing();
   if (!portfolio.certificates.length && !editing) return null;
   const columns = width >= 900 ? 4 : width >= 600 ? 2 : 1;
-  return <View style={s.section}><LandscapeHeading title="Chứng chỉ" eyebrow="CERTIFICATIONS" subtitle="Những chứng chỉ và thành tựu mình đã đạt được." icon="certificate" theme={theme} /><View style={s.grid}>{portfolio.certificates.map((item, index) => <View key={`${item.title}-${index}`} style={[s.card, extra.compactCard, { width: tileWidth(width, columns), backgroundColor: theme.surface, borderColor: theme.border }]}>
-    <View>{profileMedia(item.logoUrl) ? <Image source={profileMedia(item.logoUrl)} contentFit="contain" loading={thumbnail ? 'eager' : 'lazy'} accessibilityLabel={item.issuer} style={extra.logo} /> : <PortfolioIcon name="certificate" color={theme.accentStrong} size={30} />}<EditPhoto color={theme.accentStrong} right={-6} bottom={-6} size={24} entry={{ section: 'certificates', item, label: item.title }} /></View>
-    <View style={s.shrink}><Text role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]}>{item.title}</Text><Text style={[s.caption, { color: theme.muted }]}>{item.issuer}</Text>{!!item.year && <Text style={[s.caption, { color: theme.muted }]}>{item.year}</Text>}{!isSampleLink(item.url) && <PortfolioLink label="Xem chứng chỉ" url={item.url} theme={theme} thumbnail={thumbnail} />}</View>
+  return <View style={s.section}><LandscapeHeading title="Chứng chỉ" eyebrow="CERTIFICATIONS" subtitle="Những chứng chỉ và thành tựu mình đã đạt được." icon="certificate" theme={theme} /><View style={s.grid}>{portfolio.certificates.map((item, index) => <View key={`${item.title}-${index}`} style={[s.card, extra.compactCard, { width: tileWidth(width, columns), backgroundColor: theme.surface, borderColor: theme.border }]}><EditCertificateEntry index={index} color={theme.accentStrong} />
+    <View>{profileMedia(item.logoUrl) ? <Image source={profileMedia(item.logoUrl)} contentFit="contain" loading={thumbnail ? 'eager' : 'lazy'} accessibilityLabel={item.issuer} style={extra.logo} /> : <PortfolioIcon name="certificate" color={theme.accentStrong} size={30} />}</View>
+    <View style={[s.shrink, editing && { paddingRight: 24 }]} ><Text role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]}>{item.title}</Text><Text style={[s.caption, { color: theme.muted }]}>{item.issuer}</Text>{!!item.year && <Text style={[s.caption, { color: theme.muted }]}>{item.year}</Text>}{!isSampleLink(item.url) && <PortfolioLink label="Xem chứng chỉ" url={item.url} theme={theme} thumbnail={thumbnail} />}</View>
   </View>)}</View></View>;
 }
 export function LandscapeArticles({ portfolio, theme, width, thumbnail }: SectionProps) {

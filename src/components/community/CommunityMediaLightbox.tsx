@@ -7,6 +7,7 @@ export function CommunityMediaLightbox({ urls, index, onIndexChange, onClose }: 
   if (index === null || !urls[index]) return null;
   return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
     <View testID="community-media-lightbox" style={s.overlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} />
       <Pressable accessibilityRole="button" accessibilityLabel="Đóng xem ảnh bài viết" onPress={onClose} style={s.close}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={28} tintColor="#FFF" /></Pressable>
       <View style={s.content}>
         <Image source={{ uri: urls[index] }} resizeMode="cover" blurRadius={24} accessible={false} style={s.backdrop} />

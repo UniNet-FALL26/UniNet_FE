@@ -99,13 +99,14 @@ export function ProjectHubDetailScreen() {
     finally { if (request === imageRequest.current) { pickerLocked.current = false; setPickingImage(false); } }
   }
   async function addResource(kind: 'documents' | 'media') {
-    if (!project?.isOwner || resourceLocked.current) return;
+    if (!project || (!project.isOwner && !project.isMember) || resourceLocked.current) return;
     const request = imageRequest.current;
     resourceLocked.current = true; setAddingResource(kind); setResourceError(null);
     try {
       const file = await pickProjectAsset(kind === 'documents' ? 'document' : 'media');
       if (file && request === imageRequest.current) {
-        setProject(await projectHubService.update(project.id, { details: { ...project.details, [kind]: [...project.details[kind], file] } }));
+        const value = await projectHubService.addResource(project.id, kind, file);
+        if (request === imageRequest.current) saved(value);
       }
     } catch (cause) { if (request === imageRequest.current) setResourceError({ kind, message: messageOf(cause) }); }
     finally { if (request === imageRequest.current) { resourceLocked.current = false; setAddingResource(null); } }
@@ -226,9 +227,9 @@ function OverviewSection({ section, icon, children, last, reserveAction }: { sec
 function InfoRow({ label, icon, children }: { label: string; icon: HubIconName; children: ReactNode }) { return <View style={styles.infoRow}><HubIcon name={icon} size={17} color={c.textSecondary} /><Text style={styles.infoLabel}>{label}</Text><View style={{ flex: 1, alignItems: 'flex-end' }}>{children}</View></View>; }
 function ResourcesPanel({ project, kind, onAdd, busy, error }: { project: HubProject; kind: 'documents' | 'media'; onAdd: () => void; busy: boolean; error: string }) {
   const files = project.details[kind]; const media = kind === 'media';
-  return <HubPanel compact title={media ? 'Hình ảnh & Video demo' : 'Tài liệu dự án'} icon={media ? 'image' : 'document'} action={!media && project.isOwner ? <HubAction compact title="Tải lên" icon="upload" busy={busy} onPress={onAdd} style={styles.uploadButton} /> : undefined}>
+  return <HubPanel compact title={media ? 'Hình ảnh & Video demo' : 'Tài liệu dự án'} icon={media ? 'image' : 'document'} action={!media && (project.isOwner || project.isMember) ? <HubAction compact title="Tải lên" icon="upload" busy={busy} onPress={onAdd} style={styles.uploadButton} /> : undefined}>
     {!files.length ? <View style={styles.resourceEmpty}><HubIcon name={media ? 'image' : 'document'} size={38} /><Text style={styles.muted}>{media ? 'Chưa có hình ảnh hoặc video demo.' : 'Chưa có tài liệu được chia sẻ.'}</Text></View> : <View style={media ? styles.mediaGrid : { gap: 10 }}>{files.map((file, i) => <Resource key={`${file.url}-${i}`} file={file} media={media} />)}</View>}
-    {project.isOwner && media && <View style={{ alignSelf: 'flex-start' }}><HubAction compact title="Thêm hình ảnh / video" icon="plus" busy={busy} onPress={onAdd} /></View>}
+    {(project.isOwner || project.isMember) && media && <View style={{ alignSelf: 'flex-start' }}><HubAction compact title="Thêm hình ảnh / video" icon="plus" busy={busy} onPress={onAdd} /></View>}
     {!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}
   </HubPanel>;
 }

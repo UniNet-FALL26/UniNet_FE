@@ -54,6 +54,7 @@ export function ProfileProjectPicker({ projects, limit, onApply, onManual, onClo
 
   return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} />
       <View accessibilityViewIsModal style={s.dialog}>
         <Text accessibilityRole="header" style={s.heading}>Dự án trong hồ sơ</Text>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>

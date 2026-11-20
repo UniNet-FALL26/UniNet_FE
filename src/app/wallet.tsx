@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Redirect } from 'expo-router';
@@ -12,6 +13,7 @@ import { WalletContent } from '@/components/wallet/WalletContent';
 const money = (value: string) => BigInt(value).toLocaleString('vi-VN') + ' ₫';
 const states = ['Chờ duyệt', 'Đã duyệt', 'Đã lập lệnh chi', 'Đã chuyển tiền', 'Từ chối', 'Đã hủy'];
 export default function WalletScreen() {
+  const safeAreaEdges = useScreenSafeAreaEdges();
   const { account, isAuthenticated, isLoading } = useAuthStore();
   const [data, setData] = useState<WalletData | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState(''), [bank, setBank] = useState(''), [number, setNumber] = useState(''), [holder, setHolder] = useState('');
@@ -46,7 +48,7 @@ export default function WalletScreen() {
   if (isLoading) return <ActivityIndicator />;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
   if (!account || account.role !== ACCOUNT_ROLE.ASSESSOR) return <View style={s.content}><Text>Ví thu nhập chỉ dành cho thẩm định viên.</Text></View>;
-  return <SafeAreaView style={s.root}><DetailNavigation title="Ví thu nhập" actions={<Pressable accessibilityRole="button" disabled={busy} onPress={() => void refresh()}><Text style={s.link}>Tải lại</Text></Pressable>} />
+  return <SafeAreaView style={s.root} edges={safeAreaEdges}><DetailNavigation title="Ví thu nhập" actions={<Pressable accessibilityRole="button" disabled={busy} onPress={() => void refresh()}><Text style={s.link}>Tải lại</Text></Pressable>} />
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!!notice && <Text accessibilityRole="alert" style={s.success}>{notice}</Text>}
       {loading && !data ? <ActivityIndicator color={colors.primary} /> : data && <>

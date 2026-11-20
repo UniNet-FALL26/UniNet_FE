@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import type { ImagePickerAsset } from 'expo-image-picker';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { colors } from '@/constants/colors';
 import { ToastHost } from '@/components/ui/ToastHost';
@@ -62,7 +62,8 @@ export function CompanyPhotoDialog({ initialAsset, target, onSave, onClose }: Pr
   const close = () => { if (!upload.current && !choosing) onClose(); };
 
   return <Modal visible transparent animationType="fade" onRequestClose={close}>
-    <View style={s.overlay}><ToastHost modal /><View testID="company-photo-dialog" role="dialog" aria-modal accessibilityViewIsModal style={s.dialog}>
+    <View style={s.overlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} /><ToastHost modal /><View testID="company-photo-dialog" role="dialog" aria-modal accessibilityViewIsModal style={s.dialog}>
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <Text role="heading" aria-level={2} style={s.title}>{target === 'avatarUrl' ? 'Xem trước ảnh đại diện' : 'Xem trước ảnh bìa'}</Text>
         <View style={[s.previewFrame, target === 'avatarUrl' && s.avatarFrame]}><Image source={{ uri: asset.uri }} contentFit="contain" accessibilityLabel="Ảnh đã chọn từ máy" style={s.preview} /></View>

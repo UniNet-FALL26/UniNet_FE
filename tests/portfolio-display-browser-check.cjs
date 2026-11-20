@@ -8,7 +8,7 @@ const profileId = '11111111-1111-1111-1111-111111111111';
 const account = { id: 'display-student', email: 'display@example.org', role: 0, profileComplete: true, profile: { id: profileId, fullName: 'Nguyễn Mai An', nickname: 'Mai An', displayName: 'Mai An', isVerified: false } };
 let saved = { ...structuredClone(sample), isOwner: true, profile: { ...sample.profile, ...account.profile, avatarUrl: null, coverUrl: null, bio: 'Giới thiệu của An' } };
 saved.portfolio.appearance.profile = { template: 'developer-modern', theme: 'blue', font: 'Inter', sectionOrder: [], hiddenSections: [], showPortfolio: true };
-saved.portfolio.isPublic = true;
+let authorUnavailable = false;
 let failSave = false, failDisplay = false, failLoad = false, saveGate = null, finishSave, writes = 0;
 const paths = [];
 function visitorResponse() {
@@ -48,7 +48,7 @@ function visitorResponse() {
       saved.portfolio.appearance.profile.showPortfolio = req.postDataJSON().showPortfolio;
       return route.fulfill({ json: saved });
     }
-    if (path.endsWith(`/profile/portfolio/${profileId}`)) return saved.portfolio.isPublic ? route.fulfill({ json: visitorResponse() }) : route.fulfill({ status: 404, json: { message: 'Không tìm thấy hồ sơ công khai.' } });
+    if (path.endsWith(`/profile/portfolio/${profileId}`)) return !authorUnavailable ? route.fulfill({ json: visitorResponse() }) : route.fulfill({ status: 404, json: { message: 'Không tìm thấy hồ sơ.' } });
     if (path.startsWith('/api/')) return route.fulfill({ json: [] });
     return route.continue();
   });
@@ -140,11 +140,11 @@ function visitorResponse() {
     assert.ok(paths.includes(`/api/profile/portfolio/${profileId}`));
     saved.portfolio.appearance.profile.showPortfolio = false; await page.reload({ waitUntil: 'commit' }); await page.getByTestId('student-profile-starter').waitFor();
     for (const label of ['Đổi ảnh đại diện','Đổi ảnh bìa','Chọn mẫu hồ sơ']) assert.equal(await button(label).count(), 0);
-    saved.portfolio.isPublic = false; await page.reload({ waitUntil: 'commit' }); await page.getByText('Không tìm thấy hồ sơ công khai.', { exact: true }).waitFor();
+    authorUnavailable = true; await page.reload({ waitUntil: 'commit' }); await page.getByText('Không tìm thấy hồ sơ.', { exact: true }).waitFor();
     assert.equal(await page.getByTestId('student-profile-starter').count(), 0);
     await page.waitForFunction(() => [...document.querySelectorAll('[role="button"]')].some(element => element.textContent === 'Thử lại' && Object.keys(element).some(key => key.startsWith('__reactProps') && typeof element[key]?.onClick === 'function')));
-    saved.portfolio.isPublic = true; await button('Thử lại').click(); await page.getByTestId('student-profile-starter').waitFor();
-    console.log('PASS: visitor read-only, private denial and retry');
+    authorUnavailable = false; await button('Thử lại').click(); await page.getByTestId('student-profile-starter').waitFor();
+    console.log('PASS: visitor read-only, missing author and retry');
     await signIn(); await page.getByRole('tab', { name: 'Cá nhân', exact: true }).click(); await button('Mở cài đặt').click(); await toggle.waitFor();
     for (const width of [320,768,1440]) { await page.setViewportSize({ width, height: 900 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot({ path: `dist/portfolio-display-verification/settings-${width}.png` }); }
     console.log('PASS: responsive settings');

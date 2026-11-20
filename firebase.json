@@ -1,0 +1,7 @@
+{
+  "react-native": {
+    "messaging_ios_foreground_presentation_options": [],
+    "messaging_android_notification_channel_id": "uninet-messages",
+    "messaging_android_notification_delegation_enabled": false
+  }
+}

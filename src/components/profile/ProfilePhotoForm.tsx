@@ -172,7 +172,8 @@ export function ProfilePhotoForm({ initialAsset, onConfirm, onClose, portrait = 
   const close = () => { if (!upload.current) onClose(); };
   const processing = !!asset && !editingOriginal && (portrait ? !preview : cropFor ? !cropReady || url === null : url === null) && !error;
 
-  return <Modal visible transparent animationType="fade" onRequestClose={close}><View style={s.overlay}><ToastHost modal /><View style={s.dialog} accessibilityViewIsModal>
+  return <Modal visible transparent animationType="fade" onRequestClose={close}><View style={s.overlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} /><ToastHost modal /><View style={s.dialog} accessibilityViewIsModal>
     <ScrollView style={s.dialogScroll} contentContainerStyle={s.dialogContent} showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
       <Text role="heading" aria-level={2} style={s.title}>{cropFor ? cropFor === 'coverUrl' ? 'Căn khung ảnh bìa' : 'Căn khung ảnh đại diện' : portrait ? 'Ảnh chân dung' : 'Chọn ảnh hồ sơ'}</Text>
       {asset && cropFor ? <>

@@ -1,6 +1,6 @@
 import { API_URL } from '@/constants/config';
 import { apiRequest } from '@/services/api';
-import type { HubPage, HubPerson, HubProject, HubProjectInput, HubRecruitment, HubRequest } from '@/types/project-hub';
+import type { HubFile, HubPage, HubPerson, HubProject, HubProjectInput, HubRecruitment, HubRequest } from '@/types/project-hub';
 
 const root = () => `${API_URL.endsWith('/api') ? '' : '/api'}/project-hub`;
 const id = (value: string) => encodeURIComponent(value);
@@ -12,6 +12,7 @@ export const projectHubService = {
   get: (projectId: string, signal?: AbortSignal) => apiRequest<HubProject>(`${root()}/${id(projectId)}`, { signal, feedback: false }),
   create: (value: HubProjectInput) => apiRequest<HubProject>(root(), json('POST', value)),
   update: (projectId: string, value: Partial<HubProjectInput>) => apiRequest<HubProject>(`${root()}/${id(projectId)}`, json('PATCH', value)),
+  addResource: (projectId: string, kind: 'documents' | 'media', file: HubFile) => apiRequest<HubProject>(`${root()}/${id(projectId)}/resources/${kind}`, json('POST', file)),
   remove: (projectId: string) => apiRequest<void>(`${root()}/${id(projectId)}`, json('DELETE')),
   complete: (projectId: string) => apiRequest<HubProject>(`${root()}/${id(projectId)}/complete`, json('POST')),
   saveRecruitment: (projectId: string, value: Pick<HubRecruitment, 'description' | 'positions' | 'deadline' | 'status'>) => apiRequest<HubProject>(`${root()}/${id(projectId)}/recruitment`, json('PUT', value)),

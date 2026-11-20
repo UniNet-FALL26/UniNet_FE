@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { CommentModal } from "@/components/community/CommentModal";
 import { CommunityOpportunitiesCard } from "@/components/community/CommunityOpportunitiesCard";
 import { ACCOUNT_ROLE } from "@/constants/roles";
@@ -48,6 +49,7 @@ function mergeFeedPosts(current: PostResponse[], incoming: PostResponse[]) {
 }
 
 export default function CommunityScreen() {
+  const safeAreaEdges = useScreenSafeAreaEdges();
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const wideFeed = width >= 1280;
@@ -397,7 +399,7 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
       <View style={styles.feedLayout}>
       <View testID="community-feed-column" style={styles.feedColumn}>
       {loading ? (
@@ -418,7 +420,7 @@ export default function CommunityScreen() {
           ListHeaderComponent={
             <View style={styles.feedHeader}>
               {isAuthenticated && <CommunityComposer onCreated={() => fetchFeed(1, true)} />}
-              {showOpportunities && !wideFeed && <CommunityOpportunitiesCard key={account.id} />}
+              {showOpportunities && !phone && !wideFeed && <CommunityOpportunitiesCard key={account.id} />}
             </View>
           }
           contentContainerStyle={[styles.listContent, phone && styles.phoneListContent]}
@@ -462,8 +464,9 @@ export default function CommunityScreen() {
         }}
       />
 
-      <Modal visible={!!deleteConfirmPostId} transparent animationType="fade">
+      <Modal visible={!!deleteConfirmPostId} transparent animationType="fade" onRequestClose={() => setDeleteConfirmPostId(null)}>
         <View style={styles.popupOverlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setDeleteConfirmPostId(null)} />
           <View style={styles.popupContent}>
             <Text style={styles.popupTitle}>Xóa bài viết?</Text>
             <View style={styles.popupActions}>
@@ -501,9 +504,10 @@ export default function CommunityScreen() {
       <CommunityMediaLightbox urls={lightboxPost?.mediaUrls ?? []} index={selectedImageIndex} onIndexChange={setSelectedImageIndex} onClose={() => setSelectedImageIndex(null)} />
       {/* OVERLAY BÁO CÁO BÀI VIẾT */}
       {/* OVERLAY BÁO CÁO BÀI VIẾT */}
-      <Modal visible={!!reportPostId} transparent animationType="fade">
+      <Modal visible={!!reportPostId} transparent animationType="fade" onRequestClose={() => { setReportPostId(null); setSelectedReason(''); }}>
         {/* Bỏ KeyboardAvoidingView đi vì không còn nhập phím nữa */}
         <View style={[styles.popupOverlay, { alignItems: "center" }]}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => { setReportPostId(null); setSelectedReason(''); }} />
           <View style={[styles.popupContent, { width: "85%", maxWidth: 400 }]}>
             <Text style={styles.popupTitle}>Báo cáo bài viết</Text>
             <Text
@@ -588,7 +592,7 @@ const styles = StyleSheet.create({
   feedColumn: { flex: 1, minWidth: 0 },
   feedHeader: { gap: 12 },
   opportunitiesSidebar: { position: "absolute", top: 12, left: "50%", marginLeft: 337 },
-  phoneListContent: { paddingHorizontal: 0 },
+  phoneListContent: { paddingHorizontal: 0, paddingTop: 0, gap: 8 },
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   listContent: {

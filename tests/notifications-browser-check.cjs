@@ -45,6 +45,7 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
         if (path.endsWith('/profile/portfolio/me')) return route.fulfill({ json: { ...structuredClone(sample), isOwner: true, profile: { ...sample.profile, ...account.profile } } });
         if (path.endsWith('/partner/dashboard')) return route.fulfill({ status: 503, json: { message: 'Tổng quan chưa khả dụng trong kiểm thử.' } });
         if (path.includes('/api/')) return route.fulfill({ json: [] });
+        if (process.env.NOTIFICATIONS_CLIENT_RENDER === '1' && url.origin === origin && req.isNavigationRequest()) return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body,#root{height:100%;margin:0}body{overflow:hidden;display:flex}#root{display:flex;flex:1}</style></head><body><div id="root"></div><script src="/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&transform.routerRoot=src%2Fapp"></script></body></html>' });
         if (url.origin !== origin) return route.fulfill({ status: 204 });
         return route.continue();
       });
@@ -151,6 +152,8 @@ const origin = process.env.PROFILE_TEST_ORIGIN || 'http://localhost:8081';
       await inbox.getByTestId('notification-design-comment').waitFor();
       for (const width of [320, 375, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
+        const icon = await inbox.getByTestId('notification-icon-design-project').boundingBox();
+        assert.ok(icon.width <= 34 && icon.height <= 34, 'notification icons stay compact');
         const controls = await Promise.all([inbox.getByRole('tablist', { name: 'Trạng thái thông báo', exact: true }), inbox.getByRole('button', { name: 'Đánh dấu tất cả đã đọc', exact: true })].map(control => control.boundingBox()));
         const rowCenters = controls.map(box => box.y + box.height / 2);
         assert.ok(Math.max(...rowCenters) - Math.min(...rowCenters) < 8, `controls share a row at ${width}px`);
