@@ -5,8 +5,25 @@ import type { PortfolioResponse, ProfileTheme } from '@/types/portfolio';
 import type { ProfileEditField, ProfileImageTarget } from '@/utils/profile-fields';
 import { profileEditorSections, type ProfileEditorSection, type ProfileSectionId } from '@/utils/profile-editor';
 
-export const ProfileEditContext = createContext<{ data: PortfolioResponse; disabled: boolean; onField: (field: ProfileEditField) => void; onPhoto: (target: ProfileImageTarget) => void; onAdd: (section: ProfileEditorSection) => void } | null>(null);
+export const ProfileEditContext = createContext<{ data: PortfolioResponse; disabled: boolean; onField: (field: ProfileEditField) => void; onPhoto: (target: ProfileImageTarget) => void; onAdd: (section: ProfileEditorSection) => void; onEditEducation: (index: number) => void; onEditCertificate: (index: number) => void } | null>(null);
 export const useProfileEditing = () => useContext(ProfileEditContext);
+export function EditCertificateEntry({ index, color }: { index: number; color: string }) {
+  const editing = useProfileEditing();
+  if (!editing) return null;
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Chỉnh sửa chứng chỉ ${editing.data.portfolio.certificates[index]?.title ?? ''}`} disabled={editing.disabled} hitSlop={4} onPress={() => editing.onEditCertificate(index)} style={({ pressed }) => [s.certificatePencil, pressed && s.pressed]}>
+    <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={17} tintColor={color} />
+  </Pressable>;
+}
+export function EditEducationEntry({ index, color, children }: { index: number; color: string; children: ReactNode }) {
+  const editing = useProfileEditing();
+  if (!editing || index < 0) return <>{children}</>;
+  return <View style={s.entryDate}>
+    <View style={s.entryDateValue}>{children}</View>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Chỉnh sửa học vấn ${editing.data.portfolio.education[index]?.title ?? ''}`} disabled={editing.disabled} hitSlop={6} onPress={() => editing.onEditEducation(index)} style={({ pressed }) => [s.entryPencil, pressed && s.pressed]}>
+      <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} tintColor={color} />
+    </Pressable>
+  </View>;
+}
 export function EditField({ field, label, color, children, overlay = false }: { field: ProfileEditField; label: string; color: string; children: ReactNode; overlay?: boolean }) {
   const editing = useProfileEditing();
   const textRef = useRef<Text | null>(null);
@@ -62,7 +79,7 @@ export function EditPhoto({ field = 'avatarUrl', color, right = 12, bottom = 12,
 export function SectionAdd({ title, theme }: { title: string; theme: ProfileTheme }) {
   const editing = useProfileEditing();
   if (!editing) return null;
-  const ids: ProfileSectionId[] = /Hành trình/.test(title) ? ['education', 'experience'] : /Kỹ năng/.test(title) ? ['skills'] : /Dự án/.test(title) ? ['projects'] : /Chứng chỉ/.test(title) ? ['certificates'] : /Blog|Bài viết/.test(title) ? ['articles'] : /Hoạt động/.test(title) ? ['activities'] : /Ngôn ngữ/.test(title) ? ['languages'] : /Liên kết/.test(title) ? ['socialLinks'] : [];
+  const ids: ProfileSectionId[] = /Hành trình/.test(title) ? ['education'] : /Kỹ năng/.test(title) ? ['skills'] : /Dự án/.test(title) ? ['projects'] : /Chứng chỉ/.test(title) ? ['certificates'] : /Blog|Bài viết/.test(title) ? ['articles'] : /Hoạt động/.test(title) ? ['activities'] : /Ngôn ngữ/.test(title) ? ['languages'] : /Liên kết/.test(title) ? ['socialLinks'] : [];
   return <View style={s.controls}>{ids.map(id => {
     const original = profileEditorSections.find(item => item.id === id)!;
     const section = id === 'projects' && title !== 'Dự án nổi bật' ? { ...original, fields: original.fields.filter(field => field.key !== 'featured') } : original;
@@ -70,6 +87,9 @@ export function SectionAdd({ title, theme }: { title: string; theme: ProfileThem
   })}</View>;
 }
 const s = StyleSheet.create({
+  certificatePencil: { position: 'absolute', right: 6, top: 6, width: 32, height: 32, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  entryDate: { alignSelf: 'flex-start', maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 2 },
+  entryDateValue: { flexShrink: 1, minWidth: 0 }, entryPencil: { width: 24, height: 32, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   fieldOverlay: { position: 'relative', alignSelf: 'flex-start', maxWidth: '100%' },
   pencilOverlay: { position: 'absolute', right: -20, top: 0, bottom: 0, width: 16, justifyContent: 'center' },
   field: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, maxWidth: '100%' }, value: { flexShrink: 1, minWidth: 0 }, pressed: { opacity: 0.65 },

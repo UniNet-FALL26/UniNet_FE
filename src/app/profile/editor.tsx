@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
 import { useEffect, useRef, useState } from 'react';
@@ -20,11 +21,12 @@ import { ACCOUNT_ROLE } from '@/constants/roles';
 import { portfolioService } from '@/services/portfolio.service';
 import { authStore, useAuthStore } from '@/store/auth.store';
 import type { PortfolioContent, PortfolioResponse } from '@/types/portfolio';
-import type { ProfileEditorSection } from '@/utils/profile-editor';
+import { profileEditorSections, type ProfileEditorSection } from '@/utils/profile-editor';
 import { updateProfileField, updateProfileImage, type ProfileEditField, type ProfileImageTarget } from '@/utils/profile-fields';
 import { createProfileDraft, isProfileDraftDirty, updateProfileAppearance } from '@/utils/profile-draft';
 
 export default function ProfileEditorScreen() {
+  const safeAreaEdges = useScreenSafeAreaEdges();
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
   const params = useLocalSearchParams<{ template?: string; theme?: string; photo?: string }>();
@@ -41,6 +43,7 @@ export default function ProfileEditorScreen() {
   const dirty = !!data && !!baseline && isProfileDraftDirty(data, baseline);
   const [message, setMessage] = useState('');
   const [section, setSection] = useState<ProfileEditorSection | null>(null);
+  const [entryIndex, setEntryIndex] = useState<number | undefined>();
   const [manualProject, setManualProject] = useState(false);
   const [field, setField] = useState<ProfileEditField | null>(null);
   const [photo, setPhoto] = useState<{ target: ProfileImageTarget | 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null);
@@ -106,7 +109,7 @@ export default function ProfileEditorScreen() {
   const add = (content: PortfolioContent) => {
     if (!data || saving) return;
     setLoaded({ accountId: account!.id, data: { ...data, portfolio: content } });
-    setMessage(''); setSection(null); setManualProject(false);
+    setMessage(''); setSection(null); setEntryIndex(undefined); setManualProject(false);
   };
   const save = async () => {
     if (!data || !dirty || saveController.current || !account?.id) return;
@@ -126,8 +129,8 @@ export default function ProfileEditorScreen() {
     }
   };
   // Static HTML cannot resolve query-selected appearance until the client hydrates.
-  if (Platform.OS === 'web' && !hydrated) return <SafeAreaView style={s.safe}><View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải trình chỉnh sửa" color={colors.primary} /></View></SafeAreaView>;
-  return <SafeAreaView style={s.safe}>
+  if (Platform.OS === 'web' && !hydrated) return <SafeAreaView style={s.safe} edges={safeAreaEdges}><View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải trình chỉnh sửa" color={colors.primary} /></View></SafeAreaView>;
+  return <SafeAreaView style={s.safe} edges={safeAreaEdges}>
     <DetailNavigation onParentNavigate={href => { if (dirty) { pendingParent.current = href; setLeaving('back'); } else router.navigate(href as never); }} title="Hồ sơ của tôi" backLabel="Quay lại xem mẫu" disabled={saving} onBack={() => dirty ? setLeaving('back') : back()} actions={<View style={s.headerActions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Chọn mẫu khác" accessibilityState={{ disabled: saving }} disabled={saving} onPress={() => dirty ? setLeaving('templates') : router.push('/profile/templates')} style={({ pressed }) => [s.iconButton, pressed && s.pressed, saving && s.disabled]}><SymbolView name={{ ios: 'rectangle.grid.2x2', android: 'dashboard', web: 'dashboard' }} size={22} tintColor={colors.primary} /></Pressable>
         {!!data && <Pressable accessibilityRole="button" accessibilityLabel="Lưu hồ sơ" accessibilityState={{ disabled: !dirty || saving, busy: saving }} disabled={!dirty || saving} onPress={() => void save()} style={({ pressed }) => [s.iconButton, s.save, pressed && s.pressed, (!dirty || saving) && s.disabled]}>{saving ? <ActivityIndicator color={colors.surface} /> : <SymbolView name={{ ios: 'square.and.arrow.down', android: 'save', web: 'save' }} size={22} tintColor={colors.surface} />}</Pressable>}
@@ -136,13 +139,13 @@ export default function ProfileEditorScreen() {
     {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.state}><Text style={s.stateTitle}>Đăng nhập để tạo hồ sơ của bạn</Text><Text style={s.hint}>Mẫu đã chọn sẽ được giữ lại khi bạn quay lại trang này.</Text><Button title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ của bạn" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.notice}><Text style={s.hint}>Lưu để áp dụng nội dung, mẫu và màu cho hồ sơ của bạn. Quyền riêng tư và chế độ hiển thị hiện tại được giữ nguyên.</Text>{dirty && <Text accessibilityLiveRegion="polite" style={s.pending}>Có thay đổi chưa lưu.</Text>}{!!message && <ActionFeedback type={message.startsWith('Đã ') ? 'success' : 'error'} message={message} />}</View>
       <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)} style={s.frame}>
-        <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={setSection} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} />
+        <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={next => { setEntryIndex(undefined); setSection(next); }} onEditEducation={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'education')!); }} onEditCertificate={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'certificates')!); }} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} />
       </View>
     </ScrollView>}
     {section && data && (section.id === 'projects' && !manualProject
       ? <ProfileProjectPicker key={account?.id} projects={data.portfolio.projects} limit={section.limit ?? 50}
           onApply={projects => add({ ...data.portfolio, projects })} onManual={() => setManualProject(true)} onClose={() => setSection(null)} />
-      : <ProfileEntryForm key={`${account?.id}-${section.id}`} section={section} data={data} onAdd={add} onClose={() => { setSection(null); setManualProject(false); }} />)}
+      : <ProfileEntryForm key={`${account?.id}-${section.id}-${entryIndex ?? 'new'}`} section={section} data={data} entryIndex={entryIndex} onAdd={add} onClose={() => { setSection(null); setEntryIndex(undefined); setManualProject(false); }} />)}
     {field && data && <ProfileFieldForm key={`${account?.id}-${field}`} data={data} field={field} onClose={() => setField(null)} onConfirm={next => { if (!saving && account) { setLoaded({ accountId: account.id, data: next }); setMessage(''); setField(null); } }} />}
     {photo && data && <ProfilePhotoForm portrait={photo.target === 'avatarUrl' && account?.role === ACCOUNT_ROLE.STUDENT} key={`${account?.id}-${typeof photo.target === 'string' ? photo.target : `${photo.target.section}-${photo.target.index}`}`} initialAsset={photo.asset} onClose={() => setPhoto(null)} onConfirm={url => { if (!saving && account) { const next = typeof photo.target === 'string' ? updateProfileField(data, photo.target, url) : updateProfileImage(data, photo.target, url); setLoaded({ accountId: account.id, data: next }); setMessage(''); setPhoto(null); } }} />}
     <Modal visible={!!leaving} transparent animationType="fade" onRequestClose={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }}><View style={s.overlay}><View style={s.confirm}><Text style={s.stateTitle}>Thay đổi chưa được lưu</Text><Text style={s.hint}>Rời trang sẽ bỏ các thông tin bạn vừa thêm.</Text><Button title="Tiếp tục chỉnh sửa" onPress={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }} /><Button title={leaving === 'templates' ? 'Bỏ thay đổi và chọn mẫu khác' : 'Bỏ thay đổi và quay lại'} variant="outline" onPress={() => { if (baseline && account) setLoaded({ accountId: account.id, data: createProfileDraft(baseline) }); setPendingDestination(leaving); setLeaving(null); }} /></View></View></Modal>
@@ -152,7 +155,7 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background }, header: { width: '100%', maxWidth: 1160, alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   back: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, minWidth: 0 }, title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' }, subtitle: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 3 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 }, iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 9 }, save: { backgroundColor: colors.primary }, pressed: { opacity: 0.65 }, disabled: { opacity: 0.55 },
-  palette: { width: '100%', maxWidth: 1120, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingHorizontal: 18, paddingBottom: 8 }, paletteButton: { minHeight: 22, borderWidth: 1, borderRadius: 5, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }, swatch: { width: 7, height: 7, borderRadius: 3.5 }, paletteLabel: { fontSize: 10, fontWeight: '600' },
+  palette: { width: '100%', maxWidth: 1120, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6, paddingHorizontal: 18, paddingBottom: 8 }, paletteButton: { minHeight: 22, borderWidth: 1, borderRadius: 5, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }, swatch: { width: 7, height: 7, borderRadius: 3.5 }, paletteLabel: { fontSize: 10, fontWeight: '600' },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingBottom: 24 }, notice: { padding: 14, marginHorizontal: 18, marginTop: 12, backgroundColor: colors.primaryLight, borderRadius: 10, gap: 6 }, hint: { color: colors.textSecondary, fontSize: 13, lineHeight: 21 }, pending: { color: colors.primaryDark, fontSize: 13, fontWeight: '600' }, success: { color: colors.success, fontSize: 13 }, error: { color: colors.error, fontSize: 13, lineHeight: 21 },
   state: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }, stateTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '700' }, frame: { width: '100%', overflow: 'hidden', marginTop: 16 },
   overlay: { flex: 1, backgroundColor: 'rgba(16,40,75,0.4)', justifyContent: 'center', alignItems: 'center', padding: 18 }, confirm: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: 12, padding: 20, gap: 16 },

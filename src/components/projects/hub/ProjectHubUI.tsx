@@ -5,6 +5,7 @@ import { colors } from '@/constants/colors';
 import { FullProjectImage } from './FullProjectImage';
 const modalStack: object[] = [];
 const ModalAppearance = createContext(false);
+export const HubPagePresentation = createContext(false);
 
 export const hubColors = { ...colors, ink: '#111A36', canvas: '#F8FAFE', line: '#E2E8F3', blueWash: '#EAF1FF' };
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
@@ -57,12 +58,13 @@ export function HubPanel({ title, icon, children, style, compact = false, action
   return <View style={[ui.panel, compact && { padding: 16, gap: 10, borderRadius: 11 }, style]}>{title && <View style={[ui.sectionTitle, compact && { gap: 8 }, !!action && { alignItems: 'center' }]}>{icon && <HubIcon name={icon} size={compact ? 18 : 20} />}<Text accessibilityRole="header" aria-level={2} style={[ui.heading, compact && { fontSize: 15 }, !!action && { flex: 1, minWidth: 0 }]}>{title}</Text>{action}</View>}{children}</View>;
 }
 export function HubModal({ title, subtitle, onClose, children, footer, wide = true, compact = false, icon = 'folder', maxWidth }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; compact?: boolean; icon?: HubIconName; maxWidth?: number }) {
+  const page = useContext(HubPagePresentation);
   const { width, height } = useWindowDimensions();
   const frame = useRef<View>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (page || Platform.OS !== 'web') return;
     const previous = document.activeElement as HTMLElement | null;
     const node = frame.current as unknown as HTMLElement | null;
     const marker = {}; modalStack.push(marker);
@@ -84,7 +86,17 @@ export function HubModal({ title, subtitle, onClose, children, footer, wide = tr
     document.addEventListener('keydown', handle, true);
     document.addEventListener('keyup', handleKeyUp, true);
     return () => { cancelAnimationFrame(timer); document.removeEventListener('keydown', handle, true); document.removeEventListener('keyup', handleKeyUp, true); const index = modalStack.indexOf(marker); if (index !== -1) modalStack.splice(index, 1); if (previous?.isConnected) previous.focus(); };
-  }, []);
+  }, [page]);
+  if (page) return <ModalAppearance.Provider value={true}>
+    <View testID="hub-settings-page" style={pageStyles.page}>
+      <View style={pageStyles.header}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={onClose} style={pageStyles.back}><HubIcon name="back" size={22} /></Pressable>
+        <View style={pageStyles.heading}><Text accessibilityRole="header" style={pageStyles.title}>{title}</Text>{subtitle && <Text style={modalStyles.subtitle}>{subtitle}</Text>}</View>
+      </View>
+      <ScrollView style={pageStyles.body} contentContainerStyle={pageStyles.content} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      {footer && <View style={pageStyles.footer}>{footer}</View>}
+    </View>
+  </ModalAppearance.Provider>;
   return <ModalAppearance.Provider value={true}><Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={[ui.scrim, { padding: width < 600 ? 10 : 28 }]}>
     <View ref={frame} role="dialog" aria-modal={true} accessibilityViewIsModal accessibilityLabel={title} style={[ui.modal, modalStyles.frame, { maxWidth: maxWidth ?? (wide ? compact ? 880 : 960 : 600), maxHeight: height - (width < 600 ? 20 : 56) }]}>
       <View style={[ui.modalHead, modalStyles.head, width < 600 && { paddingHorizontal: 16 }]}>
@@ -95,6 +107,15 @@ export function HubModal({ title, subtitle, onClose, children, footer, wide = tr
     </View>
   </View></Modal></ModalAppearance.Provider>;
 }
+const pageStyles = StyleSheet.create({
+  page: { flex: 1, minHeight: 0, backgroundColor: '#FFFFFF' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 6, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E2E8F2', backgroundColor: '#FFFFFF' },
+  back: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  heading: { flex: 1, minWidth: 0, gap: 3, paddingRight: 16 },
+  title: { fontSize: 18, lineHeight: 25, fontWeight: '600', color: '#172B49' },
+  body: { flex: 1 }, content: { padding: 16 },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F2' },
+});
 const modalStyles = StyleSheet.create({
   frame: { borderRadius: 16, borderColor: '#E4E9F7', backgroundColor: '#FCFDFF', boxShadow: '0 18px 60px rgba(23, 42, 88, 0.18)' },
   head: { paddingVertical: 14, paddingHorizontal: 18, gap: 10, backgroundColor: '#FBFCFF', borderColor: '#E9EDF5' },

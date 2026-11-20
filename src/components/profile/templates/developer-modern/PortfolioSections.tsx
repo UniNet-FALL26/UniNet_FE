@@ -1,3 +1,4 @@
+import { formatProfileMilestonePeriod } from '@/utils/profile-milestone';
 import { Image } from 'expo-image';
 import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
 import { StyleSheet, Text, View } from 'react-native';
@@ -5,7 +6,7 @@ import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/p
 import { profileMedia } from '@/components/profile/profile-media';
 import { ProfileSkillIcon } from '@/components/profile/ProfileSkillIcon';
 import { Chip, PortfolioIcon, PortfolioLink, SectionTitle, ui } from './PortfolioPrimitives';
-import { EditField, EditPhoto, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { EditCertificateEntry, EditEducationEntry, EditField, EditPhoto, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { portfolioMetrics, type ProfileEditField } from '@/utils/profile-fields';
 
 export type SectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; compact: boolean; thumbnail?: boolean; demo?: boolean };
@@ -39,13 +40,13 @@ export function JourneySection({ portfolio, theme, compact }: SectionProps) {
   const milestones = [...portfolio.education, ...portfolio.experience].sort((a, b) => (a.startDate ?? a.period ?? '').localeCompare(b.startDate ?? b.period ?? ''));
   return <View style={ui.section}><SectionTitle title="Hành trình phát triển" name="journey" theme={theme} /><View style={[ui.row, { gap: 0 }]}>{milestones.map((item, index) => <View key={`${item.title}-${index}`} style={[s.milestone, { width: compact ? '100%' : `${100 / milestones.length}%`, borderColor: theme.border }, compact && s.verticalMilestone]}>
     <View style={[s.milestoneIcon, { backgroundColor: theme.accentSoft }]}><PortfolioIcon name="journey" color={theme.accent} size={19} /></View>
-    <View style={{ flex: 1 }}><Text style={[ui.small, { color: theme.accentStrong, fontWeight: '600' }]}>{item.period || item.startDate}</Text><Text style={[s.cardTitle, { fontSize: 14, marginTop: 6, color: theme.text }]}>{item.title}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 5 }]}>{item.organization}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 5 }]}>{item.description}</Text></View>
+    <View style={{ flex: 1 }}><EditEducationEntry index={portfolio.education.indexOf(item)} color={theme.accentStrong}><Text style={[ui.small, { color: theme.accentStrong, fontWeight: '600' }]}>{formatProfileMilestonePeriod(item)}</Text></EditEducationEntry><Text style={[s.cardTitle, { fontSize: 14, marginTop: 6, color: theme.text }]}>{item.title}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 5 }]}>{item.organization}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 5 }]}>{item.description}</Text></View>
   </View>)}</View></View>;
 }
 export function CertificateSection({ portfolio, theme, compact, thumbnail }: SectionProps) {
   const editing = useProfileEditing();
   if (!portfolio.certificates.length && !editing) return null;
-  return <View style={ui.section}><SectionTitle title="Chứng chỉ" name="certificate" theme={theme} /><View style={ui.row}>{portfolio.certificates.map((item, index) => <View key={`${item.title}-${index}`} style={[ui.card, s.certificate, { width: compact ? '100%' : '23%', borderColor: theme.border, backgroundColor: theme.surface }]}><View>{item.logoUrl ? <Image source={profileMedia(item.logoUrl)} style={s.skillBadge} contentFit="contain" accessibilityLabel={item.issuer} /> : <PortfolioIcon name="certificate" color={groupColors[index % 4]} size={30} />}<EditPhoto color={theme.accentStrong} right={-6} bottom={-6} size={24} entry={{ section: 'certificates', item, label: item.title }} /></View><View style={{ flex: 1 }}><Text style={[s.cardTitle, { fontSize: 13, color: theme.text }]}>{item.title}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 4 }]}>{item.issuer}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 12 }]}>{item.year}</Text>{!!item.url && <PortfolioLink label="Xem chứng chỉ" url={item.url} theme={theme} thumbnail={thumbnail} subtle />}</View></View>)}</View></View>;
+  return <View style={ui.section}><SectionTitle title="Chứng chỉ" name="certificate" theme={theme} /><View style={ui.row}>{portfolio.certificates.map((item, index) => <View key={`${item.title}-${index}`} style={[ui.card, s.certificate, { width: compact ? '100%' : '23%', borderColor: theme.border, backgroundColor: theme.surface }]}><EditCertificateEntry index={index} color={theme.accentStrong} /><View>{item.logoUrl ? <Image source={profileMedia(item.logoUrl)} style={s.skillBadge} contentFit="contain" accessibilityLabel={item.issuer} /> : <PortfolioIcon name="certificate" color={groupColors[index % 4]} size={30} />}</View><View style={{ flex: 1, paddingRight: editing ? 24 : 0 }}><Text style={[s.cardTitle, { fontSize: 13, color: theme.text }]}>{item.title}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 4 }]}>{item.issuer}</Text><Text style={[ui.small, { color: theme.muted, marginTop: 12 }]}>{item.year}</Text>{!!item.url && <PortfolioLink label="Xem chứng chỉ" url={item.url} theme={theme} thumbnail={thumbnail} subtle />}</View></View>)}</View></View>;
 }
 export function ArticleSection({ portfolio, theme, compact, thumbnail }: SectionProps) {
   const editing = useProfileEditing();

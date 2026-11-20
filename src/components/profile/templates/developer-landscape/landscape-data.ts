@@ -10,7 +10,7 @@ export function landscapeMetrics(portfolio: PortfolioContent, editing = false) {
   if (values.gpa || editing) metrics.push({ value: values.gpa || 'Nhập GPA', label: 'GPA tại trường', icon: 'certificate', field: 'gpa' });
   return metrics;
 }
-export function landscapeJourney(portfolio: PortfolioContent): (PortfolioMilestone & { kind: 'education' | 'experience' })[] {
-  return [...portfolio.education.map(item => ({ ...item, kind: 'education' as const })), ...portfolio.experience.map(item => ({ ...item, kind: 'experience' as const }))]
+export function landscapeJourney(portfolio: PortfolioContent): (PortfolioMilestone & { kind: 'education' | 'experience'; sourceIndex: number })[] {
+  return [...portfolio.education.map((item, sourceIndex) => ({ ...item, kind: 'education' as const, sourceIndex })), ...portfolio.experience.map((item, sourceIndex) => ({ ...item, kind: 'experience' as const, sourceIndex }))]
     .sort((a, b) => (a.startDate ?? a.period ?? '').localeCompare(b.startDate ?? b.period ?? ''));
 }

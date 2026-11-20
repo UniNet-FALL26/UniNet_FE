@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { ToastHost } from '@/components/ui/ToastHost';
 import { useCallback, useEffect, useState, type ComponentProps } from 'react';
@@ -19,6 +20,7 @@ import { verificationPresentation } from '@/utils/student-verification';
 import { portfolioService } from '@/services/portfolio.service';
 
 export function SettingsPanel({ embedded = false, onPartnerVerificationStatusChange }: { embedded?: boolean; onPartnerVerificationStatusChange?: (value: PartnerVerificationStatus) => void }) {
+  const safeAreaEdges = useScreenSafeAreaEdges();
   const { account, isAuthenticated, isLoading } = useAuthStore();
   const { logout, loading: loggingOut, error: logoutError, clearError } = useAuth();
   const [dialog, setDialog] = useState<'account' | 'terms' | 'privacy' | null>(null);
@@ -56,7 +58,7 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
   const busy = loggingOut;
   const openDialog = (value: 'account' | 'terms' | 'privacy') => { clearError(); setDialog(value); if (value === 'account' && student) void verification.refresh(); };
   const closeDialog = () => { if (!loggingOut) { setDialog(null); clearError(); } };
-  return <SafeAreaView style={[s.safe, embedded && s.embeddedSafe]} edges={embedded ? [] : undefined}>
+  return <SafeAreaView style={[s.safe, embedded && s.embeddedSafe]} edges={embedded ? [] : safeAreaEdges}>
     {!embedded && <DetailNavigation title="Cài đặt" backLabel="Quay lại hồ sơ cá nhân" disabled={busy} />}
     <ScrollView showsVerticalScrollIndicator={!embedded} contentContainerStyle={[s.content, !wide && s.mobileContent, embedded && s.embeddedContent]}>
       {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.panel}><Text style={s.sectionTitle}>Chào mừng đến với UniNet</Text><Text style={s.body}>Đăng nhập để quản lý tài khoản và hồ sơ của bạn.</Text><Button style={s.actionButton} textStyle={s.actionButtonText} title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : <View style={[s.columns, wide && s.wideColumns]}>

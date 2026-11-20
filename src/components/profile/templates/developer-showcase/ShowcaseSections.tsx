@@ -1,6 +1,7 @@
+import { formatProfileMilestonePeriod } from '@/utils/profile-milestone';
 import { Image } from 'expo-image';
 import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
-import { EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { EditCertificateEntry, EditEducationEntry, EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
 import { profileMedia, isSampleLink } from '@/components/profile/profile-media';
@@ -41,16 +42,16 @@ export function ShowcaseJourney({ portfolio, theme, width }: ShowcaseSectionProp
   const vertical = width < 900 || milestones.length > 6;
   return <View style={s.section}><ShowcaseHeading eyebrow="KINH NGHIỆM LÀM VIỆC & HỌC TẬP" title="Hành trình phát triển" theme={theme} /><View style={{ flexDirection: vertical ? 'column' : 'row', marginTop: 12 }}>{milestones.map((item, index) => <View key={`${item.title}-${index}`} style={[s.milestone, { width: vertical ? '100%' : `${100 / milestones.length}%`, marginLeft: vertical ? 18 : 0, flexDirection: vertical ? 'row' : 'column', borderColor: theme.accentStrong, borderLeftWidth: vertical ? 1 : 0, borderTopWidth: vertical ? 0 : 1 }]}>
     <View style={[s.journeyIcon, { backgroundColor: theme.accentSoft }, vertical ? { marginLeft: -31 } : { marginTop: -35 }]}><PortfolioIcon name="journey" color={theme.accentStrong} size={20} /></View>
-    <View style={s.shrink}><Text style={[s.caption, { color: theme.accentStrong }]}>{item.period || item.startDate}</Text><Text role="heading" aria-level={3} style={[s.groupName, { color: theme.text, marginTop: 5 }]}>{item.title}</Text><Text style={[s.caption, { color: theme.muted, marginTop: 5 }]}>{item.organization}</Text>{!!item.description && <Text style={[s.caption, { color: theme.muted, marginTop: 5 }]}>{item.description}</Text>}</View>
+    <View style={s.shrink}><EditEducationEntry index={portfolio.education.indexOf(item)} color={theme.accentStrong}><Text style={[s.caption, { color: theme.accentStrong }]}>{formatProfileMilestonePeriod(item)}</Text></EditEducationEntry><Text role="heading" aria-level={3} style={[s.groupName, { color: theme.text, marginTop: 5 }]}>{item.title}</Text><Text style={[s.caption, { color: theme.muted, marginTop: 5 }]}>{item.organization}</Text>{!!item.description && <Text style={[s.caption, { color: theme.muted, marginTop: 5 }]}>{item.description}</Text>}</View>
   </View>)}</View></View>;
 }
 export function ShowcaseCertificates({ portfolio, theme, width, thumbnail }: ShowcaseSectionProps) {
   const editing = useProfileEditing();
   if (!portfolio.certificates.length && !editing) return null;
   const columns = width >= 900 ? 4 : width >= 600 ? 2 : 1;
-  return <View style={s.section}><ShowcaseHeading eyebrow="CHỨNG CHỈ" title="Ghi dấu những điều đã học" theme={theme} /><View style={s.grid}>{portfolio.certificates.map((item, index) => <View key={`${item.title}-${index}`} style={[s.card, s.certificate, { width: cardWidth(width, columns), backgroundColor: theme.surface, borderColor: theme.border }]}>
-    <View>{profileMedia(item.logoUrl) ? <Image source={profileMedia(item.logoUrl)} style={s.logo} contentFit="contain" priority="low" loading={thumbnail ? 'eager' : 'lazy'} accessibilityLabel={item.issuer} /> : <PortfolioIcon name="certificate" color={theme.accentStrong} size={28} />}<EditPhoto color={theme.accentStrong} right={-6} bottom={-6} size={24} entry={{ section: 'certificates', item, label: item.title }} /></View>
-    <View style={s.shrink}><Text role="heading" aria-level={3} style={[s.groupName, { color: theme.text }]}>{item.title}</Text><Text style={[s.caption, { color: theme.muted, marginTop: 4 }]}>{item.issuer}{item.year ? ` · ${item.year}` : ''}</Text>{!isSampleLink(item.url) && <PortfolioLink label="Xem chứng chỉ" url={item.url} theme={theme} thumbnail={thumbnail} subtle />}</View>
+  return <View style={s.section}><ShowcaseHeading eyebrow="CHỨNG CHỈ" title="Ghi dấu những điều đã học" theme={theme} /><View style={s.grid}>{portfolio.certificates.map((item, index) => <View key={`${item.title}-${index}`} style={[s.card, s.certificate, { width: cardWidth(width, columns), backgroundColor: theme.surface, borderColor: theme.border }]}><EditCertificateEntry index={index} color={theme.accentStrong} />
+    <View>{profileMedia(item.logoUrl) ? <Image source={profileMedia(item.logoUrl)} style={s.logo} contentFit="contain" priority="low" loading={thumbnail ? 'eager' : 'lazy'} accessibilityLabel={item.issuer} /> : <PortfolioIcon name="certificate" color={theme.accentStrong} size={28} />}</View>
+    <View style={[s.shrink, editing && { paddingRight: 24 }]} ><Text role="heading" aria-level={3} style={[s.groupName, { color: theme.text }]}>{item.title}</Text><Text style={[s.caption, { color: theme.muted, marginTop: 4 }]}>{item.issuer}{item.year ? ` · ${item.year}` : ''}</Text>{!isSampleLink(item.url) && <PortfolioLink label="Xem chứng chỉ" url={item.url} theme={theme} thumbnail={thumbnail} subtle />}</View>
   </View>)}</View></View>;
 }
 export function ShowcaseArticles({ portfolio, theme, width, thumbnail }: ShowcaseSectionProps) {

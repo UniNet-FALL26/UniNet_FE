@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -15,6 +16,7 @@ import { FriendProfileActions } from '@/components/friends/FriendProfileActions'
 import { CommunityProfilePosts } from '@/components/community/CommunityProfilePosts';
 
 export default function StudentProfileViewer() {
+  const safeAreaEdges = useScreenSafeAreaEdges();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { account, isAuthenticated, isLoading } = useAuthStore();
   const viewerKey = isAuthenticated ? account?.id : 'anonymous';
@@ -35,7 +37,7 @@ export default function StudentProfileViewer() {
   }, [id, attempt, viewerKey, isLoading, isAuthenticated]);
   const template = getProfileTemplate(data?.portfolio.appearance.profile.template);
   const theme = getProfileTheme(template.id, data?.portfolio.appearance.profile.theme);
-  return <SafeAreaView style={s.safe}>
+  return <SafeAreaView style={s.safe} edges={safeAreaEdges}>
     <DetailNavigation title="Hồ sơ sinh viên" onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/community')} />
     {error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ sinh viên" color={colors.primary} /></View> : <>
       <View testID="profile-view-header" style={[s.toolbar, width < 600 && s.mobileToolbar]}>

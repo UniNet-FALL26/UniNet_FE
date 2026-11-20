@@ -4,19 +4,27 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleShee
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { Button } from '@/components/ui/Button';
+import { CalendarDateInput } from '@/components/ui/CalendarDateInput';
+import { ProjectTimelineDateModal } from '@/components/projects/hub/ProjectTimelineDateModal';
 import { ProfileTextInput } from './ProfileTextInput';
+import { CertificateImageInput } from './CertificateImageInput';
 import { colors } from '@/constants/colors';
 import type { PortfolioContent, PortfolioResponse } from '@/types/portfolio';
-import { addProfileEntry, updateProfileSkills, profileSkillSelection, profileFormValues, profileSkillOptions, type ProfileEditorSection, type ProfileSkillSort } from '@/utils/profile-editor';
+import { addProfileEntry, updateProfileEntry, updateProfileSkills, profileSkillSelection, profileFormValues, profileSkillOptions, profileDateToIso, type ProfileEditorSection, type ProfileFormField, type ProfileSkillSort } from '@/utils/profile-editor';
 import { profileMedia } from './profile-media';
 
-type Props = { section: ProfileEditorSection; data: PortfolioResponse; onAdd: (content: PortfolioContent) => void; onClose: () => void };
-export function ProfileEntryForm({ section, data, onAdd, onClose }: Props) {
-  const [values, setValues] = useState(() => profileFormValues(data.portfolio, section.id));
+type Props = { section: ProfileEditorSection; data: PortfolioResponse; entryIndex?: number; onAdd: (content: PortfolioContent) => void; onClose: () => void };
+export function ProfileEntryForm({ section, data, entryIndex, onAdd, onClose }: Props) {
+  const editableSection = section.id === 'education' || section.id === 'certificates' ? section.id : null;
+  const editingEntry = editableSection !== null && entryIndex !== undefined;
+  const [values, setValues] = useState(() => profileFormValues(data.portfolio, section.id, entryIndex));
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>(() => profileSkillSelection(data.portfolio, data.skillCatalog ?? []).map(item => item.id));
   const [sort, setSort] = useState<ProfileSkillSort>('name');
+  const [editingDate, setEditingDate] = useState<ProfileFormField | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const close = () => { if (!imageBusy) onClose(); };
   const update = (key: string, value: string) => { setValues(current => ({ ...current, [key]: value })); setError(''); };
   const available = data.skillCatalog ?? [];
   const saved = profileSkillSelection(data.portfolio, available);
@@ -28,14 +36,16 @@ export function ProfileEntryForm({ section, data, onAdd, onClose }: Props) {
     setSelectedSkills(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
   };
   const submit = () => {
-    try { onAdd(section.id === 'skills' ? updateProfileSkills(data.portfolio, selectedSkills, catalog) : addProfileEntry(data.portfolio, section.id, values, catalog)); }
+    if (imageBusy) return;
+    try { onAdd(editingEntry ? updateProfileEntry(data.portfolio, editableSection, entryIndex, values) : section.id === 'skills' ? updateProfileSkills(data.portfolio, selectedSkills, catalog) : addProfileEntry(data.portfolio, section.id, values, catalog)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Vui lòng kiểm tra thông tin.'); }
   };
-  return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+  return <Modal visible transparent animationType="fade" onRequestClose={close}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ToastHost modal /><View accessibilityViewIsModal style={s.dialog}>
-        <View style={s.header}><Text role="heading" aria-level={2} style={s.title}>{section.id === 'basic' ? 'Cập nhật' : 'Thêm'} {section.title.toLowerCase()}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng biểu mẫu" onPress={onClose} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View>
+        <View style={s.header}><Text role="heading" aria-level={2} style={s.title}>{editingEntry || section.id === 'basic' ? 'Cập nhật' : 'Thêm'} {section.title.toLowerCase()}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng biểu mẫu" disabled={imageBusy} onPress={close} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.fields}>
+          {section.id === 'certificates' && <CertificateImageInput value={values.logoUrl ?? ''} onChange={url => update('logoUrl', url)} onBusy={setImageBusy} />}
           {section.fields.filter(field => section.id !== 'skills' || field.kind === 'skill').map((field, index) => field.kind === 'skill' ? <View key={field.key} style={s.skillField}>
             <ProfileTextInput label="Tìm kỹ năng" value={search} onChangeText={setSearch} placeholder="Tìm theo tên hoặc nhóm kỹ năng…" autoFocus multiline={false} />
             <View style={s.sortRow}><Text style={s.hint}>Sắp xếp:</Text>{([['name', 'Tên A–Z'], ['name-desc', 'Tên Z–A'], ['category', 'Theo nhóm']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: sort === value }} aria-pressed={sort === value} onPress={() => setSort(value)} style={[s.sortChoice, sort === value && s.selected]}><Text style={[s.sortText, sort === value && s.selectedText]}>{label}</Text></Pressable>)}</View>
@@ -44,16 +54,24 @@ export function ProfileEntryForm({ section, data, onAdd, onClose }: Props) {
             {!!catalog.length && !options.length && <Text style={s.hint}>Không tìm thấy kỹ năng phù hợp.</Text>}
             <View style={s.choices}>{options.map(item => {
               const selected = selectedSkills.includes(item.id);
-              return <View key={item.id} style={s.choiceWrap}><Pressable accessibilityRole="checkbox" accessibilityLabel={item.name} accessibilityState={{ checked: selected }} onPress={() => toggleSkill(item.id)} style={[s.choice, selected && s.selected, selected && s.removableChoice]}><SkillChoiceIcon name={item.name} iconUrl={item.iconUrl} /><Text style={[s.choiceText, selected && s.selectedText]}>{item.name}</Text></Pressable>{selected && <Pressable accessibilityRole="button" accessibilityLabel={'Bỏ chọn ' + item.name} onPress={() => toggleSkill(item.id)} style={s.removeChoice}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={11} tintColor={colors.primary} /></Pressable>}</View>;
+              return <Pressable key={item.id} accessibilityRole="checkbox" accessibilityLabel={item.name} accessibilityState={{ checked: selected }} onPress={() => toggleSkill(item.id)} style={[s.choice, selected && s.selected]}><SkillChoiceIcon name={item.name} iconUrl={item.iconUrl} /><Text style={[s.choiceText, selected && s.selectedText]}>{item.name}</Text></Pressable>;
             })}</View>
           </View> : field.kind === 'boolean' ? <Pressable key={field.key} accessibilityRole="checkbox" accessibilityLabel={field.label} accessibilityState={{ checked: values[field.key] === 'true' }} onPress={() => update(field.key, values[field.key] === 'true' ? 'false' : 'true')} style={s.checkbox}><Text style={s.choiceText}>{values[field.key] === 'true' ? '☑' : '☐'} {field.label}</Text></Pressable>
-            : <ProfileTextInput key={field.key} label={`${field.label}${field.required ? ' *' : ''}`} value={values[field.key]} onChangeText={value => update(field.key, value)} autoFocus={index === 0} multiline={field.kind !== 'number'} minimumHeight={field.multiline ? 88 : 46} maxLength={field.kind === 'number' || field.kind === 'list' ? undefined : field.max ?? (field.kind === 'url' ? 2048 : 2000)} autoCapitalize={field.kind === 'url' || field.kind === 'email' ? 'none' : 'sentences'} keyboardType={field.kind === 'number' ? 'decimal-pad' : field.kind === 'email' ? 'email-address' : field.kind === 'url' ? 'url' : 'default'} />)}
+            : field.kind === 'date' ? <CalendarDateInput key={field.key} label={field.label} value={values[field.key]} placeholder={field.placeholder} onChangeText={value => update(field.key, value)} onOpenCalendar={() => setEditingDate(field)} />
+            : <ProfileTextInput key={field.key} label={`${field.label}${field.required ? ' *' : ''}`} value={values[field.key]} placeholder={field.placeholder} onChangeText={value => update(field.key, value)} autoFocus={index === 0} multiline={field.kind !== 'number' && field.kind !== 'year'} minimumHeight={field.multiline ? 88 : 46} maxLength={field.kind === 'number' || field.kind === 'list' ? undefined : field.max ?? (field.kind === 'url' ? 2048 : 2000)} autoCapitalize={field.kind === 'url' || field.kind === 'email' ? 'none' : 'sentences'} keyboardType={field.kind === 'number' ? 'decimal-pad' : field.kind === 'year' ? 'number-pad' : field.kind === 'email' ? 'email-address' : field.kind === 'url' ? 'url' : 'default'} />)}
           {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
           <Text style={s.hint}>Thông tin sẽ xuất hiện trong bản xem trước. Bấm “Lưu hồ sơ” để lưu thay đổi.</Text>
         </ScrollView>
-        <View style={s.actions}><Button title="Hủy" variant="outline" onPress={onClose} style={s.action} textStyle={s.actionText} /><Button title="Xác nhận" onPress={submit} style={s.action} textStyle={s.actionText} /></View>
+        <View style={s.actions}><Button title="Hủy" variant="outline" disabled={imageBusy} onPress={close} style={s.action} textStyle={s.actionText} /><Button title="Xác nhận" disabled={imageBusy} onPress={submit} style={s.action} textStyle={s.actionText} /></View>
       </View>
     </KeyboardAvoidingView>
+    {editingDate && <ProjectTimelineDateModal title={`Chọn ${editingDate.label.toLowerCase()}`} value={profileDateToIso(values[editingDate.key] ?? '') ?? ''}
+      min={editingDate.key === 'endDate' ? profileDateToIso(values.startDate ?? '') ?? undefined : undefined}
+      max={editingDate.key === 'startDate' ? profileDateToIso(values.endDate ?? '') ?? undefined : undefined}
+      busy={false} error="" onClose={() => setEditingDate(null)} onConfirm={date => {
+        update(editingDate.key, date ? date.split('-').reverse().join('/') : '');
+        setEditingDate(null);
+      }} />}
   </Modal>;
 }
 function SkillChoiceIcon({ name, iconUrl }: { name: string; iconUrl?: string | null }) {
@@ -70,7 +88,6 @@ const s = StyleSheet.create({
   choice: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border }, choiceText: { color: colors.textPrimary, fontSize: 12 }, selected: { backgroundColor: colors.primaryLight, borderColor: colors.primary }, selectedText: { color: colors.primary, fontWeight: '700' }, disabled: { opacity: 0.5 },
   skillIcon: { width: 18, height: 18 },
   sortRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5 }, sortChoice: { minHeight: 32, paddingHorizontal: 8, borderRadius: 6, justifyContent: 'center' }, sortText: { fontSize: 12, color: colors.primary }, selectionHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  choiceWrap: { position: 'relative' }, removableChoice: { paddingRight: 18 }, removeChoice: { position: 'absolute', right: -5, top: -7, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
   checkbox: { minHeight: 44, justifyContent: 'center' },
   hint: { color: colors.textSecondary, fontSize: 12, lineHeight: 19 }, error: { color: colors.error, fontSize: 13, lineHeight: 20 }, actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 16, borderTopWidth: 1, borderColor: colors.border },
   action: { minHeight: 38, minWidth: 80, paddingHorizontal: 16, borderRadius: 8 }, actionText: { fontSize: 13, fontWeight: '600' },

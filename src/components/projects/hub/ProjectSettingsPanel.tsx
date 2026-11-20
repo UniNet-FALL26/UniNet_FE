@@ -7,6 +7,7 @@ import { ProjectTimelineDateModal, formatTimelineDate } from './ProjectTimelineD
 import { messageOf, validDate } from './ProjectHubFields';
 import { projectHubService } from '@/services/project-hub.service';
 import { ProjectChatSettings } from '@/components/messaging/ProjectChatSettings';
+import { CalendarDateInput } from '@/components/ui/CalendarDateInput';
 
 export function ProjectSettingsPanel({ project, onManage, onSaved }: { project: HubProject; onManage: (action: 'complete' | 'delete' | 'leave') => void; onSaved: (value: HubProject) => void }) {
   const canComplete = project.isOwner && project.status !== 2 && project.status !== 3;
@@ -81,15 +82,9 @@ function ProjectTimelineSettings({ project, onSaved }: { project: HubProject; on
       {fields.map(field => {
         const disabled = busy;
         return <View key={field.key} style={styles.dateField}>
-          <Text style={styles.dateLabel}>{field.label}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={field.title} accessibilityState={{ disabled }} disabled={disabled}
-            onPress={() => { setError(''); setEditing(field.key); }}
-            style={({ pressed }) => [styles.control, disabled && styles.locked, pressed && styles.pressed]}>
-            <HubIcon name="calendar" size={16} color={c.ink} />
-            <Text style={[styles.controlText, !timeline[field.key] && { color: c.textSecondary }]}>
-              {timeline[field.key] ? formatTimelineDate(timeline[field.key]) : field.key === 'startDate' ? 'Chọn ngày bắt đầu' : 'Chọn ngày kết thúc'}
-            </Text>
-          </Pressable>
+          <CalendarDateInput label={field.label} value={timeline[field.key] ? formatTimelineDate(timeline[field.key]) : ''}
+            placeholder={field.key === 'startDate' ? 'Chọn ngày bắt đầu' : 'Chọn ngày kết thúc'} readOnly disabled={disabled}
+            onOpenCalendar={() => { setError(''); setEditing(field.key); }} />
         </View>;
       })}
     </View>
@@ -125,9 +120,7 @@ const styles = StyleSheet.create({
   sectionIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.blueWash, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: c.ink }, subtitle: { fontSize: 11, lineHeight: 17, color: c.textSecondary },
   dateFields: { flexDirection: 'row', gap: 18 }, stacked: { flexDirection: 'column', gap: 14 },
-  dateField: { flex: 1, minWidth: 0, gap: 6 }, dateLabel: { fontSize: 12, fontWeight: '500', color: c.ink },
-  control: { minHeight: 36, borderWidth: 1, borderColor: '#D6DFF0', borderRadius: 7, backgroundColor: c.surface, paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', gap: 9, alignItems: 'center' },
-  controlText: { flex: 1, fontSize: 12, lineHeight: 18, color: c.ink }, locked: { backgroundColor: '#FAFBFE' }, pressed: { backgroundColor: c.blueWash },
+  dateField: { flex: 1, minWidth: 0, gap: 6 }, pressed: { backgroundColor: c.blueWash },
   management: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   managementItem: { flex: 1, flexBasis: 300, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: 12, borderRadius: 9 },
   completion: { backgroundColor: '#F1F5FF' }, deletion: { backgroundColor: '#FFF3F5' },

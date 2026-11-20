@@ -1,5 +1,6 @@
+import { formatProfileMilestonePeriod } from '@/utils/profile-milestone';
 import { useState } from 'react';
-import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { EditEducationEntry, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { Image } from 'expo-image';
 import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
 import { StyleSheet, Text, View } from 'react-native';
@@ -47,7 +48,7 @@ export function LandscapeJourney({ portfolio, theme }: SectionProps) {
     <View style={s.timeline}>{milestones.map((item, index) => <View testID="landscape-milestone" key={`${item.title}-${index}`} style={[s.milestone, { borderLeftColor: theme.timeline }]}>
       <View style={[s.node, { backgroundColor: theme.timeline }]} />
       <View style={[s.journeyIcon, { backgroundColor: theme.timelineSoft }]}><PortfolioIcon name={item.kind === 'education' ? 'certificate' : 'project'} color={theme.accentStrong} size={20} /></View>
-      <View style={[s.milestoneBody, { backgroundColor: theme.surfaceSoft }]}><Text style={[s.caption, { color: theme.accentStrong }]}>{item.period || [item.startDate, item.endDate].filter(Boolean).join(' – ')}</Text><Text role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]}>{item.title}</Text>{!!item.organization && <Text style={[s.caption, { color: theme.muted }]}>{item.organization}</Text>}{!!item.description && <Text style={[s.caption, { color: theme.muted }]}>{item.description}</Text>}</View>
+      <View style={[s.milestoneBody, { backgroundColor: theme.surfaceSoft }]}><EditEducationEntry index={item.kind === 'education' ? item.sourceIndex : -1} color={theme.accentStrong}><Text style={[s.caption, { color: theme.accentStrong }]}>{formatProfileMilestonePeriod(item)}</Text></EditEducationEntry><Text role="heading" aria-level={3} style={[s.cardTitle, { color: theme.text }]}>{item.title}</Text>{!!item.organization && <Text style={[s.caption, { color: theme.muted }]}>{item.organization}</Text>}{!!item.description && <Text style={[s.caption, { color: theme.muted }]}>{item.description}</Text>}</View>
     </View>)}</View>
   </View>;
 }

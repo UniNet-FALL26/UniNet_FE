@@ -31,13 +31,17 @@ export function updateProfileSkills(content: PortfolioContent, skillIds: readonl
 }
 
 export type ProfileSectionId = 'basic' | 'skills' | 'projects' | 'education' | 'experience' | 'certificates' | 'activities' | 'languages' | 'articles' | 'socialLinks';
-export type ProfileFormField = { key: string; label: string; kind?: 'url' | 'email' | 'number' | 'list' | 'boolean' | 'skill'; required?: boolean; multiline?: boolean; max?: number; min?: number; integer?: boolean };
+export type ProfileFormField = { key: string; label: string; kind?: 'url' | 'email' | 'number' | 'list' | 'boolean' | 'skill' | 'date' | 'year'; placeholder?: string; required?: boolean; multiline?: boolean; max?: number; min?: number; integer?: boolean };
 export type ProfileEditorSection = { id: ProfileSectionId; title: string; fields: ProfileFormField[]; limit?: number };
 const title: ProfileFormField = { key: 'title', label: 'Tên / tiêu đề', required: true, max: 255 };
 const description: ProfileFormField = { key: 'description', label: 'Mô tả', multiline: true };
 const organization: ProfileFormField = { key: 'organization', label: 'Đơn vị / tổ chức', max: 255 };
 const url: ProfileFormField = { key: 'url', label: 'Liên kết', kind: 'url' };
-const milestone = [title, organization, { key: 'period', label: 'Thời gian', max: 100 }, { key: 'startDate', label: 'Ngày bắt đầu', max: 20 }, { key: 'endDate', label: 'Ngày kết thúc', max: 20 }, description];
+const milestone: ProfileFormField[] = [title, organization, { key: 'startDate', label: 'Ngày bắt đầu', kind: 'date', max: 20, placeholder: 'DD/MM/YYYY' }, { key: 'endDate', label: 'Ngày kết thúc', kind: 'date', max: 20, placeholder: 'DD/MM/YYYY, để trống nếu chưa kết thúc' }, description];
+const educationHints: Record<string, string> = {
+  title: 'VD: Cử nhân Công nghệ thông tin', organization: 'VD: Trường Đại học Bách khoa',
+  description: 'VD: Chuyên ngành, thành tích hoặc hoạt động nổi bật',
+};
 export const profileEditorSections: ProfileEditorSection[] = [
   { id: 'basic', title: 'Giới thiệu & liên hệ', fields: [
     { key: 'headline', label: 'Chức danh', max: 255 }, { key: 'careerObjective', label: 'Giới thiệu / mục tiêu nghề nghiệp', multiline: true },
@@ -50,23 +54,45 @@ export const profileEditorSections: ProfileEditorSection[] = [
     { key: 'yearsOfExperience', label: 'Số năm kinh nghiệm', kind: 'number', min: 0, max: 80 },
   ] },
   { id: 'projects', title: 'Dự án', limit: 50, fields: [title, description, { key: 'type', label: 'Loại dự án', max: 100 }, { key: 'coverUrl', label: 'Liên kết ảnh bìa', kind: 'url' }, { key: 'technologies', label: 'Công nghệ (phân cách bằng dấu phẩy)', kind: 'list' }, url, { key: 'githubUrl', label: 'Liên kết mã nguồn', kind: 'url' }, { key: 'featured', label: 'Dự án nổi bật', kind: 'boolean' }] },
-  { id: 'education', title: 'Học vấn', limit: 50, fields: [...milestone, { key: 'gpa', label: 'GPA', max: 20 }] },
+  { id: 'education', title: 'Học vấn', limit: 50, fields: milestone.map(field => ({ ...field, placeholder: educationHints[field.key] ?? field.placeholder })) },
   { id: 'experience', title: 'Kinh nghiệm', limit: 50, fields: milestone },
-  { id: 'certificates', title: 'Chứng chỉ', limit: 50, fields: [title, { key: 'issuer', label: 'Đơn vị cấp', required: true, max: 255 }, { key: 'year', label: 'Năm cấp', max: 100 }, { key: 'logoUrl', label: 'Liên kết logo', kind: 'url' }, url] },
-  { id: 'activities', title: 'Hoạt động', limit: 50, fields: [title, organization, description, { key: 'date', label: 'Thời gian', max: 100 }] },
+  { id: 'certificates', title: 'Chứng chỉ', limit: 50, fields: [title, { key: 'issuer', label: 'Đơn vị cấp', required: true, max: 255 }, { key: 'year', label: 'Ngày cấp', kind: 'date', max: 20, placeholder: 'DD/MM/YYYY' }, url] },
+  { id: 'activities', title: 'Hoạt động', limit: 50, fields: [title, organization, description, { key: 'date', label: 'Thời gian', kind: 'date', max: 20, placeholder: 'DD/MM/YYYY' }] },
   { id: 'languages', title: 'Ngôn ngữ', limit: 20, fields: [{ key: 'name', label: 'Ngôn ngữ', required: true, max: 100 }, { key: 'level', label: 'Trình độ', required: true, max: 100 }] },
-  { id: 'articles', title: 'Bài viết', limit: 50, fields: [title, { key: 'date', label: 'Ngày đăng', max: 100 }, { key: 'coverUrl', label: 'Liên kết ảnh bìa', kind: 'url' }, { ...url, required: true }] },
+  { id: 'articles', title: 'Bài viết', limit: 50, fields: [title, { key: 'date', label: 'Ngày đăng', kind: 'date', max: 20, placeholder: 'DD/MM/YYYY' }, { key: 'coverUrl', label: 'Liên kết ảnh bìa', kind: 'url' }, { ...url, required: true }] },
   { id: 'socialLinks', title: 'Liên kết cá nhân', limit: 20, fields: [{ key: 'label', label: 'Tên liên kết', required: true, max: 100 }, { ...url, required: true }] },
 ];
-export function profileFormValues(content: PortfolioContent, sectionId: ProfileSectionId): Record<string, string> {
+export function profileFormValues(content: PortfolioContent, sectionId: ProfileSectionId, entryIndex?: number): Record<string, string> {
   const section = profileEditorSections.find(item => item.id === sectionId)!;
-  return Object.fromEntries(section.fields.map(field => [field.key, sectionId === 'basic' ? String(content[field.key as keyof PortfolioContent] ?? '') : field.kind === 'boolean' ? 'false' : '']));
+  const initial: Record<string, unknown> = sectionId === 'basic' ? { ...content } : (sectionId === 'education' || sectionId === 'certificates') && entryIndex !== undefined ? { ...content[sectionId][entryIndex] } : {};
+  const values = Object.fromEntries(section.fields.map(field => [field.key, String(initial[field.key] ?? (field.kind === 'boolean' ? 'false' : ''))]));
+  if (sectionId === 'certificates') values.logoUrl = String(initial.logoUrl ?? '');
+  return values;
+}
+export function updateProfileEducation(content: PortfolioContent, index: number, values: Record<string, string>): PortfolioContent {
+  return updateProfileEntry(content, 'education', index, values);
+}
+export function updateProfileEntry(content: PortfolioContent, section: 'education' | 'certificates', index: number, values: Record<string, string>): PortfolioContent {
+  if (!Number.isInteger(index) || index < 0 || index >= content[section].length) throw new Error('Mục hồ sơ không còn tồn tại.');
+  const validated = addProfileEntry({ ...content, [section]: [] }, section, values, [])[section][0];
+  return { ...content, [section]: content[section].map((item, i) => i === index ? { ...item, ...validated } : item) };
+}
+export function profileDateToIso(value: string): string | null {
+  const text = value.trim();
+  const local = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
+  const iso = local ? `${local[3]}-${local[2]}-${local[1]}` : text;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const [year, month, day] = iso.split('-').map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1] ? iso : null;
 }
 export function addProfileEntry(content: PortfolioContent, sectionId: ProfileSectionId, values: Record<string, string>, catalog: NonNullable<PortfolioResponse['skillCatalog']>): PortfolioContent {
   const section = profileEditorSections.find(item => item.id === sectionId);
   if (!section) throw new Error('Phần hồ sơ không hợp lệ.');
   const entry: Record<string, unknown> = {};
-  for (const field of section.fields) {
+  const fields: ProfileFormField[] = sectionId === 'certificates' ? [...section.fields, { key: 'logoUrl', label: 'Ảnh chứng chỉ', kind: 'url' }] : section.fields;
+  for (const field of fields) {
     const value = (values[field.key] ?? '').trim();
     if (field.required && !value) throw new Error(`Vui lòng nhập ${field.label.toLowerCase()}.`);
     if (field.kind === 'number') {
@@ -79,6 +105,8 @@ export function addProfileEntry(content: PortfolioContent, sectionId: ProfileSec
       if (items.length > 20 || items.some(item => item.length > 100)) throw new Error('Tối đa 20 công nghệ, mỗi tên tối đa 100 ký tự.');
       entry[field.key] = items;
     } else {
+      if (value && field.kind === 'date' && !profileDateToIso(value)) throw new Error(`${field.label} phải là ngày hợp lệ theo định dạng DD/MM/YYYY.`);
+      if (value && field.kind === 'year' && (!/^\d{4}$/.test(value) || Number(value) < 1)) throw new Error(`${field.label} phải là năm hợp lệ gồm 4 chữ số.`);
       if (value.length > (field.max ?? (field.kind === 'url' ? 2048 : 2000))) throw new Error(`${field.label} quá dài.`);
       if (value && field.kind === 'url') {
         let parsed: URL;
@@ -89,6 +117,7 @@ export function addProfileEntry(content: PortfolioContent, sectionId: ProfileSec
       entry[field.key] = value || null;
     }
   }
+  if (typeof entry.startDate === 'string' && typeof entry.endDate === 'string' && profileDateToIso(entry.endDate)! < profileDateToIso(entry.startDate)!) throw new Error('Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.');
   if (sectionId === 'basic') return { ...content, ...entry };
   const existing = content[sectionId] ?? [];
   if (existing.length >= (section.limit ?? 50)) throw new Error(`Đã đạt giới hạn mục trong ${section.title.toLowerCase()}.`);

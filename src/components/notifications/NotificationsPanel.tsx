@@ -13,9 +13,11 @@ export function NotificationsPanel({ description = 'Những cập nhật dành c
   const [status, setStatus] = useState<'all' | 'unread' | 'read'>('all');
   const inbox = useNotificationsInbox({ unreadOnly: status === 'unread', readOnly: status === 'read' });
   const { unreadCount } = useNotificationUpdates();
-  const narrow = useWindowDimensions().width < 640;
+  const { width } = useWindowDimensions();
+  const narrow = width < 640;
+  const phone = width < 600;
   const groups = groupNotifications(inbox.items);
-  return <View style={[s.panel, narrow && s.mobilePanel]} testID="notifications-page" accessibilityLabel={`Thông báo. ${description}`}>
+  return <View style={[s.panel, narrow && s.mobilePanel, phone && s.phonePanel]} testID="notifications-page" accessibilityLabel={`Thông báo. ${description}`}>
     <View style={[s.toolbar, narrow && s.mobileToolbar]}>
       <View accessibilityRole="tablist" accessibilityLabel="Trạng thái thông báo" style={s.tabs}>
         {tabs.map(tab => {
@@ -47,6 +49,7 @@ export function NotificationsPanel({ description = 'Những cập nhật dành c
 const s = StyleSheet.create({
   panel: { flex: 1, minHeight: 0, width: '100%', maxWidth: 1080, alignSelf: 'center', backgroundColor: '#FAFCFF', borderWidth: 1, borderColor: theme.border, borderRadius: 20, marginVertical: 20, overflow: 'hidden', paddingHorizontal: 18, paddingBottom: 14 },
   mobilePanel: { marginVertical: 10, borderRadius: 16, paddingHorizontal: 10, paddingBottom: 8 },
+  phonePanel: { marginVertical: 0, borderRadius: 0, borderWidth: 0, paddingBottom: 0 },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: theme.divider, minHeight: 46, gap: 12 }, mobileToolbar: { gap: 2 },
   tabs: { flexDirection: 'row', alignItems: 'stretch', minWidth: 0 }, tab: { minHeight: 46, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 7, borderBottomWidth: 2, borderBottomColor: 'transparent' }, mobileTab: { paddingHorizontal: 8, gap: 5 }, selectedTab: { borderBottomColor: theme.active },
   tabLabel: { fontSize: 12, fontWeight: '600', color: theme.title }, selectedLabel: { color: theme.blue },
