@@ -6,11 +6,13 @@ import { projectToday } from './ProjectDateField';
 import { ProjectTimelineDateModal, formatTimelineDate } from './ProjectTimelineDateModal';
 import { messageOf, validDate } from './ProjectHubFields';
 import { projectHubService } from '@/services/project-hub.service';
+import { ProjectChatSettings } from '@/components/messaging/ProjectChatSettings';
 
 export function ProjectSettingsPanel({ project, onManage, onSaved }: { project: HubProject; onManage: (action: 'complete' | 'delete' | 'leave') => void; onSaved: (value: HubProject) => void }) {
   const canComplete = project.isOwner && project.status !== 2 && project.status !== 3;
   return <View role="tabpanel" aria-label="Cài đặt dự án" style={styles.settings}>
     {project.isOwner && <ProjectTimelineSettings project={project} onSaved={onSaved} />}
+    <ProjectChatSettings project={project} />
     <SettingsSection title="Quản lý dự án" subtitle="Các thao tác quản lý dự án." icon="layers">
       <View style={styles.management}>
         {canComplete && <View style={[styles.managementItem, styles.completion]}>

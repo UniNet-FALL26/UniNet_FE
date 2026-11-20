@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
+import { useChat } from '@/components/messaging/ChatProvider';
 
 export const companyColors = {
   purple: appColors.primary,
@@ -241,6 +242,7 @@ export function CompanyTabBar({ placement = 'footer' }: { placement?: 'header' |
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { unreadCount, synchronize } = useNotificationUpdates();
+  const { unreadCount: chatUnread } = useChat();
   const inHeader = placement === 'header';
   const compactHeader = inHeader && width < 1200;
   return (
@@ -264,7 +266,7 @@ export function CompanyTabBar({ placement = 'footer' }: { placement?: 'header' |
             onPress={() => { dismissDetail?.(); if (notification) synchronize(); router.navigate(tab.route as never); }}
             style={({ pressed }) => [inHeader ? styles.headerTab : styles.tab, compactHeader && styles.compactHeaderTab, inHeader && isActive && styles.headerTabActive, pressed && styles.pressed]}
           >
-            {inHeader ? icon : <View style={styles.tabIcon}>{icon}{notification && unreadCount > 0 && <View testID="company-footer-unread-badge" style={styles.tabBadge}><Text style={styles.tabBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}</View>}
+            <View style={styles.tabIcon}>{icon}{notification && unreadCount > 0 && <View testID="company-footer-unread-badge" style={styles.tabBadge}><Text style={styles.tabBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}{tab.route.endsWith('/company-messages') && chatUnread > 0 && <View testID="chat-unread-badge" style={styles.tabBadge}><Text style={styles.tabBadgeText}>{chatUnread > 99 ? '99+' : chatUnread}</Text></View>}</View>
             <Text numberOfLines={1} style={[styles.tabLabel, inHeader && styles.headerTabLabel, compactHeader && styles.compactHeaderLabel, isActive && styles.tabLabelActive, inHeader && isActive && styles.headerActiveLabel]}>
               {tab.label}
             </Text>

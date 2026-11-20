@@ -11,12 +11,14 @@ import { colors } from '@/constants/colors';
 import { assessorTabs, assessorTabActive } from '@/constants/assessor-navigation';
 import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
 import { useAuthStore } from '@/store/auth.store';
+import { useChat } from '@/components/messaging/ChatProvider';
 
 export function AssessorShell({ children }: { children?: ReactNode } = {}) {
   const dismissDetail = useDismissDetail();
   const { width } = useWindowDimensions(); const insets = useSafeAreaInsets();
   const { account } = useAuthStore(); const pathname = usePathname();
   const { unreadCount, synchronize } = useNotificationUpdates();
+  const { unreadCount: chatUnread } = useChat();
   const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
   const avatarUrl = account?.profile?.avatarUrl;
   const desktop = Platform.OS === 'web' && width >= 1024;
@@ -28,6 +30,7 @@ export function AssessorShell({ children }: { children?: ReactNode } = {}) {
         style={({ pressed, hovered }) => [desktop ? action ? s.actionButton : s.headerTab : s.tab, desktop && !action && width < 1200 && s.compactLink, desktop && profile && s.profileAction, desktop && active && s.selected, desktop && hovered && s.hovered, pressed && s.pressed]}>
         <View style={s.icon}>{desktop && profile && avatarUrl && avatarUrl !== failedAvatar ? <Image source={{ uri: avatarUrl }} onError={() => setFailedAvatar(avatarUrl)} style={s.headerAvatar} accessibilityLabel="Ảnh đại diện của bạn" /> : <SymbolView name={{ ios: tab.ios, android: tab.android, web: tab.web }} size={desktop ? action ? 24 : width < 1200 ? 17 : 19 : 23} tintColor={active ? colors.primary : colors.textSecondary} />}
           {notifications && unreadCount > 0 && <View testID="assessor-unread-badge" style={s.badge}><Text style={s.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
+          {tab.key === 'messages' && chatUnread > 0 && <View testID="chat-unread-badge" style={s.badge}><Text style={s.badgeText}>{chatUnread > 99 ? '99+' : chatUnread}</Text></View>}
         </View>
         {(!desktop || !action) && <Text numberOfLines={1} style={[desktop ? s.headerLabel : s.label, desktop && width < 1200 && s.compactLabel, active && s.active]}>{!desktop && 'shortLabel' in tab ? tab.shortLabel : tab.label}</Text>}
         {desktop && profile && <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={colors.textSecondary} />}

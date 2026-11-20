@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { portfolioService } from '@/services/portfolio.service';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
+import { useChat } from '@/components/messaging/ChatProvider';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type TabItem = { label: string; href: Href; paths: string[]; icon: SymbolName; activeIcon: SymbolName; unread?: number };
@@ -26,7 +27,7 @@ const tabs: TabItem[] = [
 
 const shortcuts: Shortcut[] = [
   { label: 'Cơ hội', href: '/(tabs)/opportunities', icon: { ios: 'briefcase', android: 'business_center', web: 'business_center' }, tint: '#E34B66', background: '#FFF0F3' },
-  { label: 'Tìm đồng đội', href: '/(tabs)/find-teammates', icon: { ios: 'person.2', android: 'groups', web: 'groups' }, tint: '#1769E0', background: '#EAF1FF' },
+  { label: 'Hợp tác', href: '/(tabs)/find-teammates', icon: { ios: 'hands.clap', android: 'handshake', web: 'handshake' }, tint: '#1769E0', background: '#EAF1FF' },
 ];
 
 export function badgeLabel(count: number | undefined) {
@@ -51,6 +52,7 @@ export default function AppTabs({ children }: { children?: ReactNode } = {}) {
   const navigate = (href: Href) => { dismissDetail?.(); router.navigate(href); };
   const { account } = useAuthStore();
   const { unreadCount } = useNotificationUpdates();
+  const { unreadCount: chatUnreadCount } = useChat();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -102,7 +104,7 @@ export default function AppTabs({ children }: { children?: ReactNode } = {}) {
           {desktopItems.map(item => {
             const active = item.paths.some(path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)));
             return <Pressable key={String(item.href)} accessibilityRole="tab" accessibilityLabel={item.label} aria-selected={active} accessibilityState={{ selected: active }} onPress={() => navigate(item.href)} style={({ pressed, hovered }) => [styles.desktopLink, width < 1200 && styles.compactLink, active && styles.desktopLinkActive, hovered && styles.desktopLinkHovered, pressed && styles.pressed]}>
-              <SymbolView name={active ? item.activeIcon : item.icon} size={width < 1200 ? 17 : 19} tintColor={active ? colors.primary : colors.textSecondary} />
+              <View style={{ position: 'relative' }}><SymbolView name={active ? item.activeIcon : item.icon} size={width < 1200 ? 17 : 19} tintColor={active ? colors.primary : colors.textSecondary} />{item.paths.includes('/messages') && chatUnreadCount > 0 && <View testID="chat-unread-badge" style={styles.badge}><Text style={styles.badgeText}>{badgeLabel(chatUnreadCount)}</Text></View>}</View>
               <Text numberOfLines={1} style={[styles.desktopLabel, width < 1200 && styles.compactLabel, active && styles.activeLabel]}>{item.label}</Text>
             </Pressable>;
           })}
@@ -136,7 +138,7 @@ export default function AppTabs({ children }: { children?: ReactNode } = {}) {
     </View>}
     {!desktop && <View testID="mobile-app-footer" style={[styles.footer, { paddingBottom: bottomInset }]} accessibilityRole="tablist">
       <FooterTab item={tabs[0]} active={tabs[0].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[0].href); }} />
-      <FooterTab item={tabs[1]} active={tabs[1].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[1].href); }} />
+      <FooterTab item={{ ...tabs[1], unread: chatUnreadCount }} active={tabs[1].paths.includes(pathname)} onPress={() => { setMenuOpen(false); navigate(tabs[1].href); }} />
       <Pressable onPress={() => setMenuOpen(open => !open)} hitSlop={{ top: 20, left: 6, right: 6 }} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Đóng menu' : 'Mở menu'} accessibilityState={{ expanded: menuOpen }} style={styles.menuSlot}>
         <View style={styles.menuButton}><SymbolView name={menuOpen ? { ios: 'xmark', android: 'close', web: 'close' } : { ios: 'line.3.horizontal', android: 'menu', web: 'menu' }} size={25} tintColor="#FFFFFF" /></View>
       </Pressable>

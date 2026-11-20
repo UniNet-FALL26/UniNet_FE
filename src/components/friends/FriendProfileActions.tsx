@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useAuthStore } from '@/store/auth.store';
 import { useNotificationUpdates } from '@/components/notifications/NotificationsProvider';
@@ -8,6 +8,7 @@ import type { FriendPerson } from '@/types/friendship';
 import { HubAction, hubColors as c, ui } from '@/components/projects/hub/ProjectHubUI';
 import { FriendActions } from './FriendActions';
 import { ACCOUNT_ROLE } from '@/constants/roles';
+import { messageRoute } from '@/messaging/device';
 
 export function FriendProfileActions({ profileId }: { profileId: string }) {
   const { account } = useAuthStore();
@@ -19,6 +20,10 @@ export function FriendProfileActions({ profileId }: { profileId: string }) {
     if (account?.role === ACCOUNT_ROLE.STUDENT && account.profile?.id !== profileId) friendshipService.relationship(profileId, controller.signal).then(value => { if (!controller.signal.aborted) setPerson(value); }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Không tải được quan hệ kết bạn.'); });
     return () => controller.abort();
   }, [account?.id, account?.role, account?.profile?.id, profileId, attempt, revision]);
-  if (account?.role !== ACCOUNT_ROLE.STUDENT || account.profile?.id === profileId) return null;
-  return <View style={{ gap: 8, padding: 16, alignItems: 'flex-end' }}>{error ? <><Text accessibilityRole="alert" style={ui.error}>{error}</Text><HubAction compact title="Tải lại quan hệ" onPress={() => setAttempt(value => value + 1)} /></> : person ? <FriendActions person={person} onChanged={setPerson} /> : <ActivityIndicator color={c.primary} accessibilityLabel="Đang tải quan hệ kết bạn" />}</View>;
+  if (!account || account.profile?.id === profileId) return null;
+  if (account.role !== ACCOUNT_ROLE.STUDENT) return <HubAction compact title="Nhắn tin" icon="message" onPress={() => router.push({ pathname: messageRoute(account.role), params: { profileId } })} />;
+  return <View style={{ gap: 8, alignItems: 'flex-end', maxWidth: '100%' }}>{error ? <><Text accessibilityRole="alert" style={ui.error}>{error}</Text><HubAction compact title="Tải lại quan hệ" onPress={() => setAttempt(value => value + 1)} /></> : person ? <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
+    <HubAction compact title="Nhắn tin" icon="message" onPress={() => router.push({ pathname: messageRoute(account.role), params: { profileId: person.profileId } })} />
+    <FriendActions person={person} onChanged={setPerson} />
+  </View> : <ActivityIndicator color={c.primary} accessibilityLabel="Đang tải quan hệ kết bạn" />}</View>;
 }
