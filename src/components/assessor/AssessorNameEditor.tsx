@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View, Pressable } from 'react-native';
 import { ProfileTextInput } from '@/components/profile/ProfileTextInput';
 import { Button } from '@/components/ui/Button';
 import { colors } from '@/constants/colors';
@@ -21,6 +21,7 @@ export function AssessorNameEditor({ fullName, onSave, onClose }: Props) {
   };
   return <Modal visible transparent animationType="fade" onRequestClose={close}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} />
       <View role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel="Chỉnh sửa họ tên" style={s.dialog}>
         <Text role="heading" style={shared.sectionTitle}>Chỉnh sửa họ tên</Text>
         <ProfileTextInput label="Họ và tên" autoFocus maxLength={255} editable={!busy} value={name} onChangeText={setName} />

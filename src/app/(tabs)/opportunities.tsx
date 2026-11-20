@@ -1,5 +1,6 @@
-import { OpportunityApplicationScroll } from '@/components/opportunities/OpportunityApplicationScroll';
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { OpportunityFiltersModal } from '@/components/opportunities/OpportunityFiltersModal';
+import { OpportunityApplicationScroll } from '@/components/opportunities/OpportunityApplicationScroll';
 import { DetailModal } from '@/components/navigation/DetailModal';
 import CompanyProfileScreen from '../(company)/profile';
 import { WebsiteBrandIcon, websitePlatformLabel } from '@/components/company/WebsiteBrandIcon';
@@ -67,6 +68,7 @@ function partnerKindLabel(type: number | null | undefined) {
   }
 }
 export default function OpportunitiesScreen() {
+  const safeAreaEdges = useScreenSafeAreaEdges();
   const { jobId: requestedJobId, tab: requestedTab } = useLocalSearchParams<{ jobId?: string; tab?: string }>();
   const [jobs, setJobs] = useState<OpportunityJob[]>([]);
   const [selectedJob, setSelectedJob] = useState<OpportunityJob | null>(null);
@@ -90,10 +92,7 @@ export default function OpportunitiesScreen() {
   const selectedSubmittedApplication = submittedApplications.find(application => application.id === selectedApplicationId) ?? null;
   const [view, setView] = useState<OpportunityView>('all');
   const [recommendedOnly, setRecommendedOnly] = useState(false);
-  const [sortMode, setSortMode] = useState<'newest' | 'fit'>('newest');
-  const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
   const [workType, setWorkType] = useState<OpportunityWorkType | undefined>();
   const [employmentType, setEmploymentType] = useState<OpportunityEmploymentType | undefined>();
   const [salaryMinInput, setSalaryMinInput] = useState('');
@@ -177,7 +176,7 @@ export default function OpportunitiesScreen() {
   }, []));
 
   const changeView = (next: OpportunityView) => { setRecommendedOnly(false); setView(next); };
-  const showRecommended = () => { setView('all'); setRecommendedOnly(true); setSortMode('fit'); };
+  const showRecommended = () => { setView('all'); setRecommendedOnly(true); };
   const changeWorkType = (next: OpportunityWorkType | undefined) => { setWorkType(next); };
   const openJob = async (job: OpportunityJob) => {
     detailRequest.current?.abort();
@@ -288,12 +287,10 @@ export default function OpportunitiesScreen() {
     const match = skillMatch(job);
     return match.matchedRequired * 2 + match.matchedPreferred;
   };
-  const sortedJobs = useMemo(() => [...jobs].sort((a, b) => sortMode === 'fit'
-    ? fitScore(b) - fitScore(a)
-    : new Date(b.startAt ?? b.createdAt).getTime() - new Date(a.startAt ?? a.createdAt).getTime()), [jobs, sortMode, myPortfolio]);  const filteredJobs = useMemo(() => {
+  const filteredJobs = useMemo(() => {
     const minimum = salaryMinInput.trim() ? Number(salaryMinInput.replace(',', '.')) * 1_000_000 : null;
     const maximum = salaryMaxInput.trim() ? Number(salaryMaxInput.replace(',', '.')) * 1_000_000 : null;
-    return sortedJobs.filter(job => {
+    const filtered = jobs.filter(job => {
       if (employmentType !== undefined && job.employmentType !== employmentType) return false;
       if (minimum == null && maximum == null) return true;
       const jobMinimum = job.minSalaryVnd ?? job.maxSalaryVnd;
@@ -301,11 +298,12 @@ export default function OpportunitiesScreen() {
       if (jobMinimum == null || jobMaximum == null) return false;
       return (maximum == null || jobMinimum <= maximum) && (minimum == null || jobMaximum >= minimum);
     });
-  }, [sortedJobs, employmentType, salaryMinInput, salaryMaxInput]);
+    return recommendedOnly ? filtered.sort((a, b) => fitScore(b) - fitScore(a)) : filtered;
+  }, [jobs, recommendedOnly, myPortfolio, employmentType, salaryMinInput, salaryMaxInput]);
   const activeFilterCount = Number(workType !== undefined) + Number(employmentType !== undefined) + Number(!!salaryMinInput || !!salaryMaxInput);
   const clearFilters = () => { setWorkType(undefined); setEmploymentType(undefined); setSalaryMinInput(''); setSalaryMaxInput(''); };
 
-  const renderJob = (job: OpportunityJob) => <View key={job.id} style={[styles.jobCard, isWideWeb && layoutMode === 'grid' && styles.jobCardWide]}>
+  const renderJob = (job: OpportunityJob) => <View key={job.id} style={[styles.jobCard, phone && styles.phoneJobCard, isWideWeb && styles.jobCardWide]}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Xem ${job.title} tại ${job.companyName}`} onPress={() => void openJob(job)} style={({ pressed }) => [styles.jobMain, pressed && styles.pressed]}>
       <View style={styles.jobHeading}>
         <CompanyMark avatarUrl={job.companyAvatarUrl} companyName={job.companyName} />
@@ -333,8 +331,8 @@ export default function OpportunitiesScreen() {
     </View>
   </View>;
 
-  return <SafeAreaView style={styles.safe} edges={['top']}>
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadJobs(1, false, true)} tintColor={colors.primary} />}>
+  return <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
+    <ScrollView contentContainerStyle={[styles.content, phone && styles.phoneContent]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadJobs(1, false, true)} tintColor={colors.primary} />}>
       {isWideWeb && <View style={[styles.heroHeader, styles.heroHeaderWide]}>
         <View style={styles.heroCopy}><Text accessibilityRole="header" style={styles.title}>Cơ hội</Text><Text style={styles.subtitle}>Khám phá việc làm, thực tập và các cơ hội phát triển phù hợp với bạn.</Text></View>
         {isWideWeb && <Image
@@ -346,28 +344,27 @@ export default function OpportunitiesScreen() {
           importantForAccessibility="no-hide-descendants"
         />}
       </View>}
-      <View style={[styles.searchFilterRow, !isWideWeb && styles.searchFilterRowMobile]}>
+      <View style={[styles.searchFilterRow, !isWideWeb && styles.searchFilterRowMobile, phone && styles.phoneInset]}>
           <View style={styles.searchBox}><SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} tintColor={colors.textMuted} /><TextInput value={searchInput} onChangeText={setSearchInput} onSubmitEditing={() => setKeyword(searchInput)} placeholder="Tìm vị trí, kỹ năng, công ty..." placeholderTextColor={colors.textMuted} returnKeyType="search" style={styles.searchInput} accessibilityLabel="Tìm cơ hội" />{!!searchInput && <Pressable accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm" onPress={() => { setSearchInput(''); setKeyword(''); }} hitSlop={8}><SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} size={18} tintColor={colors.textMuted} /></Pressable>}</View>
           <View style={styles.filterMenuAnchor}>
             <Pressable accessibilityRole="button" accessibilityLabel="Bộ lọc" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(current => !current)} style={[styles.filterButton, !isWideWeb && styles.filterIconButton, (filtersOpen || activeFilterCount > 0) && styles.filterButtonActive]}>
               <SymbolView name={{ ios: 'line.3.horizontal.decrease', android: 'filter_alt', web: 'filter_alt' }} size={18} tintColor={colors.primary} />
               {isWideWeb && <Text style={styles.filterButtonText}>Bộ lọc</Text>}
-              {!!activeFilterCount && <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeFilterCount}</Text></View>}
+              {!!activeFilterCount && <View style={[styles.filterCount, !isWideWeb && styles.filterCountCorner]}><Text style={styles.filterCountText}>{activeFilterCount}</Text></View>}
             </Pressable>
             <OpportunityFiltersModal visible={filtersOpen} workType={workType} employmentType={employmentType} salaryMin={salaryMinInput} salaryMax={salaryMaxInput} onWorkType={setWorkType} onEmploymentType={setEmploymentType} onSalaryMin={setSalaryMinInput} onSalaryMax={setSalaryMaxInput} onClear={clearFilters} onClose={() => setFiltersOpen(false)} />
           </View>
         </View>
 
         <View style={isWideWeb && styles.browseControlsWide}>
-        <View style={[styles.browseToolbar, isWideWeb && styles.browseToolbarWide]}>
+        <View style={[styles.browseToolbar, phone && styles.phoneInset, isWideWeb && styles.browseToolbarWide]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.viewTabs}>{[...views, { value: 'recommended' as const, label: 'Phù hợp với bạn' }].map(item => { const selected = item.value === 'recommended' ? recommendedOnly : !recommendedOnly && view === item.value; const icon = item.value === 'saved' ? { ios: 'bookmark', android: 'bookmark_border', web: 'bookmark_border' } : item.value === 'applied' ? { ios: 'paperplane', android: 'send', web: 'send' } : item.value === 'recommended' ? { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' } : { ios: 'square.grid.2x2', android: 'grid_view', web: 'grid_view' }; return <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => item.value === 'recommended' ? showRecommended() : changeView(item.value as OpportunityView)} style={[styles.viewTab, selected && styles.viewTabSelected]}><SymbolView name={icon} size={14} tintColor={selected ? '#FFFFFF' : item.value === 'recommended' ? colors.primary : colors.textSecondary} /><Text style={[styles.viewTabText, selected && styles.viewTabTextSelected]}>{item.label}</Text></Pressable>; })}</ScrollView>
-          {isWideWeb && <View style={styles.browseActions}><View style={styles.sortWrap}><Pressable accessibilityRole="button" accessibilityState={{ expanded: sortOpen }} onPress={() => setSortOpen(value => !value)} style={styles.sortButton}><SymbolView name={{ ios: 'arrow.up.arrow.down', android: 'sort', web: 'sort' }} size={16} tintColor={colors.textSecondary} /><Text style={styles.sortText}>Sắp xếp: {sortMode === 'newest' ? 'Mới nhất' : 'Phù hợp nhất'}</Text><SymbolView name={{ ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }} size={15} tintColor={colors.textMuted} /></Pressable>{sortOpen && <View style={styles.sortMenu}><Pressable onPress={() => { setSortMode('newest'); setSortOpen(false); }} style={styles.sortOption}><Text style={styles.sortOptionText}>Mới nhất</Text></Pressable><Pressable onPress={() => { setSortMode('fit'); setSortOpen(false); }} style={styles.sortOption}><Text style={styles.sortOptionText}>Phù hợp nhất</Text></Pressable></View>}</View><View style={styles.layoutToggle}><Pressable accessibilityRole="button" accessibilityLabel="Xem dạng lưới" accessibilityState={{ selected: layoutMode === 'grid' }} onPress={() => setLayoutMode('grid')} style={[styles.layoutButton, layoutMode === 'grid' && styles.layoutButtonActive]}><SymbolView name={{ ios: 'square.grid.2x2', android: 'grid_view', web: 'grid_view' }} size={17} tintColor={layoutMode === 'grid' ? '#FFFFFF' : colors.textSecondary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Xem dạng danh sách" accessibilityState={{ selected: layoutMode === 'list' }} onPress={() => setLayoutMode('list')} style={[styles.layoutButton, layoutMode === 'list' && styles.layoutButtonActive]}><SymbolView name={{ ios: 'list.bullet', android: 'view_list', web: 'view_list' }} size={17} tintColor={layoutMode === 'list' ? '#FFFFFF' : colors.textSecondary} /></Pressable></View></View>}
         </View>
-        <View style={[styles.listHeader, isWideWeb && styles.listHeaderWide]}><View><Text style={styles.sectionTitle}>{view === 'saved' ? 'Cơ hội đã lưu' : view === 'applied' ? 'Cơ hội đã ứng tuyển' : recommendedOnly ? 'Phù hợp với bạn' : 'Danh sách cơ hội'}</Text><Text style={styles.sectionHint}>{loading ? 'Đang tìm cơ hội phù hợp' : `Tìm thấy ${filteredJobs.length} cơ hội phù hợp`}</Text></View></View>
+        <View style={[styles.listHeader, phone && styles.phoneInset, isWideWeb && styles.listHeaderWide]}><View><Text style={styles.sectionTitle}>{view === 'saved' ? 'Cơ hội đã lưu' : view === 'applied' ? 'Cơ hội đã ứng tuyển' : recommendedOnly ? 'Phù hợp với bạn' : 'Danh sách cơ hội'}</Text><Text style={styles.sectionHint}>{loading ? 'Đang tìm cơ hội phù hợp' : `Tìm thấy ${filteredJobs.length} cơ hội phù hợp`}</Text></View></View>
         </View>
         {!!error && <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text><Pressable accessibilityRole="button" onPress={() => void loadJobs(1)}><Text style={styles.retryText}>Thử lại</Text></Pressable></View>}
         {loading && !refreshing ? <View style={styles.loadingState}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>Đang tải cơ hội...</Text></View> : filteredJobs.length ? <>
-          <View style={[styles.jobResults, isWideWeb && layoutMode === 'grid' && styles.jobGrid]}>{filteredJobs.map(renderJob)}</View>
+          <View style={[styles.jobResults, isWideWeb && styles.jobGrid]}>{filteredJobs.map(renderJob)}</View>
           {isWideWeb && totalPages > 1 ? <View style={styles.pagination}><Pressable accessibilityRole="button" accessibilityLabel="Trang trước" disabled={page <= 1 || loadingMore} onPress={() => void loadJobs(page - 1)} style={[styles.pageButton, (page <= 1 || loadingMore) && styles.pageButtonDisabled]}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={17} tintColor={colors.textSecondary} /></Pressable>{Array.from({ length: totalPages }, (_, index) => index + 1).map(pageNumber => <Pressable key={pageNumber} accessibilityRole="button" accessibilityLabel={`Trang ${pageNumber}`} accessibilityState={{ selected: page === pageNumber }} onPress={() => page !== pageNumber && void loadJobs(pageNumber)} style={[styles.pageButton, page === pageNumber && styles.pageButtonActive]}><Text style={[styles.pageButtonText, page === pageNumber && styles.pageButtonTextActive]}>{pageNumber}</Text></Pressable>)}<Pressable accessibilityRole="button" accessibilityLabel="Trang tiếp theo" disabled={page >= totalPages || loadingMore} onPress={() => void loadJobs(page + 1)} style={[styles.pageButton, (page >= totalPages || loadingMore) && styles.pageButtonDisabled]}><SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={17} tintColor={colors.textSecondary} /></Pressable></View> : page < totalPages && <Pressable disabled={loadingMore} onPress={() => void loadJobs(page + 1, true)} style={({ pressed }) => [styles.loadMore, pressed && styles.pressed]}>{loadingMore ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.loadMoreText}>Tải thêm cơ hội</Text>}</Pressable>}
         </> : !error && <View style={styles.emptyCard}><View style={styles.emptyIcon}><SymbolView name={{ ios: 'tray', android: 'inbox', web: 'inbox' }} size={23} tintColor={colors.primary} /></View><Text style={styles.emptyTitle}>{view === 'saved' ? 'Chưa có cơ hội đã lưu' : view === 'applied' ? 'Bạn chưa ứng tuyển cơ hội nào' : 'Chưa có cơ hội phù hợp'}</Text><Text style={styles.emptyText}>Thử đổi bộ lọc hoặc quay lại sau để xem bài đăng mới.</Text></View>}
     </ScrollView>
@@ -426,7 +423,8 @@ export default function OpportunitiesScreen() {
       </SafeAreaView>
     </DetailModal>
     <Modal visible={reapplyConfirmOpen} transparent animationType="fade" onRequestClose={() => setReapplyConfirmOpen(false)}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(20, 32, 52, 0.48)', alignItems: 'center', justifyContent: 'center', padding: 22 }}><View style={{ width: '100%', maxWidth: 420, borderRadius: 18, padding: 18, backgroundColor: '#FFFFFF', gap: 12 }}><Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800' }}>Nộp lại hồ sơ?</Text><Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>Đơn và CV đã nộp trước đó sẽ được giữ nguyên. Lượt nộp mới sẽ lưu một bản hồ sơ mới cho nhà tuyển dụng.</Text><View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 3 }}><Pressable accessibilityRole="button" onPress={() => setReapplyConfirmOpen(false)} style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 15, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}><Text style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '700' }}>Hủy</Text></Pressable><Pressable accessibilityRole="button" onPress={() => { setReapplyConfirmOpen(false); void applyToJob(); }} style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 15, borderRadius: 10, backgroundColor: colors.primary }}><Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>Nộp lại</Text></Pressable></View></View></View>
+      <View style={{ flex: 1, backgroundColor: 'rgba(20, 32, 52, 0.48)', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setReapplyConfirmOpen(false)} /><View style={{ width: '100%', maxWidth: 420, borderRadius: 18, padding: 18, backgroundColor: '#FFFFFF', gap: 12 }}><Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800' }}>Nộp lại hồ sơ?</Text><Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>Đơn và CV đã nộp trước đó sẽ được giữ nguyên. Lượt nộp mới sẽ lưu một bản hồ sơ mới cho nhà tuyển dụng.</Text><View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 3 }}><Pressable accessibilityRole="button" onPress={() => setReapplyConfirmOpen(false)} style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 15, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}><Text style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '700' }}>Hủy</Text></Pressable><Pressable accessibilityRole="button" onPress={() => { setReapplyConfirmOpen(false); void applyToJob(); }} style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 15, borderRadius: 10, backgroundColor: colors.primary }}><Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>Nộp lại</Text></Pressable></View></View></View>
     </Modal>
   </SafeAreaView>;
 }
@@ -475,6 +473,10 @@ function relativeDate(value: string) { const days = Math.max(0, Math.floor((Date
 function dateLabel(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Chưa xác định' : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date); }
 
 const styles = StyleSheet.create({
+  filterCountCorner: { position: 'absolute', top: -6, right: -6, minWidth: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#FFFFFF' },
+  phoneContent: { flexGrow: 1, paddingHorizontal: 0, paddingTop: 8, paddingBottom: 24 },
+  phoneInset: { marginHorizontal: 16 },
+  phoneJobCard: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
   searchFilterRowMobile: { marginTop: 0, gap: 8 },
   filterIconButton: { width: 44, minWidth: 44, height: 44, paddingHorizontal: 0, flexShrink: 0 },
   heroHeader: { minHeight: 130, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 20, paddingHorizontal: 24, paddingVertical: 20, backgroundColor: '#EEF4FF' },
@@ -482,7 +484,7 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, minWidth: 0 },
   heroArtwork: { width: 330, height: 166, flexShrink: 0 },
   searchFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 13, zIndex: 20 }, filterMenuAnchor: { position: 'relative', zIndex: 30 }, filterButton: { minHeight: 44, minWidth: 108, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' }, filterButtonActive: { borderColor: '#AFCBFA', backgroundColor: '#F5F9FF' }, filterButtonText: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' }, filterCount: { minWidth: 19, height: 19, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingHorizontal: 5 }, filterCountText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-  browseToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginTop: 14 }, viewTabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }, viewTab: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' }, viewTabSelected: { backgroundColor: colors.primary, borderColor: colors.primary }, viewTabText: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' }, viewTabTextSelected: { color: '#FFFFFF' }, browseActions: { flexDirection: 'row', alignItems: 'center', gap: 8 }, sortWrap: { position: 'relative', zIndex: 5 }, sortButton: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' }, sortText: { color: colors.textPrimary, fontSize: 11, fontWeight: '700' }, sortMenu: { position: 'absolute', top: 39, right: 0, width: 178, padding: 5, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF', shadowColor: '#152A4D', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8 }, sortOption: { minHeight: 37, justifyContent: 'center', paddingHorizontal: 11, borderRadius: 8 }, sortOptionText: { color: colors.textPrimary, fontSize: 11 }, layoutToggle: { flexDirection: 'row', padding: 2, borderRadius: 11, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' }, layoutButton: { width: 33, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }, layoutButtonActive: { backgroundColor: colors.primary },
+  browseToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginTop: 14 }, viewTabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }, viewTab: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' }, viewTabSelected: { backgroundColor: colors.primary, borderColor: colors.primary }, viewTabText: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' }, viewTabTextSelected: { color: '#FFFFFF' },
   jobResults: { width: '100%', gap: 13 }, jobGrid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', columnGap: 14, rowGap: 14 }, jobCardWide: { width: '48.5%', flexBasis: '48.5%', flexGrow: 0, flexShrink: 0, marginBottom: 0 }, pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 7, marginTop: 28, marginBottom: 10 }, pageButton: { minWidth: 38, height: 38, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: '#FFFFFF' }, pageButtonDisabled: { opacity: 0.45 }, pageButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary }, pageButtonText: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' }, pageButtonTextActive: { color: '#FFFFFF' },
   safe: { flex: 1, backgroundColor: colors.background }, content: { width: '100%', maxWidth: 1280, alignSelf: 'center', paddingHorizontal: 28, paddingTop: 24, paddingBottom: 50 },
   title: { color: colors.navy, fontSize: 30, lineHeight: 38, fontWeight: '800' }, subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 5 },

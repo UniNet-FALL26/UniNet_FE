@@ -42,6 +42,7 @@ export function ProfileEntryForm({ section, data, entryIndex, onAdd, onClose }: 
   };
   return <Modal visible transparent animationType="fade" onRequestClose={close}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} />
       <ToastHost modal /><View accessibilityViewIsModal style={s.dialog}>
         <View style={s.header}><Text role="heading" aria-level={2} style={s.title}>{editingEntry || section.id === 'basic' ? 'Cập nhật' : 'Thêm'} {section.title.toLowerCase()}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng biểu mẫu" disabled={imageBusy} onPress={close} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.fields}>

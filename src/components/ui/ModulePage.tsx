@@ -1,3 +1,4 @@
+import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { SymbolView } from 'expo-symbols';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -5,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
 
 export function ModulePage({ title, description, sections, header }: { title: string; description: string; sections: string[]; header?: ReactNode }) {
-  return <SafeAreaView style={styles.safe} edges={['top']}>
+  const safeAreaEdges = useScreenSafeAreaEdges();
+  return <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
     {header}
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.brand}>UNINET</Text>

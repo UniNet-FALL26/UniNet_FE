@@ -7,5 +7,5 @@ export const assessorTabs = [
 ] as const;
 export function assessorTabActive(key: string, pathname: string) {
   const tab = assessorTabs.find(t => t.key === key);
-  return !!tab && (pathname === tab.path || pathname.startsWith(tab.path + '/') || key === 'assessments' && pathname === '/assessor-availability');
+  return !!tab && (key === 'messages' && pathname.startsWith('/chat/') || pathname === tab.path || pathname.startsWith(tab.path + '/') || key === 'assessments' && pathname === '/assessor-availability');
 }

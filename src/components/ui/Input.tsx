@@ -10,7 +10,7 @@ const leftIconNames = {
   person: { ios: 'person', android: 'person', web: 'person' },
   business: { ios: 'building.2', android: 'business', web: 'business' },
 } as const;
-type Props = TextInputProps & { label: string; appearance?: 'default' | 'project'; compact?: boolean; autoGrow?: boolean; error?: string; leftIcon?: LeftIcon; passwordVisibility?: { visible: boolean; onToggle: () => void } };
+type Props = TextInputProps & { label: string; appearance?: 'default' | 'project' | 'auth'; compact?: boolean; autoGrow?: boolean; error?: string; leftIcon?: LeftIcon; passwordVisibility?: { visible: boolean; onToggle: () => void } };
 export function Input({ label, appearance = 'default', compact = false, autoGrow = false, error, leftIcon, passwordVisibility, editable = true, style, ...props }: Props) {
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -27,7 +27,7 @@ export function Input({ label, appearance = 'default', compact = false, autoGrow
   }, [autoGrow, props.multiline, props.value, width]);
   return <View style={[styles.field, compact && { gap: 4 }]}>
     <Text style={styles.label}>{label}</Text>
-    <View style={[styles.box, appearance === 'project' && styles.projectBox, compact && { minHeight: 40 }, compact && appearance === 'project' && { backgroundColor: colors.surface }, focused && styles.focused, !!error && styles.errorBox, !editable && styles.disabled]}>
+    <View style={[styles.box, appearance === 'auth' && styles.authBox, appearance === 'project' && styles.projectBox, compact && { minHeight: 40 }, compact && appearance === 'project' && { backgroundColor: colors.surface }, focused && styles.focused, !!error && styles.errorBox, !editable && styles.disabled]}>
       {leftIcon && <SymbolView name={leftIconNames[leftIcon]} size={20} tintColor={colors.textSecondary} style={styles.leftIcon} />}
       <TextInput {...props} ref={inputRef} editable={editable} scrollEnabled={autoGrow ? false : props.scrollEnabled} onContentSizeChange={event => { if (autoGrow && Platform.OS !== 'web') setContentHeight(Math.max(80, Math.ceil(event.nativeEvent.contentSize.height))); props.onContentSizeChange?.(event); }} onFocus={event => { setFocused(true); props.onFocus?.(event); }} onBlur={event => { setFocused(false); props.onBlur?.(event); }}
         placeholderTextColor={colors.textMuted} style={[styles.input, appearance === 'project' && styles.projectInput, compact && { minHeight: 38, minWidth: 0, paddingVertical: 8 }, style, autoGrow && props.multiline && { height: contentHeight, minHeight: 80 }]} accessibilityLabel={label} />
@@ -40,6 +40,7 @@ export function Input({ label, appearance = 'default', compact = false, autoGrow
 }
 const styles = StyleSheet.create({
   field: { gap: 7 }, label: { fontSize: 13, fontWeight: '600', color: colors.textPrimary }, box: { minHeight: 54, borderWidth: 1, borderColor: colors.primaryLight, backgroundColor: colors.primaryLight, borderRadius: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
+  authBox: { backgroundColor: colors.surface, borderColor: colors.border },
   projectBox: { minHeight: 52, borderRadius: 12, borderColor: colors.border, backgroundColor: colors.primaryLight }, projectInput: { minHeight: 50, fontSize: 14, paddingVertical: 12 },
   focused: { borderColor: colors.primary }, errorBox: { borderColor: colors.error }, disabled: { opacity: 0.5 }, input: { flex: 1, minHeight: 52, fontSize: 15, color: colors.textPrimary, paddingVertical: 0 }, leftIcon: { width: 22, height: 22, marginRight: 10 }, rightIcon: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, marginRight: -10 }, iconPressed: { backgroundColor: colors.border }, error: { fontSize: 13, color: colors.error },
 });

@@ -181,6 +181,7 @@ export function PartnerVerification({ onClose, onStatusChange }: Props) {
   </View>;
   if (onClose) return <Modal visible transparent animationType="fade" onRequestClose={close}>
     <KeyboardAvoidingView style={s.scrim} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} />
       <ToastHost modal />
       <View testID="partner-verification-dialog" role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel="Xác minh tài khoản đối tác" style={s.dialog}>
         {header}<ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">{form}</ScrollView>{footer}

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { File as LocalFile } from 'expo-file-system';
 import { API_URL } from '@/constants/config';
 import { apiRequest, ApiError, refreshSession } from './api';
 import { tokenStorage } from '@/utils/storage';
@@ -8,6 +9,33 @@ const root = '/messaging';
 const id = encodeURIComponent;
 const json = (method: string, body?: unknown) => ({ method, feedback: false as const, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const read = <T>(path: string, signal?: AbortSignal) => apiRequest<T>(root + path, { signal, feedback: false });
+
+async function attachmentContent(file: ChatAttachment, signal?: AbortSignal) {
+  if (!/^\/messaging\/attachments\/[a-f0-9-]+\/content$/.test(file.fileUrl)) throw new Error('Đường dẫn file không hợp lệ.');
+  const original = tokenStorage.getSession(); if (!original) throw new ApiError('Vui lòng đăng nhập.', 401);
+  const currentSession = () => {
+    const current = tokenStorage.getSession();
+    if (!current || current.generation !== original.generation) throw new ApiError('Phiên đăng nhập đã thay đổi.', 401);
+    if (signal?.aborted) throw new ApiError('Đã hủy tải file.');
+    return current;
+  };
+  if (original.expiresAt && Date.parse(original.expiresAt) <= Date.now() + 30_000) await refreshSession(original);
+  let requestedToken = '';
+  const request = () => {
+    requestedToken = currentSession().accessToken;
+    return fetch(API_URL + file.fileUrl, { headers: { Authorization: `Bearer ${requestedToken}` }, signal });
+  };
+  let response = await request();
+  currentSession();
+  if (response.status === 401) {
+    const current = currentSession();
+    if (current.accessToken === requestedToken) await refreshSession(current);
+    response = await request();
+    currentSession();
+  }
+  if (!response.ok) throw new ApiError(response.status === 403 ? 'Bạn không còn quyền xem file này.' : 'Không tải được file trò chuyện.', response.status);
+  return { response, assertCurrent: currentSession };
+}
 
 export const messagingService = {
   list: (filter = 'all', q = '', page = 1, signal?: AbortSignal) => read<ChatPage<ChatConversation>>(`/conversations?${new URLSearchParams({ filter, q, page: String(page) })}`, signal),
@@ -21,7 +49,12 @@ export const messagingService = {
     if (input.replyToMessageId) form.append('ReplyToMessageId', input.replyToMessageId);
     for (const file of input.files) {
       if (Platform.OS === 'web') form.append('Files', file.file ?? await (await fetch(file.uri)).blob(), file.name);
-      else form.append('Files', { uri: file.uri, name: file.name, type: file.mimeType || 'application/octet-stream' } as unknown as Blob);
+      else {
+        // Expo 57 fetch serializes File/Blob bytes, not RN's legacy URI parts.
+        const localFile = new LocalFile(file.uri);
+        if (!localFile.exists) throw new Error('Không đọc được file đã chọn. Vui lòng chọn lại ảnh hoặc tài liệu.');
+        form.append('Files', localFile, file.name);
+      }
     }
     const path = 'conversationId' in target ? `/conversations/${id(target.conversationId)}/messages` : `/direct/${id(target.profileId)}/messages`;
     return apiRequest<ChatMessage>(root + path, { method: 'POST', body: form, feedback: false });
@@ -45,12 +78,15 @@ export const messagingService = {
   unregisterDevice: (deviceId: string) => apiRequest<void>(`${root}/devices/${id(deviceId)}`, json('DELETE')),
   acknowledge: (deviceId: string, messageId: string) => apiRequest<void>(`${root}/devices/${id(deviceId)}/ack`, json('POST', { messageId })),
   async attachmentBlob(file: ChatAttachment, signal?: AbortSignal) {
-    if (!/^\/messaging\/attachments\/[a-f0-9-]+\/content$/.test(file.fileUrl)) throw new Error('Đường dẫn file không hợp lệ.');
-    const original = tokenStorage.getSession(); if (!original) throw new ApiError('Vui lòng đăng nhập.', 401);
-    if (original.expiresAt && Date.parse(original.expiresAt) <= Date.now() + 30_000) await refreshSession(original);
-    if (tokenStorage.getSession()?.generation !== original.generation) throw new ApiError('Phiên đăng nhập đã thay đổi.', 401);
-    const response = await fetch(API_URL + file.fileUrl, { headers: { Authorization: `Bearer ${tokenStorage.getSession()!.accessToken}` }, signal });
-    if (!response.ok) throw new ApiError(response.status === 403 ? 'Bạn không còn quyền xem file này.' : 'Không tải được file trò chuyện.', response.status);
-    return response.blob();
+    const { response, assertCurrent } = await attachmentContent(file, signal);
+    const blob = await response.blob();
+    assertCurrent();
+    return blob;
+  },
+  async attachmentBytes(file: ChatAttachment, signal?: AbortSignal) {
+    const { response, assertCurrent } = await attachmentContent(file, signal);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    assertCurrent();
+    return bytes;
   },
 };

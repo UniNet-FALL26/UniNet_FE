@@ -1,0 +1,10 @@
+# Native chat file access
+
+- Reproduced on the connected Android phone: the native image loader received HTTP 401 for a protected attachment while `attachmentBlob` could retrieve the same 2 MB PNG. Both images later rendered successfully in chat and the shared gallery after this fix.
+- `attachmentContent` centralizes protected GET requests, refreshes once on 401, reuses concurrent token refreshes, rejects changed sessions and preserves 403 without refresh. Both blob and byte readers check the session after reading the body.
+- `loadChatAttachment` returns browser object URLs on web and private cache files on native. Native reads response bytes directly, avoiding unsupported RN Blob.arrayBuffer and AbortSignal.throwIfAborted methods. No bearer token is sent to image/video components or placed in a URL.
+- Chat image/video previews and gallery thumbnails share this loader and clean up temporary files on unmount/cancellation. Retry remounts failed media. Documents use the same authenticated loader before opening the native share sheet; shared files remain cached for receiving applications, matching prior behavior.
+- Chat images preserve their aspect ratio within a compact frame: maximum width is the lesser of 280dp or 68% of viewport width; maximum height is the lesser of 300dp or 40% of viewport height. Portrait and landscape rendering was inspected on the connected phone.
+- Gallery image details open `ChatImageViewer`, a full-screen dark viewer with a back control and safe area. `ChatAttachment.fullScreen` bypasses thumbnail limits while retaining contain sizing and authenticated file loading. Closing returns to the existing gallery state/selection. Verified on the connected phone.
+- Verification: 10 protected-file checks, 25 attachment checks and 5 upload checks pass. Changed source files pass ESLint. Typecheck retains the 13 existing unrelated errors.
+- Actual video playback/document opening was not verified on device: the inspected conversation/gallery contains two images, zero videos and zero documents. No test messages were sent.

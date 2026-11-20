@@ -94,7 +94,8 @@ export function CommunityProfilePosts({ profileId, readOnly = false, title, empt
     <CommunityMediaLightbox urls={media?.urls ?? []} index={media?.index ?? null} onIndexChange={index => setMedia(current => current ? { ...current, index } : null)} onClose={() => setMedia(null)} />
     <UpdatePostModal post={editingPost} visible={!!editingPost} onClose={() => setEditingPost(null)} onUpdated={updated => setPosts(current => current.map(post => post.id === updated.id ? updated : post))} />
     <Modal visible={!!deleteId || !!reportId} transparent animationType="fade" onRequestClose={() => { if (!actionBusy) { setDeleteId(null); setReportId(null); } }}>
-      <View style={s.overlay}><View role="dialog" aria-modal aria-label={deleteId ? 'Xóa bài viết' : 'Báo cáo bài viết'} style={s.dialog}>
+      <View style={s.overlay}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => { if (!actionBusy) { setDeleteId(null); setReportId(null); } }} /><View role="dialog" aria-modal aria-label={deleteId ? 'Xóa bài viết' : 'Báo cáo bài viết'} style={s.dialog}>
         <Text style={s.title}>{deleteId ? 'Xóa bài viết?' : 'Báo cáo bài viết'}</Text>
         {reportId && <TextInput accessibilityLabel="Lý do báo cáo" placeholder="Nhập lý do báo cáo" value={reportReason} onChangeText={setReportReason} maxLength={1000} multiline style={s.reason} />}
         {!!actionError && <Text accessibilityRole="alert" style={s.error}>{actionError}</Text>}

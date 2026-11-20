@@ -39,6 +39,7 @@ export function AssessorSectionEditor({ section, summary = false, profile, onSav
   };
   return <Modal visible transparent animationType="fade" onRequestClose={close}>
     <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} />
       <View role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel={`Chỉnh sửa ${config.title}`} style={s.dialog}>
         <View style={s.header}>
           <View style={[s.headerIcon, { backgroundColor: config.background }]}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={19} tintColor={config.color} /></View>

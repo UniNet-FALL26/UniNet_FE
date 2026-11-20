@@ -91,7 +91,7 @@ export function ProjectDocumentsPanel({ project, busy, error, onAdd, onUpdate }:
   return <View role="region" accessibilityLabel="Tài liệu dự án" style={s.panel}>
     <View style={s.header}>
       <View style={s.heading}><HubIcon name="document" size={21} /><View style={{ flex: 1, gap: 4 }}><Text accessibilityRole="header" aria-level={2} style={s.title}>Tài liệu dự án</Text><Text style={s.subtitle}>Quản lý, lưu trữ và chia sẻ tài liệu liên quan đến dự án.</Text></View></View>
-      {project.isOwner && <HubAction compact title="Tải lên tài liệu" icon="upload" variant="primary" busy={busy} disabled={downloading} onPress={onAdd} />}
+      {(project.isOwner || project.isMember) && <HubAction compact title="Tải lên tài liệu" icon="upload" variant="primary" busy={busy} disabled={downloading} onPress={onAdd} />}
     </View>
     {project.isOwner && selected.size > 0 && <View style={s.selection}><Text style={s.subtitle}>Đã chọn {selected.size} tài liệu</Text><HubAction compact title="Xóa đã chọn" icon="trash" variant="danger" disabled={disabled} onPress={() => { setActionError(''); setDialog({ kind: 'delete', indices: [...selected] }); }} /></View>}
     {!files.length ? <View style={s.empty}><HubIcon name="document" size={32} /><Text style={s.subtitle}>Chưa có tài liệu được chia sẻ.</Text></View> : <View onLayout={event => setTableWidth(event.nativeEvent.layout.width)} style={{ minWidth: 0 }}>

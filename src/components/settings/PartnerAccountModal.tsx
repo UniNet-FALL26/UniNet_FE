@@ -34,7 +34,8 @@ export function PartnerAccountModal({ account, name, onClose, onStatusChange }: 
   const submittedAt = formatDate(value?.submittedAt);
   const reviewedAt = formatDate(value?.reviewedAt);
   return <Modal visible transparent animationType="fade" onRequestClose={onClose} accessibilityLabel="Thông tin tài khoản">
-    <View style={s.scrim}><ToastHost modal /><View testID="partner-account-panel" accessibilityViewIsModal style={s.dialog}>
+    <View style={s.scrim}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} /><ToastHost modal /><View testID="partner-account-panel" accessibilityViewIsModal style={s.dialog}>
       <View style={s.heading}><Text role="heading" aria-level={2} style={s.title}>Thông tin tài khoản</Text><Pressable ref={closeButton} accessibilityRole="button" accessibilityLabel="Đóng thông tin tài khoản" onPress={onClose} style={s.close}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={19} tintColor={colors.navy} /></Pressable></View>
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <Detail label="Tên hiển thị" value={name} />

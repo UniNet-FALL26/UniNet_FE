@@ -168,6 +168,7 @@ export const communityService = {
       {
         method: "POST",
         signal,
+        feedback: { success: false },
       },
     );
   },
@@ -207,6 +208,14 @@ export const communityService = {
   // COMMENTS & REPLIES
   // ==========================================
 
+  // The moderation queue is post-based; include the exact comment as evidence.
+  reportComment: (postId: string, comment: CommentResponse, reason: string): Promise<void> =>
+    apiRequest<void>(`/community/posts/${encodeURIComponent(postId)}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason: `Báo cáo bình luận ${comment.id}\nTác giả: ${comment.authorName}\nLý do: ${reason}\nNội dung: ${comment.content}` }),
+      feedback: { success: 'Đã gửi báo cáo bình luận. Cảm ơn bạn đã góp phần xây dựng cộng đồng UniNet văn minh và an toàn hơn!', error: false },
+    }),
+
   /**
    * Lấy danh sách bình luận gốc & reply lồng nhau
    */
@@ -234,6 +243,7 @@ export const communityService = {
         method: "POST",
         body: JSON.stringify(input),
         signal,
+        feedback: { success: false },
       },
     );
   },
@@ -252,6 +262,7 @@ export const communityService = {
         method: "POST",
         body: JSON.stringify(input),
         signal,
+        feedback: { success: false },
       },
     );
   },
@@ -270,6 +281,7 @@ export const communityService = {
         method: "PUT",
         body: JSON.stringify(input),
         signal,
+        feedback: { success: false },
       },
     );
   },
@@ -283,6 +295,7 @@ export const communityService = {
       {
         method: "DELETE",
         signal,
+        feedback: { success: false },
       },
     );
   },

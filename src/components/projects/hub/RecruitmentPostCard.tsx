@@ -7,14 +7,14 @@ import { HubAction, HubIcon, ProjectCover, hubColors as c } from './ProjectHubUI
 import { formatRecruitmentDeadline } from './ProjectRecruitmentPickers';
 import { TechnologyLogo } from './ProjectTechnologyChips';
 
-export function RecruitmentPostCard({ project, catalog, width, onOpen }: { project: HubProject; catalog: SkillCatalogItem[]; width: number | '100%'; onOpen: () => void }) {
+export function RecruitmentPostCard({ project, catalog, width, edgeToEdge = false, onOpen }: { project: HubProject; catalog: SkillCatalogItem[]; width: number | '100%'; edgeToEdge?: boolean; onOpen: () => void }) {
   const recruitment = project.recruitment!;
   const compact = typeof width === 'number' && width < 620;
   const competencies = [...new Set([...project.technologies, ...recruitment.positions.flatMap(p => [...p.technologies, ...p.skills])])];
   const members = project.members.filter(member => member.status === 0 && member.userId !== project.creator.id);
   const recruitmentQuantity = recruitment.positions.reduce((total, position) => total + position.quantity, 0);
   const recruiting = recruitment.status === 1;
-  return <View testID={`recruitment-post-${project.id}`} style={[s.card, { width }]}>
+  return <View testID={`recruitment-post-${project.id}`} style={[s.card, { width }, edgeToEdge && s.edgeToEdge]}>
     <View style={[s.body, compact && s.bodyCompact]}>
       <View style={s.content}>
         <View pointerEvents="none" accessibilityElementsHidden aria-hidden style={[s.art, compact && { display: 'none' }]}><View style={s.artHalo} /><View style={s.laptop}><HubIcon name="code" size={36} color="#8B9EFF" /></View><View style={s.laptopBase} /></View>
@@ -45,6 +45,7 @@ export function RecruitmentPostCard({ project, catalog, width, onOpen }: { proje
 }
 
 const s = StyleSheet.create({
+  edgeToEdge: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0, boxShadow: 'none' },
   card: { borderWidth: 1, borderColor: '#DEE7FA', borderRadius: 14, backgroundColor: '#FFFFFF', overflow: 'hidden', boxShadow: '0 3px 12px rgba(45, 101, 230, 0.05)' },
   body: { paddingHorizontal: 18, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 18 }, bodyCompact: { padding: 14, flexDirection: 'column', gap: 12, alignItems: 'stretch' },
   content: { flex: 1, minWidth: 0, gap: 10 }, heading: { flexDirection: 'row', gap: 12, alignItems: 'center' },

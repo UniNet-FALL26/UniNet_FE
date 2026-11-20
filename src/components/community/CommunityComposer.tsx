@@ -258,6 +258,7 @@ export function CommunityComposer({ onCreated }: { onCreated: () => void }) {
           style={s.overlay}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={close} />
           {open && <ToastHost modal />}<View accessibilityViewIsModal style={s.dialog}>
             <View style={s.dialogHeader}>
               <View style={{ width: 36 }} />
@@ -391,8 +392,8 @@ const s = StyleSheet.create({
     alignSelf: "center",
     marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    paddingBottom: 8,
+    paddingVertical: 10,
+    paddingBottom: 6,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -440,7 +441,7 @@ const s = StyleSheet.create({
   dividerLine: {
     height: 1,
     backgroundColor: "#F3F4F6",
-    marginTop: 12,
+    marginTop: 8,
     marginBottom: 4,
   },
 

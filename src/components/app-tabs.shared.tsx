@@ -20,7 +20,7 @@ type Shortcut = { label: string; href: Href; icon: SymbolName; tint: string; bac
 
 const tabs: TabItem[] = [
   { label: 'Cộng đồng', href: '/(tabs)', paths: ['/', '/community'], icon: { ios: 'person.2', android: 'groups', web: 'groups' }, activeIcon: { ios: 'person.2.fill', android: 'groups', web: 'groups' } },
-  { label: 'Nhắn tin', href: '/(tabs)/messages', paths: ['/messages'], icon: { ios: 'bubble.left', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }, activeIcon: { ios: 'bubble.left.fill', android: 'chat_bubble', web: 'chat_bubble' } },
+  { label: 'Nhắn tin', href: '/(tabs)/messages', paths: ['/messages', '/chat'], icon: { ios: 'bubble.left', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }, activeIcon: { ios: 'bubble.left.fill', android: 'chat_bubble', web: 'chat_bubble' } },
   { label: 'Thông báo', href: '/(tabs)/notifications', paths: ['/notifications'], icon: { ios: 'bell', android: 'notifications_none', web: 'notifications_none' }, activeIcon: { ios: 'bell.fill', android: 'notifications', web: 'notifications' } },
   { label: 'Cá nhân', href: '/(tabs)/profile', paths: ['/profile'], icon: { ios: 'person', android: 'person_outline', web: 'person_outline' }, activeIcon: { ios: 'person.fill', android: 'person', web: 'person' } },
 ];
@@ -158,11 +158,11 @@ const styles = StyleSheet.create({
   profileAction: { flexDirection: 'row', gap: 9, paddingHorizontal: 10, marginLeft: 4 },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EAF3FF', borderWidth: 2, borderColor: '#DEEEFF' },
   compactHeader: { paddingHorizontal: 16, gap: 16 }, compactLink: { paddingHorizontal: 6, gap: 4 }, compactLabel: { fontSize: 11 },
-  desktopNav: { flex: 1, paddingLeft: 24, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 },
+  desktopNav: { flex: 1, paddingLeft: 24, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 10 },
   desktopLink: { minHeight: 44, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 11 },
   desktopLinkActive: { backgroundColor: '#EAF3FF' }, desktopLinkHovered: { backgroundColor: '#F0F6FD' },
   desktopLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.surface },
   page: { flex: 1 },
   footer: { minHeight: 70, flexDirection: 'row', alignItems: 'flex-start', paddingTop: 7, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8EDF5', shadowColor: '#0B3E9C', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 8, zIndex: 2 },
   tab: { flex: 1, minHeight: 62, alignItems: 'center', justifyContent: 'center', gap: 2 },

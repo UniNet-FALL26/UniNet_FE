@@ -51,7 +51,7 @@ export function AssessorShell({ children }: { children?: ReactNode } = {}) {
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background }, content: { flex: 1, minHeight: 0 },
+  root: { flex: 1, backgroundColor: colors.surface }, content: { flex: 1, minHeight: 0 },
   header: desktopHeaderStyles.frame,
   headerInner: { minHeight: 68, maxWidth: 1600, width: '100%', alignSelf: 'center', paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 }, compactHeader: { paddingHorizontal: 16, gap: 16 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flexShrink: 0 }, logo: { width: 30, height: 34 }, brandName: { fontSize: 23, fontWeight: '800', color: colors.navy, letterSpacing: -0.8 },

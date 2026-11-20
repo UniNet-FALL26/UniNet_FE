@@ -109,7 +109,8 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
     {dialog === 'account' && student && account && isAuthenticated && <StudentVerificationModal key={account.id} account={account} name={name} schoolName={school?.accountId === account.id ? school.name : undefined} value={verification.value} loading={verification.loading} error={verification.error} onRefresh={verification.refresh} onSubmitted={verification.submitted} onClose={closeDialog} />}
     {dialog === 'account' && partner && account && isAuthenticated && <PartnerAccountModal key={account.id} account={account} name={name} onClose={closeDialog} onStatusChange={onPartnerVerificationStatusChange} />}
     <Modal visible={dialog !== null && !(dialog === 'account' && (student || partner))} transparent animationType="fade" onRequestClose={closeDialog}>
-      <View style={s.scrim}>{dialog !== null && <ToastHost modal />}<View role="dialog" aria-modal accessibilityViewIsModal style={s.dialog}>
+      <View style={s.scrim}>
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={closeDialog} />{dialog !== null && <ToastHost modal />}<View role="dialog" aria-modal accessibilityViewIsModal style={s.dialog}>
         <View style={s.dialogHeading}><Text role="heading" aria-level={2} style={[s.sectionTitle, { flex: 1 }]}>{dialog === 'account' ? 'Thông tin tài khoản' : dialog === 'terms' ? 'Điều khoản dịch vụ' : 'Chính sách bảo mật'}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng" disabled={loggingOut} onPress={closeDialog} style={({ pressed }) => [s.back, pressed && s.pressed]}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={20} tintColor={colors.textPrimary} /></Pressable></View>
         {dialog === 'account' ? <>
           <View style={s.detail}><Text style={s.body}>Tên hiển thị</Text><Text selectable style={s.detailValue}>{name}</Text></View>

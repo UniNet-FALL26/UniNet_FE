@@ -253,7 +253,7 @@ export function CompanyTabBar({ placement = 'footer' }: { placement?: 'header' |
     >
       {tabs.filter(tab => !inHeader || (tab.route !== '/(company)/profile' && tab.route !== '/(company)/company-notifications')).map((tab) => {
         const targetPath = tab.route.slice(tab.route.indexOf(")") + 1);
-        const isActive = pathname === targetPath || (tab.route.endsWith("/jobs") && pathname === "/create");
+        const isActive = (tab.route.endsWith('/company-messages') && pathname.startsWith('/chat/')) || pathname === targetPath || (tab.route.endsWith("/jobs") && pathname === "/create");
         const notification = tab.route === '/(company)/company-notifications';
         const icon = <CompanyIcon name={isActive ? tab.active : tab.icon} size={inHeader ? compactHeader ? 17 : 19 : 23} color={isActive ? companyColors.purple : appColors.textSecondary} />;
         return (

@@ -5,7 +5,7 @@ import { chatDeviceId } from '@/messaging/device';
 import { messagingService } from './messaging.service';
 
 export const authService = {
-  login: async (request: LoginRequest) => apiRequest<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ ...request, deviceId: await chatDeviceId() }) }),
+  login: async (request: LoginRequest) => apiRequest<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ ...request, deviceId: await chatDeviceId() }), feedback: { success: false } }),
   registerStudent: (request: RegisterStudentRequest) => apiRequest<LoginResponse>('/auth/register/student', { method: 'POST', body: JSON.stringify(request) }),
   registerPartner: (request: RegisterPartnerRequest) => apiRequest<LoginResponse>('/auth/register/partner', { method: 'POST', body: JSON.stringify(request) }),
   getCurrentUser: () => apiRequest<AuthAccount>('/auth/me'),

@@ -149,6 +149,7 @@ export function UpdatePostModal({
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
+      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} />
         {visible && <ToastHost modal />}<View style={styles.dialog}>
           <View style={styles.dialogHeader}>
             <View style={{ width: 36 }} />

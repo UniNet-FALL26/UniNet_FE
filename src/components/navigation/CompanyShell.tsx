@@ -28,7 +28,7 @@ export function CompanyShell({ children }: { children?: ReactNode } = {}) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.surface },
   header: desktopHeaderStyles.frame,
   headerInner: { width: '100%', maxWidth: 1600, alignSelf: 'center', minHeight: 68, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 24 },
   compactHeader: { paddingHorizontal: 16, gap: 16 },

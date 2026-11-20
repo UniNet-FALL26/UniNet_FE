@@ -49,8 +49,8 @@ export function FindTeammatesScreen() {
   };
   return <View style={s.screen}>
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-      <View style={s.page}>
-        <View testID="collaboration-banner" style={[s.banner, compact && s.bannerCompact]}>
+      <View style={[s.page, phone && s.phonePage]}>
+        <View testID="collaboration-banner" style={[s.banner, compact && s.bannerCompact, phone && s.phoneBanner]}>
           {!compact && <Image pointerEvents="none" aria-hidden source={require('../../../../assets/images/friends-banner-illustration.png')} contentFit="contain" contentPosition="right bottom" style={s.bannerArt} />}
           <View style={[s.bannerContent, compact && s.bannerContentCompact]}>
             <View style={s.heading}><View style={[s.emblem, compact && s.emblemCompact]}><HubIcon name="people" size={compact ? 24 : 28} /></View><View style={s.headingCopy}>
@@ -64,7 +64,7 @@ export function FindTeammatesScreen() {
         {loading ? <View style={s.state}><ActivityIndicator color={c.primary} accessibilityLabel="Đang tải bài tuyển" /><Text style={ui.muted}>Đang tìm đồng đội cho bạn…</Text></View>
           : error ? <View style={s.state}><HubIcon name="warning" size={30} color={c.error} /><Text role="alert" style={ui.error}>{error}</Text><HubAction title="Thử lại" onPress={() => setAttempt(n => n + 1)} /></View>
           : !data?.items.length ? <View style={s.state}><HubIcon name="people" size={36} /><Text accessibilityRole="header" aria-level={3} style={s.sectionTitle}>Chưa tìm thấy bài tuyển phù hợp</Text><Text style={s.emptyText}>{search ? 'Thử tìm với tên hoặc mô tả khác để khám phá thêm dự án.' : 'Các dự án đang mở tuyển sẽ xuất hiện tại đây. Hãy quay lại sau nhé.'}</Text></View>
-          : <><View style={s.grid} onLayout={event => setGridWidth(event.nativeEvent.layout.width)}>{data.items.map(project => <RecruitmentPostCard key={project.id} project={project} catalog={catalog} width={cardWidth} onOpen={() => openRecruitment(project.id)} />)}</View>
+          : <><View style={s.grid} onLayout={event => setGridWidth(event.nativeEvent.layout.width)}>{data.items.map(project => <RecruitmentPostCard key={project.id} project={project} catalog={catalog} width={cardWidth} edgeToEdge={phone} onOpen={() => openRecruitment(project.id)} />)}</View>
             {data.total > data.pageSize && <View style={s.pagination}><HubAction title="Trang trước" icon="back" disabled={page <= 1} onPress={() => setPage(n => n - 1)} /><Text style={ui.muted}>{data.page} / {Math.ceil(data.total / data.pageSize)}</Text><HubAction title="Trang sau" icon="next" disabled={page * data.pageSize >= data.total} onPress={() => setPage(n => n + 1)} /></View>}
           </>}
       </View>
@@ -74,6 +74,8 @@ export function FindTeammatesScreen() {
 }
 
 const s = StyleSheet.create({
+  phonePage: { paddingHorizontal: 0, paddingTop: 0 },
+  phoneBanner: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
   screen: { flex: 1, backgroundColor: c.canvas }, scroll: { flexGrow: 1, paddingBottom: 32 }, page: { width: '100%', maxWidth: 1160, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 16, gap: 20 },
   banner: { minHeight: 184, paddingHorizontal: 28, paddingVertical: 22, justifyContent: 'center', borderWidth: 1, borderColor: '#E1E9FC', borderRadius: 18, overflow: 'hidden', backgroundColor: '#EAF1FF', experimental_backgroundImage: 'linear-gradient(115deg, #F5F7FF 0%, #E6EEFF 55%, #D6E7FF 100%)' },
   bannerCompact: { padding: 16, minHeight: 0 }, bannerArt: { position: 'absolute', right: -14, bottom: -40, width: '100%', height: '150%' },
