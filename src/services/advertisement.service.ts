@@ -96,6 +96,32 @@ export interface TransactionResponse {
   checkoutUrl: string;
   status: string;
 }
+export interface RequestRefundRequest {
+  reason: string;
+  manualPayingAccount: string;
+  requestKey?: string;
+}
+export interface RefundException {
+  code: string;
+  message: string;
+  statusCode: number;
+}
+export interface RefundTransactionResponse {
+  id: string;
+  transactionId: string;
+  requestedByUserId?: string | null;
+  amount: number;
+  paymentProvider: string;
+  approval: number; // 0: NotRequired, 1: Pending, 2: Approved, 3: Rejected
+  status: number; // 0: Pending, 1: Success, 2: Failed
+  reason: string;
+  manualPayingAccount: string;
+  reviewReason?: string | null;
+  manualBankReference?: string | null;
+  requestedAt?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+}
 
 // ------------------------------
 // 4. API SERVICE
@@ -169,10 +195,11 @@ export const advertisementService = {
     );
   },
 
-  updateCampaign: (id: string, data: UpdateCampaignRequest) => {
+  updateCampaign: (id: string, formData: FormData, signal?: AbortSignal) => {
     return apiRequest<AdCampaign>(`/advertisements/campaigns/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: formData,
+      signal,
     });
   },
 
@@ -191,6 +218,15 @@ export const advertisementService = {
   syncPayment: (orderCode: string | number) => {
     return apiRequest<any>(`/advertisements/payments/${orderCode}/sync`, {
       method: "POST",
+    });
+  },
+  requestRefund: (
+    campaignId: string,
+    data: { reason: string; manualPayingAccount: string; requestKey?: string },
+  ) => {
+    return apiRequest(`/advertisements/campaigns/${campaignId}/refund`, {
+      method: "POST",
+      body: JSON.stringify(data),
     });
   },
 };
