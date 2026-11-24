@@ -49,9 +49,9 @@ test('QR uses the backend payload only while checkout remains payable', () => {
 });
 test('failed and expired pending payments cannot lead to reusing an old checkout', () => {
   assert.match(rules.paymentPresentation(detail(), transaction({ status: 2 }), now).title, /chưa thành công/);
-  assert.match(rules.paymentPresentation(detail(), transaction(), Date.parse(until)).title, /Đang chờ/);
+  assert.match(rules.paymentPresentation(detail(), transaction(), Date.parse(until)).title, /hết hạn/);
   assert.equal(rules.canCreateCheckout(detail(), transaction(), Date.parse(until)), false);
-  assert.match(rules.paymentPresentation(detail(), transaction({ status: 2 }), Date.parse(until)).title, /Chưa có lịch/);
+  assert.match(rules.paymentPresentation(detail(), transaction({ status: 2 }), Date.parse(until)).title, /hết hạn/);
 });
 test('payment service POST has no client amount/body and status GET stays scoped to verification', async () => {
   const calls = [];
@@ -100,6 +100,7 @@ function renderCheckout(snapshot) {
     'expo-web-browser': { openBrowserAsync() {} },
     '@/components/ui/Button': { Button: props => React.createElement('button', { disabled: props.disabled }, props.title) },
     '@/components/projects/PaymentQrCode': { PaymentQrCode: props => React.createElement('div', { 'data-qr': props.value }, 'QR thanh toán') },
+    './hub/ProjectHubUI': { HubIcon: () => null },
     '@/constants/colors': { colors: {} },
     '@/store/auth.store': { useAuthStore: () => ({ isAuthenticated: true, isLoading: false, account: { id: 'account' } }) },
     '@/services/api': { ApiError: class extends Error {} },
@@ -128,7 +129,29 @@ test('checkout screen renders ready, pending, successful and expired states with
   assert.doesNotMatch(html, /Mã giao dịch:/);
   d.verification.bookingStatus = 3;
   html = renderCheckout({ detail: d, transaction: transaction({ status: 2 }), packageData: null });
-  assert.match(html, /Chưa có lịch giữ còn hiệu lực/); assert.ok(!html.includes('Tạo checkout để thử lại'));
+  assert.match(html, /Mã QR đã hết hạn/); assert.match(html, /Tạo lại mã QR/); assert.ok(!html.includes('Tạo checkout để thử lại'));
+});
+
+test('expired QR can be renewed but paid, review, final and assigned cases cannot', () => {
+  const d = detail(), tx = transaction();
+  d.payments = [{ status: 0 }];
+  assert.equal(rules.canRenewExpiredCheckout(d, tx, now), false);
+  assert.equal(rules.canRenewExpiredCheckout(d, tx, Date.parse(until)), true);
+  for (const changes of [{ status: 1 }, { requiresReview: true }, { reconciliationRequired: true }])
+    assert.equal(rules.canRenewExpiredCheckout(d, { ...tx, ...changes }, Date.parse(until)), false);
+  for (const payment of [{ status: 1 }, { status: 0, requiresManualReview: true }]) {
+    d.payments = [payment]; assert.equal(rules.canRenewExpiredCheckout(d, tx, Date.parse(until)), false);
+  }
+  d.payments = []; d.assignments = [{ status: 0 }];
+  assert.equal(rules.canRenewExpiredCheckout(d, tx, Date.parse(until)), false);
+});
+
+test('renewal POST is verification-scoped and sends no amount, slot or deadline', async () => {
+  let call;
+  const service = load('services/verification-payment.service', { '@/constants/config': { API_URL: 'https://example.test/api' }, '@/services/api': { apiRequest: async (path, options) => { call = { path, options }; return transaction(); } } }).verificationPaymentService;
+  await service.renew('v');
+  assert.equal(call.path, '/project-verifications/v/payments/renew');
+  assert.equal(call.options.method, 'POST'); assert.equal(call.options.body, undefined);
 });
 
 test('checkout polling only reads, pauses in background, stops after three failures and cleans up', async () => {
@@ -144,7 +167,7 @@ test('checkout polling only reads, pauses in background, stops after three failu
     '@/components/navigation/DetailNavigation': {},
     'react-native-safe-area-context': {},
     'expo-router': { router: {}, useFocusEffect: cb => { focus = cb; }, useLocalSearchParams: () => ({ id: 'v' }) },
-    'expo-web-browser': {}, '@/components/ui/Button': {}, '@/components/projects/PaymentQrCode': {}, '@/constants/colors': { colors: {} },
+    'expo-web-browser': {}, '@/components/ui/Button': {}, '@/components/projects/PaymentQrCode': {}, '@/constants/colors': { colors: {} }, './hub/ProjectHubUI': {},
     '@/store/auth.store': { useAuthStore: () => ({ isAuthenticated: true, isLoading: false, account: { id: 'a' } }) }, '@/services/api': { ApiError: class extends Error {} },
     '@/services/verification-checkout': { loadVerificationCheckout: async (_, s) => { reads++; signal = s; if (failed) throw Error('Offline'); return { detail: detail(), transaction: transaction({ status: paid ? 1 : 0 }), packageData: null }; } },
     '@/services/verification-payment.service': { verificationPaymentService: { create: () => { posts++; } } },
@@ -163,4 +186,53 @@ test('checkout polling only reads, pauses in background, stops after three failu
   for (let i = 0; i < 3; i++) { assert.ok(timer); const tick = timer; timer = null; tick(); await flush(); }
   assert.equal(timer, null); assert.equal(posts, 0);
   cleanup(); assert.equal(signal.aborted, true); assert.equal(removed, 2);
+});
+
+test('first QR preparation runs once per hold, reconciles errors and skips existing or ineligible payments', async () => {
+  const source = ts.transpileModule(fs.readFileSync('src/components/projects/VerificationCheckoutScreen.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  for (const scenario of ['first', 'create-error', 'uncertain-success', 'pending', 'failed', 'paid', 'review', 'expired']) {
+    let focus, foreground, timer, reads = 0, posts = 0;
+    const d = detail();
+    d.verification.reservedUntil = '2099-10-21T02:00:00Z';
+    d.verification.scheduledStartAt = '2099-10-22T02:00:00Z';
+    let tx = null;
+    if (scenario === 'pending') tx = transaction();
+    if (scenario === 'failed') tx = transaction({ status: 2 });
+    if (scenario === 'paid') d.payments = [{ status: 1 }];
+    if (scenario === 'review') d.payments = [{ status: 2, requiresManualReview: true }];
+    if (scenario === 'expired') d.verification.reservedUntil = '2000-01-01T00:00:00Z';
+    const exports = {};
+    const imports = {
+      react: { useState: initial => [initial, () => {}], useRef: current => ({ current }), useCallback: fn => fn, useEffect() {} },
+      'react-native': { useWindowDimensions: () => ({ width: 1024 }), Platform: { OS: 'android' }, AppState: { currentState: 'active', addEventListener: (_, cb) => { foreground = cb; return { remove() {} }; } }, Linking: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: v => v } },
+      'expo-router': { router: {}, useFocusEffect: cb => { focus = cb; }, useLocalSearchParams: () => ({ id: 'v' }) },
+      '@/store/auth.store': { useAuthStore: () => ({ isAuthenticated: true, isLoading: false, account: { id: 'a' } }) },
+      '@/services/api': { ApiError: class extends Error {} },
+      '@/services/verification-checkout': { loadVerificationCheckout: async () => { reads++; return { detail: d, transaction: tx, packageData: null }; } },
+      '@/services/verification-payment.service': { verificationPaymentService: { create: async (_, feedback) => {
+        posts++; assert.equal(feedback, false);
+        if (scenario === 'create-error') throw Error('Offline');
+        tx = transaction({ expiredAt: d.verification.reservedUntil, qrCode: 'bank-qr-payload' });
+        if (scenario === 'uncertain-success') throw Error('Response lost');
+        return tx;
+      } } },
+      '@/utils/verification-payment': rules, '@/utils/verification-booking': booking,
+      '@/constants/colors': { colors: {} }, '@/components/navigation/DetailNavigation': {},
+      'react-native-safe-area-context': {}, 'expo-web-browser': {}, '@/components/ui/Button': {},
+      '@/components/projects/PaymentQrCode': {}, './hub/ProjectHubUI': {},
+      '@/utils/payment-return': { rememberPayment() {} }, '@/components/ui/Loading': {},
+      '@/utils/verification-date': { verificationDate: value => value },
+    };
+    vm.runInNewContext(source, { exports, Intl, Date, AbortController, setInterval: () => 1, clearInterval() {}, setTimeout: cb => { timer = cb; return 1; }, clearTimeout: () => { timer = null; }, require: key => key in imports ? imports[key] : require(key) });
+    exports.VerificationCheckoutScreen();
+    const cleanup = focus(), flush = () => new Promise(resolve => setImmediate(resolve));
+    await flush();
+    const automatic = ['first', 'create-error', 'uncertain-success'].includes(scenario);
+    assert.equal(posts, automatic ? 1 : 0, scenario);
+    if (scenario === 'create-error' || scenario === 'uncertain-success') assert.ok(reads >= 2, 'Reconcile uncertain mutation with GET');
+    if (timer) { timer(); await flush(); }
+    foreground(); await flush();
+    assert.equal(posts, automatic ? 1 : 0, `${scenario}: polling/focus cannot repeat creation`);
+    cleanup();
+  }
 });

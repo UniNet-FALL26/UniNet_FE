@@ -37,7 +37,7 @@ test('a live hold opens checkout within the booking route', () => {
   const imports = {
     react: { useState: initial => [state++ === 1 ? held : initial, () => {}], useRef: () => ({}), useCallback: fn => fn, useEffect() {} },
     'react/jsx-runtime': { jsx: (type, props) => ({ type, props }) },
-    'react-native': { StyleSheet: { create: value => value } },
+    'react-native': { StyleSheet: { create: value => value }, useWindowDimensions: () => ({ width: 1440 }) },
     'expo-router': { useFocusEffect() {}, useLocalSearchParams: () => ({ id: 'project' }) },
     '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'account' } }) },
     '@/constants/colors': { colors: {} },

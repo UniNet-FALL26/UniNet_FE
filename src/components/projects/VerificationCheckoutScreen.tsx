@@ -1,3 +1,4 @@
+import { HubIcon as CheckoutIcon } from './hub/ProjectHubUI';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { verificationDate as date } from '@/utils/verification-date';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,7 +13,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { ApiError } from '@/services/api';
 import { loadVerificationCheckout } from '@/services/verification-checkout';
 import { verificationPaymentService as payments } from '@/services/verification-payment.service';
-import { canCreateCheckout, checkoutLink, paymentPresentation, paymentQrPayload } from '@/utils/verification-payment';
+import { canCreateCheckout, canRenewExpiredCheckout, checkoutLink, paymentPresentation, paymentQrPayload } from '@/utils/verification-payment';
 import { canChooseMeeting, holdSeconds } from '@/utils/verification-booking';
 import { rememberPayment } from '@/utils/payment-return';
 import { Loading } from '@/components/ui/Loading';
@@ -22,7 +23,7 @@ const theme = {
   canvas: '#F8FAFE',
   line: '#E2E8F3',
   blueWash: '#EAF1FF',
-  primary: '#1252FF',
+  primary: colors.primary,
   success: '#198046',
   successBg: '#E6F7EC',
   warningBg: '#FFF8EE',
@@ -32,27 +33,7 @@ const theme = {
   dangerText: '#D64A4A',
 };
 
-function CheckoutIcon({ name, size = 18, color = theme.primary }: { name: string; size?: number; color?: string }) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const expoSymbols = require('expo-symbols');
-    const SymbolView = expoSymbols?.SymbolView;
-    if (typeof SymbolView === 'function' || typeof SymbolView === 'object') {
-      const iosMap: Record<string, string> = {
-        calendar: 'calendar',
-        clock: 'clock',
-        check: 'checkmark.circle',
-        qrcode: 'qrcode',
-        info: 'info.circle',
-        refresh: 'arrow.clockwise',
-      };
-      return <SymbolView name={{ ios: iosMap[name] || name, android: name, web: name }} size={size} tintColor={color} />;
-    }
-  } catch {
-    // Graceful fallback when expo-symbols is unavailable or mocked
-  }
-  return null;
-}
+
 
 type Snapshot = Awaited<ReturnType<typeof loadVerificationCheckout>>;
 const money = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
@@ -65,6 +46,8 @@ function errorText(cause: unknown) {
   if (code === 'PAYMENT_RECONCILIATION_REQUIRED') return 'Giao dịch cũ cần đối soát trước khi thanh toán tiếp.';
   if (code === 'PAYMENT_NOT_CONFIGURED' || code === 'PAYOS_NOT_CONFIGURED') return 'Dịch vụ thanh toán chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
   if (code === 'INVALID_VERIFICATION_PACKAGE' || code === 'INVALID_PAYMENT_AMOUNT') return 'Gói hiện chưa thể thanh toán. Vui lòng kiểm tra lại hồ sơ hoặc liên hệ hỗ trợ.';
+  if (code === 'MEETING_SLOT_UNAVAILABLE' || code === 'INVALID_MEETING_SLOT') return 'Khung giờ cũ không còn khả dụng. Vui lòng chọn lại lịch thẩm định.';
+  if (code === 'RECONCILIATION_DISABLED') return 'Chưa thể kiểm tra giao dịch cũ. Vui lòng chờ hệ thống cập nhật rồi thử lại.';
   return cause instanceof Error ? cause.message : 'Không thể tải trạng thái thanh toán. Vui lòng thử lại.';
 }
 
@@ -82,7 +65,8 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
   const projectId = returnProjectId ?? params.projectId;
   const { account, isLoading: restoring, isAuthenticated } = useAuthStore();
   const { width } = useWindowDimensions();
-  const wide = width >= 840;
+  const wide = width >= 900;
+  const buttonStyle = { ...s.compactButton, minHeight: wide ? 36 : 44 };
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -94,10 +78,12 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
   const active = useRef(false);
   const generation = useRef(0);
   const refreshRef = useRef<() => Promise<void>>(async () => {});
+  const automaticAttempts = useRef(new Set<string>());
   const refresh = () => setRevision(v => v + 1);
 
   useFocusEffect(useCallback(() => {
     if (restoring || !isAuthenticated || !account) return;
+    const accountId = account.id;
     active.current = true;
     generation.current++;
     const controller = new AbortController();
@@ -113,8 +99,27 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
       setLoading(true);
       let pending = true;
       try {
-        const result = await loadVerificationCheckout(id ?? '', controller.signal);
+        let result = await loadVerificationCheckout(id ?? '', controller.signal);
         if (controller.signal.aborted) return;
+        const attemptKey = `${accountId}:${id}:${result.detail.verification.reservedUntil}`;
+        if (!result.transaction && result.detail.payments.length === 0 &&
+          canCreateCheckout(result.detail, null, Date.now()) && !automaticAttempts.current.has(attemptKey)) {
+          automaticAttempts.current.add(attemptKey);
+          try {
+            await payments.create(id, false);
+            if (controller.signal.aborted) return;
+            result = await loadVerificationCheckout(id, controller.signal);
+            if (controller.signal.aborted) return;
+          } catch (cause) {
+            if (controller.signal.aborted) return;
+            // A timeout can still have created a payment. Read it before offering retry.
+            result = await loadVerificationCheckout(id, controller.signal);
+            if (controller.signal.aborted) return;
+            if (!paymentQrPayload(result.transaction, result.detail, Date.now())) {
+              setNotice(`${errorText(cause)} Không thể tự chuẩn bị mã QR. Bạn có thể kiểm tra trạng thái hoặc thử lại.`);
+            }
+          }
+        }
         failures = 0;
         setSnapshot(result); setError(null); setNow(Date.now());
         const terminal = result.transaction?.status === 1 || result.transaction?.requiresReview || result.transaction?.reconciliationRequired ||
@@ -190,6 +195,31 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
     finally { lock.current = false; if (active.current) { setBusy(false); await refreshRef.current(); } }
   }
 
+  async function renewCheckout() {
+    if (lock.current || loading || error || !snapshot || !canRenewExpiredCheckout(snapshot.detail, snapshot.transaction, Date.now())) return;
+    lock.current = true; setBusy(true); setNotice(null);
+    const current = generation.current;
+    const isCurrent = () => active.current && current === generation.current;
+    try {
+      let latest = await loadVerificationCheckout(id);
+      if (!isCurrent()) return;
+      setSnapshot(latest);
+      if (canRenewExpiredCheckout(latest.detail, latest.transaction, Date.now())) {
+        await payments.renew(id);
+        if (!isCurrent()) return;
+        latest = await loadVerificationCheckout(id);
+        if (!isCurrent()) return;
+        setSnapshot(latest); setNow(Date.now());
+        if (canRenewExpiredCheckout(latest.detail, latest.transaction, Date.now()))
+          setNotice('Giao dịch cũ đang được kiểm tra. Vui lòng chờ cập nhật rồi bấm “Tạo lại mã QR”.');
+      }
+    } catch (cause) { if (isCurrent()) setNotice(errorText(cause)); }
+    finally {
+      lock.current = false;
+      if (isCurrent()) { setBusy(false); await refreshRef.current(); }
+    }
+  }
+
   const detail = snapshot?.detail;
   const transaction = snapshot?.transaction ?? null;
   const remaining = detail ? holdSeconds(detail, now) : 0;
@@ -197,11 +227,12 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
   const link = detail ? checkoutLink(transaction, detail, now) : null;
   const qrPayload = detail && !error ? paymentQrPayload(transaction, detail, now) : null;
   const canCreate = !!snapshot && canCreateCheckout(snapshot.detail, transaction, now);
+  const canRenew = !!detail && canRenewExpiredCheckout(detail, transaction, now);
   const bookingProjectId = projectId || detail?.verification.projectId || detail?.project?.id;
   const backToBooking = () => { if (bookingProjectId) router.dismissTo({ pathname: '/group/verification/[id]', params: { id: bookingProjectId } } as never); };
 
   if (restoring) return <Loading />;
-  if (!isAuthenticated) return <SafeAreaView style={s.safe}><View style={s.content}><Text style={s.heading}>Đăng nhập để kiểm tra thanh toán</Text><Button title="Đăng nhập" onPress={() => router.push({ pathname: '/(auth)/login', params: { paymentReturn: id } } as never)} /></View></SafeAreaView>;
+  if (!isAuthenticated) return <SafeAreaView style={s.safe}><View style={s.content}><Text style={s.heading}>Đăng nhập để kiểm tra thanh toán</Text><Button style={buttonStyle} textStyle={s.buttonText} title="Đăng nhập" onPress={() => router.push({ pathname: '/(auth)/login', params: { paymentReturn: id } } as never)} /></View></SafeAreaView>;
 
   const paid = !!detail && (transaction?.status === 1 || detail.payments.some(payment => payment.status === 1));
   const amount = paid
@@ -210,28 +241,61 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
   const requiresReview = transaction?.requiresReview || transaction?.reconciliationRequired ||
     detail?.payments.some(payment => payment.requiresManualReview);
   const showPayOS = !!snapshot && !paid && !requiresReview;
-  const paymentAction = link || canCreate;
+  const paymentAction = link || canCreate || canRenew;
 
   return <SafeAreaView style={s.safe}>
-    <DetailNavigation title="Thẩm định dự án" projectId={detail?.verification.projectId || projectId} />
-    <ScrollView contentContainerStyle={[s.content, wide && s.contentWide]}>
+    <DetailNavigation title="Thanh toán thẩm định" projectId={bookingProjectId} crumbs={[{ label: 'Dự án của tôi', href: '/profile/projects' }, { label: 'Chi tiết dự án', href: bookingProjectId ? `/group/${encodeURIComponent(bookingProjectId)}` : undefined }, { label: 'Thanh toán thẩm định' }]} />
+    <ScrollView contentContainerStyle={s.content}>
       <View style={s.hero}>
-        <View accessible={false} style={s.heroRing} />
-        <View style={s.steps}>
-          <Text style={s.step}>✓ Phí dịch vụ</Text>
-          <Text style={s.step}>{remaining > 0 || detail?.verification.bookingStatus === 2 ? '✓ Lịch hẹn' : 'Lịch hẹn'}</Text>
-          <Text style={s.stepActive}>Thanh toán</Text>
-        </View>
         <Text accessibilityRole="header" style={s.title}>{paid ? 'Thanh toán đã được ghi nhận' : 'Thanh toán phí thẩm định'}</Text>
         <Text style={s.heroText}>{projectTitle || detail?.project?.title || detail?.verification.projectTitle || 'Thẩm định dự án với chuyên viên'}</Text>
+        <Text style={s.heroDescription}>Kiểm tra lịch hẹn và hoàn tất thanh toán phí dịch vụ.</Text>
+        <View style={s.steps}>
+          <Text style={s.step}>✓ Dịch vụ</Text>
+          <Text style={s.step}>{remaining > 0 || detail?.verification.bookingStatus === 2 ? '✓ Chọn lịch' : '2. Chọn lịch'}</Text>
+          <Text style={s.stepActive}>3. Thanh toán</Text>
+        </View>
       </View>
 
       {notice && <Text accessibilityRole="alert" style={s.notice}>{notice}</Text>}
       {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-      {loading && !snapshot && <Text accessibilityRole="progressbar" style={s.small}>Đang kiểm tra trạng thái thanh toán…</Text>}
+      {loading && !snapshot && <Text accessibilityRole="progressbar" style={s.small}>Đang kiểm tra giao dịch và chuẩn bị mã QR…</Text>}
 
       {snapshot && presentation && <View style={[s.grid, wide && s.gridWide]}>
-        <View style={[s.summary, wide && s.summaryWide]}>
+        <View role="region" accessibilityLabel="Thanh toán thẩm định" style={[s.card, wide && s.paymentWide]}>
+          <View style={[s.status, requiresReview ? s.statusReview : paid && detail?.verification.bookingStatus === 2 ? s.statusPaid : null]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <CheckoutIcon name={paid ? 'check' : requiresReview ? 'info' : 'clock'} size={18} color={paid ? theme.success : requiresReview ? theme.warningText : theme.primary} />
+              <Text accessibilityRole="header" style={[s.heading, { flex: 1 }]}>{presentation.title}</Text>
+            </View>
+            <Text style={s.body}>{presentation.message}</Text>
+            {transaction?.paidAt && paid && <Text style={s.small}>Ghi nhận lúc {date(transaction.paidAt)}</Text>}
+          </View>
+
+          {showPayOS && <View style={s.method}>
+            <View style={s.cardHeaderRow}>
+              <View style={s.emblem}><CheckoutIcon name="qrcode" size={18} color={theme.primary} /></View>
+              <Text style={s.heading}>Thanh toán qua PayOS</Text>
+            </View>
+            {qrPayload ? <>
+              <Text style={s.body}>Quét mã QR bằng ứng dụng ngân hàng.</Text>
+              <View style={s.qrWrapper}>
+                <View style={s.qr}><PaymentQrCode value={qrPayload} /></View>
+              </View>
+            </> : <Text style={s.body}>{canCreate ? 'Tạo mã QR để thanh toán.' : link ? 'Mở PayOS để xem mã QR.' : 'Mã QR hiện chưa khả dụng. Bạn có thể kiểm tra lại trạng thái giao dịch.'}</Text>}
+
+            {transaction?.status === 0 && transaction.expiredAt && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <CheckoutIcon name="clock" size={14} color={colors.textSecondary} />
+                <Text style={s.small}>Hạn thanh toán {date(transaction.expiredAt)} (giờ Việt Nam)</Text>
+              </View>
+            )}
+
+            {paymentAction && <Button style={buttonStyle} textStyle={s.buttonText} title={canRenew ? 'Tạo lại mã QR' : link ? 'Mở PayOS' : transaction?.status === 2 ? 'Tạo mã QR để thử lại' : 'Tạo mã QR thanh toán'} onPress={canRenew ? renewCheckout : link ? openPayment : createCheckout} loading={busy} disabled={loading || !!error || amount == null} />}
+          </View>}
+
+        </View>
+        <View role="region" accessibilityLabel="Tóm tắt thanh toán" style={[s.summary, wide && s.summaryWide]}>
           <View style={s.card}>
             <View style={s.cardHeaderRow}>
               <View style={s.emblem}><CheckoutIcon name="tag" size={18} color={theme.primary} /></View>
@@ -258,277 +322,54 @@ export function VerificationCheckoutScreen({ verificationId, returnProjectId, pr
               <Text style={s.countdown}>{Math.floor(remaining / 60).toString().padStart(2, '0')}:{(remaining % 60).toString().padStart(2, '0')}</Text>
             </View>}
 
-            {onEditSchedule && !paid && <Button title="Đổi lịch hẹn" variant="outline" disabled={busy || loading || !!error || !(detail && canChooseMeeting(detail))} onPress={onEditSchedule} />}
+            {(onEditSchedule || canRenew) && !paid && <Button style={buttonStyle} textStyle={s.buttonText} title={canRenew ? 'Chọn lại lịch' : 'Đổi lịch hẹn'} variant="outline" disabled={busy || loading || !!error || !(detail && canChooseMeeting(detail))} onPress={onEditSchedule || backToBooking} />}
+            <View style={s.secondaryActions}>
+              {detail && <Button style={{ ...buttonStyle, flex: 1 }} textStyle={s.buttonText} title="Xem hồ sơ" accessibilityLabel="Xem hồ sơ thẩm định" leadingIcon={<CheckoutIcon name="document" size={14} color={paid ? '#FFFFFF' : theme.primary} />} variant={paid ? 'primary' : 'outline'} disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />}
+              <Button style={{ ...buttonStyle, flex: 1 }} textStyle={s.buttonText} title="Kiểm tra" accessibilityLabel="Kiểm tra trạng thái" leadingIcon={<CheckoutIcon name="refresh" size={14} />} variant="outline" onPress={refresh} disabled={busy || loading} />
+            </View>
           </View>
         </View>
 
-        <View style={[s.card, wide && s.paymentWide]}>
-          <View style={[s.status, requiresReview ? s.statusReview : paid && detail?.verification.bookingStatus === 2 ? s.statusPaid : null]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <CheckoutIcon name={paid ? 'check' : requiresReview ? 'info' : 'clock'} size={18} color={paid ? theme.success : requiresReview ? theme.warningText : theme.primary} />
-              <Text accessibilityRole="header" style={s.heading}>{presentation.title}</Text>
-            </View>
-            <Text style={s.body}>{presentation.message}</Text>
-            {transaction?.paidAt && paid && <Text style={s.small}>Ghi nhận lúc {date(transaction.paidAt)}</Text>}
-          </View>
-
-          {showPayOS && <View style={s.method}>
-            <View style={s.cardHeaderRow}>
-              <View style={s.emblem}><CheckoutIcon name="qrcode" size={18} color={theme.primary} /></View>
-              <Text style={s.heading}>Thanh toán qua PayOS</Text>
-            </View>
-            {qrPayload ? <>
-              <Text style={s.body}>Quét mã QR bằng ứng dụng ngân hàng.</Text>
-              <View style={s.qrWrapper}>
-                <View style={s.qr}><PaymentQrCode value={qrPayload} /></View>
-              </View>
-            </> : <Text style={s.body}>{canCreate ? 'Tạo mã QR để thanh toán.' : link ? 'Mở PayOS để xem mã QR.' : 'Mã QR hiện chưa khả dụng. Bạn có thể kiểm tra lại trạng thái giao dịch.'}</Text>}
-
-            {transaction?.status === 0 && transaction.expiredAt && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <CheckoutIcon name="clock" size={14} color={colors.textSecondary} />
-                <Text style={s.small}>Hạn thanh toán {date(transaction.expiredAt)} (giờ Việt Nam)</Text>
-              </View>
-            )}
-
-            {paymentAction && <Button title={link ? 'Mở PayOS' : transaction?.status === 2 ? 'Tạo mã QR để thử lại' : 'Tạo mã QR thanh toán'} onPress={link ? openPayment : createCheckout} loading={busy} disabled={loading || !!error || amount == null} />}
-          </View>}
-
-          {detail && <Button title="Xem hồ sơ thẩm định" variant={paid ? 'primary' : 'outline'} disabled={busy} onPress={() => router.push({ pathname: '/group/verification-dossier/[id]', params: { id: detail.verification.id } } as never)} />}
-          <Button title="Kiểm tra trạng thái" variant="outline" onPress={refresh} disabled={busy || loading} />
-        </View>
       </View>}
 
-      {!snapshot && !loading && <Button title="Tải lại trạng thái" variant="outline" onPress={refresh} disabled={busy} />}
-      {!embedded && bookingProjectId && <Button title="Về trang đăng ký thẩm định" variant="outline" onPress={backToBooking} disabled={busy} />}
+      {!snapshot && !loading && <Button style={buttonStyle} textStyle={s.buttonText} title="Tải lại trạng thái" variant="outline" onPress={refresh} disabled={busy} />}
+      {!embedded && bookingProjectId && <Button style={buttonStyle} textStyle={s.buttonText} title="Về trang đăng ký thẩm định" variant="outline" onPress={backToBooking} disabled={busy} />}
     </ScrollView>
   </SafeAreaView>;
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.canvas },
-  content: {
-    width: '100%',
-    maxWidth: 1040,
-    alignSelf: 'center',
-    padding: 20,
-    gap: 16,
-    paddingBottom: 40,
-  },
-  contentWide: {
-    padding: 28,
-    gap: 20,
-  },
-  hero: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F3',
-    boxShadow: '0 4px 18px rgba(17, 26, 54, 0.04)',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroRing: {
-    display: 'none',
-  },
-  steps: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  step: {
-    color: '#64748B',
-    backgroundColor: '#F0F4FA',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stepActive: {
-    color: '#FFFFFF',
-    backgroundColor: theme.primary,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    fontSize: 12,
-    fontWeight: '700',
-    boxShadow: '0 2px 6px rgba(18, 82, 255, 0.25)',
-  },
-  title: {
-    color: '#111A36',
-    fontSize: 24,
-    lineHeight: 32,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  heroText: {
-    color: '#52617E',
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  grid: {
-    gap: 16,
-  },
-  gridWide: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  summary: {
-    minWidth: 0,
-  },
-  summaryWide: {
-    flex: 2,
-  },
-  paymentWide: {
-    flex: 3,
-  },
-  card: {
-    minWidth: 0,
-    borderWidth: 1,
-    borderColor: '#E2E8F3',
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    gap: 14,
-    boxShadow: '0 2px 10px rgba(17, 26, 54, 0.03)',
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  emblem: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    backgroundColor: '#EAF1FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heading: {
-    color: '#111A36',
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '700',
-  },
-  body: {
-    color: '#14233B',
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  small: {
-    color: '#52617E',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  label: {
-    color: '#52617E',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  amount: {
-    color: theme.primary,
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  badgePill: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#EAF1FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  badgePillText: {
-    color: theme.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  divider: {
-    borderTopWidth: 1,
-    borderColor: '#F0F3F8',
-    paddingTop: 12,
-    gap: 6,
-  },
-  timer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    backgroundColor: theme.warningBg,
-    borderWidth: 1,
-    borderColor: theme.warningBorder,
-    padding: 12,
-    borderRadius: 10,
-  },
-  countdown: {
-    color: theme.warningText,
-    fontSize: 20,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  status: {
-    backgroundColor: '#F7FAFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F3',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-  },
-  statusPaid: {
-    backgroundColor: theme.successBg,
-    borderColor: '#BBE4CA',
-  },
-  statusReview: {
-    backgroundColor: theme.warningBg,
-    borderColor: theme.warningBorder,
-  },
-  method: {
-    gap: 12,
-    borderTopWidth: 1,
-    borderColor: '#F0F3F8',
-    paddingTop: 12,
-  },
-  qrWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#F8FAFE',
-    borderWidth: 1,
-    borderColor: '#E2E8F3',
-    borderRadius: 14,
-  },
-  qr: {
-    alignSelf: 'center',
-    maxWidth: '100%',
-    padding: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-  },
-  notice: {
-    backgroundColor: '#EAF1FF',
-    borderLeftWidth: 3,
-    borderColor: theme.primary,
-    padding: 14,
-    borderRadius: 10,
-    color: '#111A36',
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  error: {
-    color: '#D64A4A',
-    backgroundColor: '#FFF2F2',
-    borderWidth: 1,
-    borderColor: '#FAD7D7',
-    padding: 14,
-    borderRadius: 10,
-    fontSize: 14,
-    lineHeight: 21,
-  },
+  content: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 16, gap: 14, paddingBottom: 28 },
+  hero: { paddingVertical: 4, gap: 6 },
+  title: { fontSize: 20, lineHeight: 27, fontWeight: '700', color: theme.ink, letterSpacing: -0.3 },
+  heroText: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
+  heroDescription: { fontSize: 12, lineHeight: 19, color: colors.textSecondary },
+  steps: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  step: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: '#64748B', backgroundColor: '#F0F4FA', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 7 },
+  stepActive: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: '#FFFFFF', backgroundColor: theme.primary, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 7 },
+  grid: { gap: 12, minWidth: 0 }, gridWide: { flexDirection: 'row', alignItems: 'flex-start' },
+  summary: { minWidth: 0 }, summaryWide: { width: 280 }, paymentWide: { flex: 1 },
+  card: { minWidth: 0, borderWidth: 1, borderColor: theme.line, borderRadius: 9, backgroundColor: '#FFFFFF', padding: 12, gap: 10 },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  emblem: { width: 24, height: 24, borderRadius: 6, backgroundColor: theme.blueWash, alignItems: 'center', justifyContent: 'center' },
+  heading: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: theme.ink, flexShrink: 1 },
+  body: { fontSize: 12, lineHeight: 19, color: colors.textPrimary, flexShrink: 1 },
+  small: { fontSize: 12, lineHeight: 19, color: colors.textSecondary, flexShrink: 1 },
+  label: { fontSize: 12, lineHeight: 19, color: colors.textSecondary, fontWeight: '600', flexShrink: 1 },
+  amount: { fontSize: 21, lineHeight: 28, fontWeight: '700', color: theme.primary },
+  badgePill: { alignSelf: 'flex-start', backgroundColor: theme.blueWash, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, maxWidth: '100%' },
+  badgePillText: { fontSize: 12, lineHeight: 19, fontWeight: '500', color: theme.primary },
+  divider: { borderTopWidth: 1, borderColor: theme.line, paddingTop: 10, gap: 5 },
+  timer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, backgroundColor: theme.warningBg, borderWidth: 1, borderColor: theme.warningBorder, padding: 8, borderRadius: 6 },
+  countdown: { fontSize: 17, fontWeight: '700', color: theme.warningText, fontVariant: ['tabular-nums'] },
+  status: { gap: 6 },
+  statusPaid: { backgroundColor: theme.successBg, borderWidth: 1, borderColor: '#BBE4CA', borderRadius: 6, padding: 10 }, statusReview: { backgroundColor: theme.warningBg, borderWidth: 1, borderColor: theme.warningBorder, borderRadius: 6, padding: 10 },
+  method: { gap: 10, borderTopWidth: 1, borderColor: theme.line, paddingTop: 10 },
+  qrWrapper: { alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  qr: { alignSelf: 'center', maxWidth: '100%', padding: 6, backgroundColor: '#FFFFFF', borderRadius: 6 },
+  compactButton: { minHeight: 44, borderRadius: 6, paddingHorizontal: 8 }, buttonText: { fontSize: 12, fontWeight: '600' },
+  secondaryActions: { flexDirection: 'row', gap: 8 },
+  notice: { backgroundColor: theme.blueWash, borderLeftWidth: 3, borderColor: theme.primary, padding: 12, borderRadius: 8, color: theme.ink, fontSize: 12, lineHeight: 19 },
+  error: { color: theme.dangerText, backgroundColor: theme.dangerBg, borderWidth: 1, borderColor: '#FAD7D7', padding: 12, borderRadius: 8, fontSize: 12, lineHeight: 19 },
 });

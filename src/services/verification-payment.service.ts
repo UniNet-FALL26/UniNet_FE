@@ -12,8 +12,11 @@ function validate(value: VerificationTransaction, verificationId: string) {
   return value;
 }
 export const verificationPaymentService = {
-  async create(verificationId: string) {
-    return validate(await apiRequest<VerificationTransaction>(base(verificationId), { method: 'POST' }), verificationId);
+  async create(verificationId: string, feedback?: false) {
+    return validate(await apiRequest<VerificationTransaction>(base(verificationId), { method: 'POST', feedback }), verificationId);
+  },
+  async renew(verificationId: string) {
+    return validate(await apiRequest<VerificationTransaction>(`${base(verificationId)}/renew`, { method: 'POST', feedback: false }), verificationId);
   },
   async get(verificationId: string, transactionId: string, signal?: AbortSignal) {
     return validate(await apiRequest<VerificationTransaction>(`${base(verificationId)}/${encodeURIComponent(transactionId)}`, { signal }), verificationId);

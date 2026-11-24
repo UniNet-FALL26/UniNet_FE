@@ -5,6 +5,15 @@ export function canCreateCheckout(detail: VerificationDetail, transaction: Verif
   return canChooseMeeting(detail, now) && holdSeconds(detail, now) > 0 &&
     (!transaction || (transaction.status === 2 && !transaction.requiresReview && !transaction.reconciliationRequired));
 }
+export function canRenewExpiredCheckout(detail: VerificationDetail, transaction: VerificationTransaction | null, now: number) {
+  const v = detail.verification;
+  const expired = (v.reservedUntil != null && Date.parse(v.reservedUntil) <= now) ||
+    (transaction?.expiredAt != null && Date.parse(transaction.expiredAt) <= now);
+  return expired && v.status === 0 && [1, 3].includes(v.bookingStatus) &&
+    !detail.meetingStartAt && !detail.meetingEndAt && detail.assignments.length === 0 &&
+    !detail.payments.some(p => p.status === 1 || p.requiresManualReview) &&
+    (!transaction || (transaction.status !== 1 && !transaction.requiresReview && !transaction.reconciliationRequired));
+}
 function canPresentPayment(transaction: VerificationTransaction | null, detail: VerificationDetail, now: number) {
   if (!transaction || transaction.status !== 0 || transaction.requiresReview || transaction.reconciliationRequired ||
     detail.verification.status !== 0 || !(holdSeconds(detail, now) > 0) ||
@@ -34,8 +43,9 @@ export function paymentPresentation(detail: VerificationDetail, transaction: Ver
   if (paid) return detail.verification.bookingStatus === 2
     ? { title: 'Thanh toán thành công', message: 'Hệ thống đã xác nhận thanh toán và lịch hẹn. Hồ sơ đang chờ bước xác minh tiếp theo.' }
     : { title: 'Đã ghi nhận thanh toán', message: 'Lịch hẹn chưa được xác nhận đồng bộ. Vui lòng kiểm tra lại hoặc liên hệ hỗ trợ, không thanh toán thêm.' };
+  if (canRenewExpiredCheckout(detail, transaction, now)) return { title: 'Mã QR đã hết hạn', message: 'Bấm “Tạo lại mã QR” để kiểm tra giao dịch cũ và giữ lại khung giờ nếu còn chỗ.' };
   if (transaction?.status === 0 || detail.payments.some(p => p.status === 0)) return { title: 'Đang chờ xác nhận thanh toán', message: 'Nếu đã trả tiền, hãy chờ hệ thống cập nhật. Đóng PayOS hoặc quay lại ứng dụng chưa xác nhận kết quả giao dịch.' };
   if (holdSeconds(detail, now) <= 0) return { title: 'Chưa có lịch giữ còn hiệu lực', message: 'Chọn lại lịch trước khi thanh toán. Không sử dụng đường dẫn thanh toán đã hết hạn.' };
   if (transaction?.status === 2) return { title: 'Thanh toán chưa thành công', message: 'Bạn có thể thử thanh toán lại khi lịch giữ vẫn còn hiệu lực.' };
-  return { title: 'Sẵn sàng thanh toán', message: 'Kiểm tra thông tin rồi tạo checkout. Số tiền cuối cùng được backend xác nhận trên giao dịch.' };
+  return { title: 'Sẵn sàng thanh toán', message: 'Kiểm tra thông tin và tạo mã QR để thanh toán. Số tiền sẽ hiển thị trên giao dịch.' };
 }
