@@ -6,6 +6,8 @@ import {
   AdCampaign,
   AdPackage,
   advertisementService,
+  RefundException,
+  UpdateCampaignRequest,
 } from "@/services/advertisement.service";
 import { reportApiFailure } from "@/services/api";
 import { toast } from "@/store/toast.store";
@@ -37,6 +39,7 @@ enum CampaignStatus {
   Active = 3,
   Completed = 4,
   Rejected = 5,
+  Refunded = 6,
 }
 
 const getStatusConfig = (status: number) => {
@@ -53,6 +56,8 @@ const getStatusConfig = (status: number) => {
       return { label: "Hoàn thành/Hết hạn", color: "#4B5563", bg: "#E5E7EB" };
     case CampaignStatus.Rejected:
       return { label: "Bị từ chối", color: "#DC2626", bg: "#FEE2E2" };
+    case CampaignStatus.Refunded:
+      return { label: "Đã hoàn tiền", color: "#7C3AED", bg: "#EDE9FE" };
     default:
       return {
         label: `Trạng thái: ${status}`,
@@ -71,12 +76,10 @@ export default function CompanyAdvertisementScreen() {
   const incomingUrl = Linking.useURL();
   const processedOrderRef = useRef<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"campaigns" | "payments">(
-    "campaigns",
-  );
-
   const [packages, setPackages] = useState<AdPackage[]>([]);
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
+
+  const [refund, setRefund] = useState<RefundException | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -117,39 +120,68 @@ export default function CompanyAdvertisementScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [payingCampaignId, setPayingCampaignId] = useState<string | null>(null);
 
-  const fetchData = useCallback(
-    async (isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      try {
-        if (activeTab === "campaigns") {
-          const resCampaigns = await advertisementService.getMyCampaigns();
-          const campaignList =
-            (resCampaigns as any)?.campaigns ||
-            (Array.isArray(resCampaigns) ? resCampaigns : []);
-          setCampaigns(campaignList);
+  // --- STATE RIÊNG CHO MODAL SỬA VÀ DUYỆT LẠI ---
+  const [editModal, setEditModal] = useState<{
+    visible: boolean;
+    campaign: AdCampaign | null;
+  }>({
+    visible: false,
+    campaign: null,
+  });
+  const [editForm, setEditForm] = useState({
+    title: "",
+    content: "",
+    destinationUrl: "",
+  });
+  const [editFile, setEditFile] = useState<any | null>(null);
+  const [existingEditImageUrl, setExistingEditImageUrl] = useState<
+    string | null
+  >(null);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
 
-          const resPackages = await advertisementService.getPackages({
-            page: 1,
-            pageSize: 20,
-          });
-          const rawPackages =
-            resPackages?.packages ||
-            (Array.isArray(resPackages) ? resPackages : []);
-          const filteredPackages = rawPackages.filter(
-            (pkg: any) => pkg.role === 1,
-          );
-          setPackages(filteredPackages);
-        }
-      } catch (cause) {
-        console.error("Lỗi tải dữ liệu:", cause);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [activeTab],
-  );
+  // --- STATE RIÊNG CHO MODAL YÊU CẦU HOÀN TIỀN ---
+  const [refundModal, setRefundModal] = useState<{
+    visible: boolean;
+    campaign: AdCampaign | null;
+  }>({
+    visible: false,
+    campaign: null,
+  });
+  const [refundForm, setRefundForm] = useState({
+    bankName: "",
+    accountNumber: "",
+    accountHolderName: "",
+    reason: "",
+    requestKey: "",
+  });
+  const [submittingRefund, setSubmittingRefund] = useState(false);
+
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const resCampaigns = await advertisementService.getMyCampaigns();
+      const campaignList =
+        (resCampaigns as any)?.campaigns ||
+        (Array.isArray(resCampaigns) ? resCampaigns : []);
+      setCampaigns(campaignList);
+
+      const resPackages = await advertisementService.getPackages({
+        page: 1,
+        pageSize: 20,
+      });
+      const rawPackages =
+        resPackages?.packages ||
+        (Array.isArray(resPackages) ? resPackages : []);
+      const filteredPackages = rawPackages.filter((pkg: any) => pkg.role === 1);
+      setPackages(filteredPackages);
+    } catch (cause) {
+      console.error("Lỗi tải dữ liệu:", cause);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -183,7 +215,6 @@ export default function CompanyAdvertisementScreen() {
           cancel === "true" || status?.toUpperCase() === "CANCELLED";
         const isPaid = status?.toUpperCase() === "PAID" && !isCancelled;
 
-        setActiveTab("campaigns");
         await fetchData(true);
 
         if (isPaid) {
@@ -239,6 +270,204 @@ export default function CompanyAdvertisementScreen() {
     setSelectedFiles([]);
   };
 
+  // --- CÁC HÀM XỬ LÝ CHO MODAL SỬA VÀ DUYỆT LẠI ---
+  const handleOpenEditModal = (campaign: UpdateCampaignRequest) => {
+    setEditForm({
+      title: campaign.title || "",
+      content: campaign.content || "",
+      destinationUrl: campaign.destinationUrl || "",
+    });
+    const currentImage =
+      (campaign as any).mediaUrl ||
+      (campaign as any).imageUrl ||
+      (campaign as any).mediaFiles?.[0]?.url ||
+      (campaign as any).media?.[0]?.url ||
+      null;
+    setExistingEditImageUrl(currentImage);
+    setEditFile(null);
+    setEditModal({ visible: true, campaign: campaign as AdCampaign });
+  };
+
+  const handleCloseEditModal = () => {
+    if (submittingEdit) return;
+    setEditModal({ visible: false, campaign: null });
+    setEditForm({ title: "", content: "", destinationUrl: "" });
+    setEditFile(null);
+    setExistingEditImageUrl(null);
+  };
+
+  async function attachEditImage() {
+    try {
+      const asset = await pickProfileImage();
+      if (!asset) return;
+      setEditFile(asset);
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error
+          ? cause.message
+          : "Chưa tải được tệp. Vui lòng thử lại.",
+      );
+    }
+  }
+  const hasEditChanges = Boolean(
+    editModal.campaign &&
+    (editForm.title.trim() !== (editModal.campaign.title || "").trim() ||
+      editForm.content.trim() !== (editModal.campaign.content || "").trim() ||
+      editForm.destinationUrl.trim() !==
+        (editModal.campaign.destinationUrl || "").trim() ||
+      editFile !== null),
+  );
+  const handleSubmitEditCampaign = async () => {
+    if (!editModal.campaign) return;
+
+    if (!hasEditChanges) {
+      toast.error("Bạn chưa thay đổi thông tin nào của chiến dịch.");
+      return;
+    }
+
+    if (
+      !editForm.title.trim() ||
+      !editForm.content.trim() ||
+      !editForm.destinationUrl.trim()
+    ) {
+      toast.error("Vui lòng nhập đầy đủ tiêu đề, nội dung và URL đích.");
+      return;
+    }
+    setSubmittingEdit(true);
+    try {
+      const formData = new FormData();
+      formData.append("title", editForm.title.trim());
+      formData.append("content", editForm.content.trim());
+
+      if (editForm.destinationUrl.trim()) {
+        formData.append("destinationUrl", editForm.destinationUrl.trim());
+      }
+
+      if (editFile) {
+        if (Platform.OS === "web" && editFile.file) {
+          formData.append("mediaFile", editFile.file);
+        } else {
+          formData.append("mediaFile", {
+            uri: editFile.uri,
+            name:
+              editFile.fileName ||
+              editFile.uri.split("/").pop() ||
+              `upload_${Date.now()}.jpg`,
+            type: editFile.mimeType || "image/jpeg",
+          } as any);
+        }
+      }
+
+      // Gọi API riêng để cập nhật và gửi duyệt lại chiến dịch
+      await advertisementService.updateCampaign(
+        editModal.campaign.id,
+        formData,
+      );
+
+      toast.success("Đã cập nhật và gửi duyệt lại chiến dịch.");
+      handleCloseEditModal();
+      await fetchData(true);
+    } catch (cause) {
+      console.error("Lỗi gửi duyệt lại:", cause);
+      reportApiFailure(
+        cause,
+        "Không thể cập nhật chiến dịch. Vui lòng thử lại.",
+      );
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+  // Helper tạo UUID tương thích cả Web và React Native (chống bấm gửi 2 lần)
+  const generateRequestKey = () => {
+    if (typeof globalThis.crypto?.randomUUID === "function") {
+      return globalThis.crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+  // --- CÁC HÀM XỬ LÝ CHO MODAL YÊU CẦU HOÀN TIỀN ---
+  const handleOpenRefundModal = (campaign: AdCampaign) => {
+    setRefundForm({
+      bankName: "",
+      accountNumber: "",
+      accountHolderName: "",
+      reason: "",
+      requestKey: generateRequestKey(),
+    });
+    setRefundModal({ visible: true, campaign });
+  };
+
+  const handleSubmitRefund = async () => {
+    if (!refundModal.campaign) return;
+
+    const bankName = refundForm.bankName.trim();
+    const accountNumber = refundForm.accountNumber.trim();
+    const accountHolderName = refundForm.accountHolderName.trim().toUpperCase();
+    const reason = refundForm.reason.trim();
+
+    if (!bankName || !accountNumber || !accountHolderName) {
+      toast.error("Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng.");
+      return;
+    }
+
+    if (!reason) {
+      toast.error("Vui lòng nhập lý do yêu cầu hoàn tiền.");
+      return;
+    }
+
+    const manualPayingAccount = `${bankName} - ${accountNumber} - ${accountHolderName}`;
+    if (manualPayingAccount.length > 255) {
+      toast.error(
+        "Thông tin tài khoản ngân hàng không được vượt quá 255 ký tự.",
+      );
+      return;
+    }
+
+    setSubmittingRefund(true);
+    try {
+      const refundRequest = await advertisementService.requestRefund(
+        refundModal.campaign.id,
+        {
+          reason,
+          manualPayingAccount,
+          requestKey: refundForm.requestKey || undefined,
+        },
+      );
+      setRefund(refundRequest as any);
+      toast.success("Đã gửi yêu cầu hoàn tiền thành công.");
+      setRefundModal({ visible: false, campaign: null });
+      await fetchData(true);
+    } catch (cause: any) {
+      // Lấy object JSON lỗi từ các thuộc tính phổ biến mà apiRequest gắn vào Error
+      const rawError =
+        cause?.data ??
+        cause?.details ??
+        cause?.payload ??
+        cause?.response?.data;
+
+      const errorResponse = {
+        code: rawError?.code ?? cause?.code ?? "UNKNOWN_ERROR",
+        message:
+          rawError?.message ??
+          cause?.message ??
+          "Không thể gửi yêu cầu hoàn tiền.",
+        statusCode:
+          rawError?.statusCode ?? cause?.status ?? cause?.statusCode ?? 500,
+      };
+
+      // Log ra đúng cấu trúc { code, message, statusCode }
+      console.error("Lỗi yêu cầu hoàn tiền:", errorResponse);
+
+      // Hiển thị thông báo từ Backend lên Toast (bỏ reportApiFailure nếu hàm đó cũng tự gọi toast)
+      toast.error(errorResponse.message);
+    } finally {
+      setSubmittingRefund(false);
+    }
+  };
+
   // Chỉ cho phép chọn 1 ảnh
   async function attach() {
     try {
@@ -282,9 +511,9 @@ export default function CompanyAdvertisementScreen() {
         if (selectedFiles.length > 0) {
           const file = selectedFiles[0];
           if (Platform.OS === "web" && file.file) {
-            formData.append("MediaFiles", file.file);
+            formData.append("mediaFile", file.file);
           } else {
-            formData.append("MediaFiles", {
+            formData.append("mediaFile", {
               uri: file.uri,
               name:
                 file.fileName ||
@@ -495,6 +724,25 @@ export default function CompanyAdvertisementScreen() {
             />
           </View>
         )}
+
+        {(Number(item.status) === CampaignStatus.Rejected ||
+          Number(item.status) === CampaignStatus.PendingModeration) && (
+          <View style={styles.rejectedActionsRow}>
+            <Pressable
+              style={styles.refundBtn}
+              onPress={() => handleOpenRefundModal(item)}
+            >
+              <Text style={styles.refundBtnText}>Yêu cầu hoàn tiền</Text>
+            </Pressable>
+
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Sửa và duyệt lại"
+                onPress={() => handleOpenEditModal(item)}
+              />
+            </View>
+          </View>
+        )}
       </Pressable>
     );
   };
@@ -506,100 +754,64 @@ export default function CompanyAdvertisementScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.contentWrapper}>
-        <View style={styles.tabsWrapper}>
-          <View style={styles.tabsContainer}>
+        <View style={styles.actionAndFilterWrapper}>
+          <Button
+            title="Tạo chiến dịch mới"
+            onPress={() => setModalStep(1)}
+            style={{ marginBottom: 12 }}
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterContainer}
+          >
             <Pressable
               style={[
-                styles.tab,
-                activeTab === "campaigns" && styles.activeTab,
+                styles.filterChip,
+                statusFilter === null && styles.activeFilterChip,
               ]}
-              onPress={() => setActiveTab("campaigns")}
+              onPress={() => setStatusFilter(null)}
             >
               <Text
                 style={[
-                  styles.tabText,
-                  activeTab === "campaigns" && styles.activeTabText,
+                  styles.filterText,
+                  statusFilter === null && styles.activeFilterText,
                 ]}
               >
-                Chiến dịch của tôi
+                Tất cả
               </Text>
             </Pressable>
-            <Pressable
-              style={[styles.tab, activeTab === "payments" && styles.activeTab]}
-              onPress={() => setActiveTab("payments")}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "payments" && styles.activeTabText,
-                ]}
-              >
-                Lịch sử thanh toán
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {activeTab === "campaigns" && (
-          <View style={styles.actionAndFilterWrapper}>
-            <Button
-              title="Tạo chiến dịch mới"
-              onPress={() => setModalStep(1)}
-              style={{ marginBottom: 12 }}
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterContainer}
-            >
+            {[
+              { label: "Đang chạy", value: CampaignStatus.Active },
+              { label: "Chờ duyệt", value: CampaignStatus.PendingModeration },
+              {
+                label: "Chờ thanh toán",
+                value: CampaignStatus.PendingPayment,
+              },
+              { label: "Hoàn thành", value: CampaignStatus.Completed },
+              { label: "Nháp", value: CampaignStatus.Draft },
+              { label: "Từ chối", value: CampaignStatus.Rejected },
+            ].map((status) => (
               <Pressable
+                key={status.value}
                 style={[
                   styles.filterChip,
-                  statusFilter === null && styles.activeFilterChip,
+                  statusFilter === status.value && styles.activeFilterChip,
                 ]}
-                onPress={() => setStatusFilter(null)}
+                onPress={() => setStatusFilter(status.value)}
               >
                 <Text
                   style={[
                     styles.filterText,
-                    statusFilter === null && styles.activeFilterText,
+                    statusFilter === status.value && styles.activeFilterText,
                   ]}
                 >
-                  Tất cả
+                  {status.label}
                 </Text>
               </Pressable>
-              {[
-                { label: "Đang chạy", value: CampaignStatus.Active },
-                { label: "Chờ duyệt", value: CampaignStatus.PendingModeration },
-                {
-                  label: "Chờ thanh toán",
-                  value: CampaignStatus.PendingPayment,
-                },
-                { label: "Hoàn thành", value: CampaignStatus.Completed },
-                { label: "Nháp", value: CampaignStatus.Draft },
-                { label: "Từ chối", value: CampaignStatus.Rejected },
-              ].map((status) => (
-                <Pressable
-                  key={status.value}
-                  style={[
-                    styles.filterChip,
-                    statusFilter === status.value && styles.activeFilterChip,
-                  ]}
-                  onPress={() => setStatusFilter(status.value)}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      statusFilter === status.value && styles.activeFilterText,
-                    ]}
-                  >
-                    {status.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+            ))}
+          </ScrollView>
+        </View>
 
         {loading || syncingPayment ? (
           <View style={styles.centerContainer}>
@@ -612,11 +824,9 @@ export default function CompanyAdvertisementScreen() {
           </View>
         ) : (
           <FlatList
-            data={activeTab === "campaigns" ? (filteredCampaigns as any[]) : []}
+            data={filteredCampaigns}
             keyExtractor={(item, index) => item.id || index.toString()}
-            renderItem={
-              activeTab === "campaigns" ? renderCampaignCard : undefined
-            }
+            renderItem={renderCampaignCard}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -668,11 +878,11 @@ export default function CompanyAdvertisementScreen() {
                 >
                   <View style={styles.formGroup}>
                     <Text style={styles.inputLabel}>
-                      Tiêu đề <Text style={styles.asterisk}>*</Text>
+                      Tên chiến dịch <Text style={styles.asterisk}>*</Text>
                     </Text>
                     <TextInput
                       style={styles.inputField}
-                      placeholder="Nhập tiêu đề hấp dẫn..."
+                      placeholder="Nhập tên chiến dịch..."
                       placeholderTextColor={colors.textSecondary}
                       value={form.title}
                       onChangeText={(txt) => setForm({ ...form, title: txt })}
@@ -942,6 +1152,343 @@ export default function CompanyAdvertisementScreen() {
         </View>
       </Modal>
 
+      {/* --- MODAL SỬA VÀ DUYỆT LẠI CHIẾN DỊCH --- */}
+      <Modal
+        visible={editModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseEditModal}
+      >
+        <View style={styles.modalOverlay}>
+          {editModal.visible && <ToastHost modal />}
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Sửa và duyệt lại</Text>
+              <Text style={styles.modalSubtitle}>
+                Chỉnh sửa thông tin chiến dịch và gửi hệ thống xét duyệt lại
+              </Text>
+            </View>
+
+            {editModal.campaign?.rejectionReason && (
+              <View style={styles.rejectionAlertBox}>
+                <Text style={styles.rejectionAlertTitle}>
+                  Lý do bị từ chối:
+                </Text>
+                <Text style={styles.rejectionAlertText}>
+                  {editModal.campaign.rejectionReason}
+                </Text>
+              </View>
+            )}
+
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ gap: 16 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  Tên chiến dịch <Text style={styles.asterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập tên chiến dịch..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={editForm.title}
+                  onChangeText={(txt) =>
+                    setEditForm({ ...editForm, title: txt })
+                  }
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  Nội dung chi tiết <Text style={styles.asterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={[
+                    styles.inputField,
+                    { height: 100, textAlignVertical: "top" },
+                  ]}
+                  placeholder="Mô tả nội dung bạn muốn truyền tải..."
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  value={editForm.content}
+                  onChangeText={(txt) =>
+                    setEditForm({ ...editForm, content: txt })
+                  }
+                />
+              </View>
+
+              {/* Hiển thị ảnh mới chọn hoặc ảnh hiện tại của chiến dịch */}
+              {(editFile || existingEditImageUrl) && (
+                <View style={styles.previewContainer}>
+                  <View style={styles.previewGrid}>
+                    {editFile ? (
+                      <View style={styles.previewItem}>
+                        <Image
+                          source={{ uri: editFile.uri }}
+                          contentFit="cover"
+                          style={styles.previewImage}
+                        />
+                        <Pressable
+                          style={styles.removeBtn}
+                          onPress={() => setEditFile(null)}
+                          disabled={submittingEdit}
+                        >
+                          <SymbolView
+                            name={{
+                              ios: "xmark",
+                              android: "close",
+                              web: "close",
+                            }}
+                            size={14}
+                            tintColor="#FFFFFF"
+                          />
+                        </Pressable>
+                      </View>
+                    ) : (
+                      existingEditImageUrl && (
+                        <View style={styles.previewItem}>
+                          <Image
+                            source={{ uri: existingEditImageUrl }}
+                            contentFit="cover"
+                            style={styles.previewImage}
+                          />
+                        </View>
+                      )
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Nút Thêm/Đổi ảnh banner */}
+              {!editFile && !existingEditImageUrl ? (
+                <Pressable
+                  style={styles.attachMediaBar}
+                  onPress={() => void attachEditImage()}
+                  disabled={submittingEdit}
+                >
+                  <SymbolView
+                    name={{
+                      ios: "photo.badge.plus",
+                      android: "add_photo_alternate",
+                      web: "add_photo_alternate",
+                    }}
+                    size={22}
+                    tintColor={colors.primary}
+                  />
+                  <Text style={styles.attachMediaText}>Thêm ảnh banner</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[
+                    styles.attachMediaBar,
+                    {
+                      backgroundColor: "#F3F4F6",
+                      borderColor: "#F59E0B",
+                      borderStyle: "solid",
+                      borderWidth: 1.5,
+                    },
+                  ]}
+                  onPress={() => void attachEditImage()}
+                  disabled={submittingEdit}
+                >
+                  <SymbolView
+                    name={{
+                      ios: "arrow.triangle.2.circlepath",
+                      android: "sync",
+                      web: "sync",
+                    }}
+                    size={20}
+                    tintColor="#4B5563"
+                  />
+                  <Text style={[styles.attachMediaText, { color: "#4B5563" }]}>
+                    Đổi ảnh khác
+                  </Text>
+                </Pressable>
+              )}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  URL đích khi click (Tùy chọn)
+                </Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="https://yourwebsite.com"
+                  placeholderTextColor={colors.textSecondary}
+                  value={editForm.destinationUrl}
+                  onChangeText={(txt) =>
+                    setEditForm({ ...editForm, destinationUrl: txt })
+                  }
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={handleCloseEditModal}
+                style={styles.cancelBtn}
+                disabled={submittingEdit}
+              >
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title={
+                    submittingEdit ? "Đang gửi duyệt..." : "Lưu & Gửi duyệt lại"
+                  }
+                  onPress={handleSubmitEditCampaign}
+                  disabled={
+                    submittingEdit ||
+                    !editForm.title.trim() ||
+                    !editForm.content.trim() ||
+                    !editForm.destinationUrl.trim() ||
+                    !hasEditChanges
+                  }
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL YÊU CẦU HOÀN TIỀN --- */}
+      <Modal
+        visible={refundModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={() =>
+          !submittingRefund &&
+          setRefundModal({ visible: false, campaign: null })
+        }
+      >
+        <View style={styles.modalOverlay}>
+          {refundModal.visible && <ToastHost modal />}
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Yêu cầu hoàn tiền</Text>
+              <Text style={styles.modalSubtitle} numberOfLines={1}>
+                Chiến dịch: {refundModal.campaign?.title}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "700",
+                  color: "#059669",
+                  marginTop: 6,
+                }}
+              >
+                Số tiền hoàn dự kiến:{" "}
+                {(refundModal.campaign?.budgetCap ?? 0).toLocaleString("vi-VN")}{" "}
+                ₫
+              </Text>
+            </View>
+
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ gap: 14 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  Tên ngân hàng <Text style={styles.asterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="VD: Vietcombank, MB Bank, Techcombank..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={refundForm.bankName}
+                  onChangeText={(txt) =>
+                    setRefundForm({ ...refundForm, bankName: txt })
+                  }
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  Số tài khoản nhận tiền <Text style={styles.asterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Nhập chính xác số tài khoản..."
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  value={refundForm.accountNumber}
+                  onChangeText={(txt) =>
+                    setRefundForm({ ...refundForm, accountNumber: txt })
+                  }
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  Tên chủ tài khoản <Text style={styles.asterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="NGUYEN VAN A (Viết hoa không dấu)"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="characters"
+                  value={refundForm.accountHolderName}
+                  onChangeText={(txt) =>
+                    setRefundForm({ ...refundForm, accountHolderName: txt })
+                  }
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>
+                  Lý do hoàn tiền <Text style={styles.asterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={[
+                    styles.inputField,
+                    { height: 84, textAlignVertical: "top" },
+                  ]}
+                  placeholder="VD: Chiến dịch bị từ chối kiểm duyệt, muốn hủy và nhận lại tiền..."
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  maxLength={500}
+                  value={refundForm.reason}
+                  onChangeText={(txt) =>
+                    setRefundForm({ ...refundForm, reason: txt })
+                  }
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() =>
+                  setRefundModal({ visible: false, campaign: null })
+                }
+                style={styles.cancelBtn}
+                disabled={submittingRefund}
+              >
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title={
+                    submittingRefund
+                      ? "Đang gửi yêu cầu..."
+                      : "Gửi yêu cầu hoàn tiền"
+                  }
+                  onPress={handleSubmitRefund}
+                  disabled={
+                    submittingRefund ||
+                    !refundForm.bankName.trim() ||
+                    !refundForm.accountNumber.trim() ||
+                    !refundForm.accountHolderName.trim() ||
+                    !refundForm.reason.trim()
+                  }
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* --- POP-UP KẾT QUẢ THANH TOÁN PAYOS --- */}
       <Modal
         visible={paymentPopup.visible}
@@ -1006,27 +1553,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 800,
   },
-  tabsWrapper: { alignItems: "center", marginVertical: 16 },
-  tabsContainer: {
-    flexDirection: "row",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    padding: 4,
-    width: "90%",
-    maxWidth: 400,
+  actionAndFilterWrapper: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
   },
-  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10 },
-  activeTab: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tabText: { fontWeight: "600", color: "#6B7280", fontSize: 14 },
-  activeTabText: { color: colors.textPrimary, fontWeight: "700" },
-  actionAndFilterWrapper: { paddingHorizontal: 16, marginBottom: 8 },
   filterContainer: { gap: 8, paddingRight: 16 },
   filterChip: {
     paddingHorizontal: 16,
@@ -1294,5 +1825,44 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+  },
+  rejectedActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+  },
+  refundBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  refundBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#DC2626",
+  },
+  rejectionAlertBox: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 10,
+    padding: 12,
+    gap: 4,
+  },
+  rejectionAlertTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#991B1B",
+  },
+  rejectionAlertText: {
+    fontSize: 13,
+    color: "#DC2626",
+    lineHeight: 18,
   },
 });
