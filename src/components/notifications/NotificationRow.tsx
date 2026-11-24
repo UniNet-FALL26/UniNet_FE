@@ -24,7 +24,7 @@ const s = StyleSheet.create({
   container: { marginBottom: 5 }, row: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: theme.divider, backgroundColor: theme.surface }, unreadRow: { backgroundColor: theme.unread, borderColor: theme.unread },
   main: { flex: 1, minWidth: 0, minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingLeft: 11, paddingRight: 8, borderRadius: 10 }, hovered: { backgroundColor: theme.hovered },
   mobileMain: { gap: 9, paddingLeft: 8, paddingRight: 4 }, mobileIcon: { width: 32, height: 32, borderRadius: 9 },
-  icon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, copy: { flex: 1, minWidth: 0, gap: 1 }, title: { fontSize: 12, lineHeight: 18, fontWeight: '600', color: theme.title }, unreadTitle: { fontWeight: '700' }, message: { fontSize: 11, lineHeight: 16, color: theme.title },
-  time: { fontSize: 10, lineHeight: 15, color: theme.secondary, marginTop: 1 },
+  icon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, copy: { flex: 1, minWidth: 0, gap: 1 }, title: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: theme.title }, unreadTitle: { fontWeight: '700' }, message: { fontSize: 12, lineHeight: 17, color: theme.title },
+  time: { fontSize: 11, lineHeight: 16, color: theme.secondary, marginTop: 1 },
   dotSlot: { width: 32, alignItems: 'center' }, dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.active }, disabled: { opacity: 0.45 },
 });
