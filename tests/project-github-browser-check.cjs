@@ -20,6 +20,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     const rows = [repo]; let manager = true, expanded = false, freshAuthorized = false, fail = false, conflict = true, stall = false, releaseOld, reachedOld;
     const stalled = new Promise(resolve => { reachedOld = resolve; });
     const identities = [{ id: 'identity-b', projectId: project.id, userProfileId: 'other-profile', externalAccountId: 99, externalUsername: 'member-b', status: 0 }];
+    let stallIdentities = false, reachedIdentity, releaseIdentity;
     const pageOf = items => ({ items, page: 1, pageSize: 50, totalCount: items.length });
     await page.route('**/api/**', async route => {
       const req = route.request(), url = new URL(req.url()), endpoint = url.pathname, method = req.method();
@@ -30,6 +31,7 @@ fs.mkdirSync(artifacts, { recursive: true });
       if (endpoint.endsWith('/auth/me')) return ok(account);
       if (endpoint.endsWith('/profile/portfolio/me')) return ok({ ...sample, profile: account.profile });
       if (endpoint.endsWith('/project-hub/' + project.id)) return ok(project);
+      if (endpoint.endsWith('/project-hub/another-project')) return ok({ ...project, id: 'another-project', title: 'Dự án khác' });
       if (endpoint.endsWith('/github/connections')) return ok([{ id: 'a', providerAccountId: '11', login: 'member-a', status: 0 }, { id: 'other', providerAccountId: '33', login: 'another-account', status: 0 }, { id: 'fresh', providerAccountId: '44', login: 'fresh-account', status: 0 }]);
       if (endpoint.endsWith('/github/oauth/complete')) { writes.push({ endpoint, body: req.postDataJSON() }); return ok({ id: 'a', providerAccountId: '11', login: 'member-a', status: 0 }); }
       if (endpoint.endsWith('/git/app/authorization/start')) { writes.push({ endpoint, body: req.postDataJSON() }); return ok({ flowId: 'app-flow', authorizationUrl: 'https://github.com/login/oauth/authorize?state=fixture', expiresAt: new Date(Date.now() + 600000).toISOString() }); }
@@ -51,11 +53,29 @@ fs.mkdirSync(artifacts, { recursive: true });
         rows.push({ ...repo, id: 'new-association', repository: { ...repo.repository, fullName: 'uninet/new-authorized', providerRepositoryId: body.repositoryId } });
         return ok({ projectGitRepositoryId: 'new-association', repositoryId: body.repositoryId, linkStatus: 0, readiness: 'PendingActivation' });
       }
-      if (method === 'DELETE') throw new Error('No unlink is authorized by this browser test');
+      if (/\/git\/identities\/[^/]+\/reactivate$/.test(endpoint)) {
+        const value = identities.find(x => x.id === endpoint.split('/').at(-2));
+        assert.ok(value && value.userProfileId === 'self-profile');
+        assert.equal(req.postDataJSON().connectionId, value.externalAccountId === 11 ? 'a' : 'other');
+        writes.push({ endpoint, method }); value.status = 0; return ok(value);
+      }
+      if (method === 'DELETE') {
+        if (endpoint.startsWith('/api/messaging/devices/')) return route.fulfill({ status: 204 }); // Fixture logout cleanup only.
+        assert.match(endpoint, /\/git\/identities\/identity-(a|other)$/);
+        const value = identities.find(x => x.id === endpoint.split('/').at(-1));
+        assert.ok(value && value.userProfileId === 'self-profile');
+        writes.push({ endpoint, method }); value.status = 1; return route.fulfill({ status: 204 });
+      }
       if (endpoint.endsWith('/git/identities')) {
+        if (method === 'GET' && stallIdentities) {
+          stallIdentities = false;
+          await new Promise(resolve => { releaseIdentity = resolve; reachedIdentity(); });
+          return ok(pageOf(identities)).catch(() => {});
+        }
         if (method === 'POST') {
           writes.push({ endpoint, body: req.postDataJSON() }); if (conflict) return error(409, 'GIT_IDENTITY_OWNERSHIP_CONFLICT');
-          const value = { id: 'identity-a', projectId: project.id, userProfileId: 'self-profile', externalAccountId: 11, externalUsername: 'member-a', status: 0 }; identities.push(value); return ok(value);
+          const second = req.postDataJSON().connectionId === 'other';
+          const value = { id: second ? 'identity-other' : 'identity-a', projectId: project.id, userProfileId: 'self-profile', externalAccountId: second ? 33 : 11, externalUsername: second ? 'another-account' : 'member-a', status: 0 }; identities.push(value); return ok(value);
         }
         return ok(pageOf(identities));
       }
@@ -106,10 +126,74 @@ fs.mkdirSync(artifacts, { recursive: true });
     manager = true; await settings(); await page.getByRole('button', { name: 'Thêm repository', exact: true }).waitFor(); passed++; console.log(`CHECK ${passed}`);
     await page.getByRole('tab', { name: /Thành viên/ }).click(); await page.getByText('35,5%', { exact: true }).waitFor(); await page.getByRole('button', { name: 'Liên kết GitHub của tôi', exact: true }).click(); await page.getByRole('button', { name: 'Liên kết @member-a với tôi', exact: true }).click(); await page.getByText(/Tài khoản GitHub đã thuộc thành viên khác/).waitFor(); passed++; console.log(`CHECK ${passed}`);
     conflict = false; await page.getByRole('button', { name: 'Liên kết @member-a với tôi', exact: true }).click(); await page.getByText('GitHub: @member-a · Đã xác minh', { exact: true }).waitFor(); passed++; console.log(`CHECK ${passed}`);
+    await page.getByRole('button', { name: 'Liên kết tài khoản GitHub khác', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'Liên kết @member-a với tôi', exact: true }).count(), 0);
+    conflict = true; await page.getByRole('button', { name: 'Liên kết @another-account với tôi', exact: true }).click();
+    await page.getByText(/Tài khoản GitHub đã thuộc thành viên khác/).waitFor();
+    assert.equal(identities.filter(x => x.userProfileId === 'self-profile' && x.status === 0).length, 1);
+    conflict = false; await page.getByRole('button', { name: 'Liên kết @another-account với tôi', exact: true }).click();
+    await page.getByText('GitHub: @another-account · Đã xác minh', { exact: true }).waitFor();
+    await page.getByText('GitHub: @member-a · Đã xác minh', { exact: true }).waitFor();
+    assert.equal(identities.filter(x => x.userProfileId === 'self-profile' && x.status === 0).length, 2);
+    assert.equal(await page.getByRole('button', { name: 'Quản lý GitHub của tôi', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Ngắt liên kết @member-b', exact: true }).count(), 0);
+    passed++; console.log(`CHECK ${passed}: multiple accounts, no replacement, conflict and self management`);
+    await page.getByRole('button', { name: 'Quản lý GitHub của tôi', exact: true }).click();
+    await page.getByRole('button', { name: 'Ngắt liên kết @member-a', exact: true }).click();
+    await page.getByRole('button', { name: 'Xác nhận ngắt Identity', exact: true }).click();
+    await page.getByRole('button', { name: 'Liên kết tài khoản GitHub khác', exact: true }).waitFor();
+    assert.equal(identities.find(x => x.id === 'identity-a').status, 1);
+    assert.equal(identities.find(x => x.id === 'identity-other').status, 0);
+    await page.getByText('GitHub: @another-account · Đã xác minh', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Liên kết tài khoản GitHub khác', exact: true }).click();
+    await page.getByRole('button', { name: 'Liên kết @member-a với tôi', exact: true }).click();
+    await page.getByText('GitHub: @member-a · Đã xác minh', { exact: true }).waitFor();
+    assert.ok(writes.some(x => x.endpoint.endsWith('/identity-a/reactivate')));
+    assert.equal(identities.filter(x => x.id === 'identity-a').length, 1);
+    passed++; console.log(`CHECK ${passed}: unlink and reactivate correct actor while retaining other account`);
+    await page.goto(origin + '/group/' + project.id + '?tab=members'); await page.reload(); await page.getByText('GitHub: @another-account · Đã xác minh', { exact: true }).waitFor(); await page.getByText('GitHub: @member-a · Đã xác minh', { exact: true }).waitFor();
+    await page.getByText('35,5%', { exact: true }).waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: path.join(artifacts, 'multiple-identities-mobile.png'), fullPage: true });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.screenshot({ path: path.join(artifacts, 'multiple-identities-desktop.png'), fullPage: true });
+    await page.goto(origin + '/group/another-project?tab=members'); await page.getByText('Dự án khác', { exact: true }).first().waitFor();
+    await page.getByText('GitHub: Chưa liên kết với dự án', { exact: true }).first().waitFor();
+    assert.equal(await page.getByText('GitHub: @member-a · Đã xác minh', { exact: true }).count(), 0);
+    await page.goto(origin + '/group/' + project.id + '?tab=members'); await page.getByText('GitHub: @another-account · Đã xác minh', { exact: true }).waitFor();
+    passed++; console.log(`CHECK ${passed}: reload, project switching, published percentage and responsive layout`);
     await page.getByRole('tab', { name: /Cài đặt/ }).click(); await page.getByRole('button', { name: 'Thêm repository', exact: true }).waitFor(); fail = true;
     await page.clock.fastForward(1600); await page.evaluate(() => window.dispatchEvent(new Event('focus'))); await page.getByText(/Không thể kiểm tra trạng thái\./).waitFor(); await page.getByRole('button', { name: 'Thử lại', exact: true }).waitFor(); fail = false; await page.getByRole('button', { name: 'Thử lại', exact: true }).click(); await page.getByRole('button', { name: 'Thêm repository', exact: true }).waitFor(); passed++; console.log(`CHECK ${passed}`);
     await page.evaluate(({ id, accountId }) => window.sessionStorage.setItem('uninet.github-flow.v1', JSON.stringify({ flowId: 'test-flow', projectId: id, accountId, tab: 'settings', expiresAt: new Date(Date.now() + 60000).toISOString() })), { id: project.id, accountId: account.id });
     await page.goto(origin + '/github/callback?githubFlowId=test-flow&githubStatus=ready'); await page.getByText('Tài khoản GitHub đã được xác minh', { exact: true }).waitFor(); await page.getByRole('button', { name: 'Quay lại dự án', exact: true }).click(); await page.getByRole('button', { name: 'Thêm repository', exact: true }).waitFor(); passed++; console.log(`CHECK ${passed}`);
+    await page.goto(origin + '/settings'); await page.getByRole('button', { name: /Đăng xuất/ }).click();
+    await page.waitForURL(url => url.pathname.includes('/login'));
+    account.id = 'fixture-account-b'; account.email = 'fixture-b@example.test';
+    account.profile = { ...account.profile, id: 'other-profile', fullName: 'Thành viên B' };
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email);
+    await page.getByRole('textbox', { name: 'Mật khẩu', exact: true }).fill('fixture-password');
+    await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await page.waitForURL(url => !url.pathname.includes('/login'));
+    await page.goto(origin + '/group/' + project.id + '?tab=members');
+    await page.getByText('GitHub: @member-b · Đã xác minh', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Quản lý GitHub của tôi', exact: true }).click();
+    await page.getByRole('button', { name: 'Ngắt liên kết @member-b', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Ngắt liên kết @member-a', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Ngắt liên kết @another-account', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('dialog').count(), 0);
+    passed++; console.log(`CHECK ${passed}: session switch restricts management to the new owner`);
+    const stalledIdentity = new Promise(resolve => { reachedIdentity = resolve; });
+    stallIdentities = true;
+    await page.goto(origin + '/group/another-project?tab=members'); await stalledIdentity;
+    await page.clock.fastForward(21000);
+    await page.getByText('Chưa thể kiểm tra danh tính GitHub. Hãy thử lại.', { exact: true }).waitFor();
+    assert.equal(await page.getByText('GitHub: @member-a · Đã xác minh', { exact: true }).count(), 0);
+    releaseIdentity();
+    await page.getByRole('button', { name: 'Thử lại danh tính GitHub', exact: true }).click();
+    await page.getByText('GitHub: Chưa liên kết với dự án', { exact: true }).first().waitFor();
+    assert.doesNotMatch(await page.locator('body').innerText(), /IdentityId|ExternalAccountId|OAuthConnectionId|fixture-access|fixture-refresh/);
+    passed++; console.log(`CHECK ${passed}: bounded timeout, late response ignored, safe retry, no raw identity or secrets`);
     assert.ok(requests.every(x => !x.endpoint.includes('68f98a9f-d73d-4dcf-be5c-7099b29329c0'))); assert.deepEqual(errors, []);
     console.log(`PASS ${passed} browser scenarios; all writes/GitHub navigation intercepted; screenshots: ${artifacts}`);
   } finally { await browser.close(); }

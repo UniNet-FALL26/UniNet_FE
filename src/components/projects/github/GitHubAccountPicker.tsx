@@ -8,7 +8,7 @@ import { gitError } from '@/utils/project-github';
 import { useGitHubRevalidation } from '@/hooks/useGitHubRevalidation';
 import { HubAction, hubColors as c } from '../hub/ProjectHubUI';
 
-export function GitHubAccountPicker({ projectId, tab, onSelect, selectedId, disabled = false }: { projectId: string; tab: 'members' | 'settings'; onSelect: (connection: GitHubConnection) => Promise<void>; selectedId?: string; disabled?: boolean }) {
+export function GitHubAccountPicker({ projectId, tab, onSelect, selectedId, disabled = false, linkedAccountIds = [] }: { projectId: string; tab: 'members' | 'settings'; onSelect: (connection: GitHubConnection) => Promise<void>; selectedId?: string; disabled?: boolean; linkedAccountIds?: string[] }) {
   const { account } = useAuthStore();
   const [connections, setConnections] = useState<GitHubConnection[]>([]), [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ export function GitHubAccountPicker({ projectId, tab, onSelect, selectedId, disa
     {connections.map(connection => <View key={connection.id} style={s.row}>
       {!!connection.avatarUrl && <Image source={{ uri: connection.avatarUrl }} accessibilityLabel={`Ảnh GitHub ${connection.login}`} style={{ width: 32, height: 32, borderRadius: 16 }} />}
       <View style={{ flex: 1, minWidth: 0 }}><Text style={s.name}>@{connection.login}</Text><Text style={s.copy}>{connection.status === 0 ? 'Đã xác minh' : 'Cần xác thực lại'}</Text></View>
-      {connection.status === 0 && <HubAction compact title={tab === 'members' ? `Liên kết @${connection.login} với tôi` : `Dùng @${connection.login}`} variant={selectedId === connection.id ? 'primary' : 'secondary'} disabled={busy || disabled} onPress={() => void run(() => onSelect(connection))} />}
+      {tab === 'members' && linkedAccountIds.includes(connection.providerAccountId) ? <Text style={s.copy}>Đã liên kết với dự án</Text> : connection.status === 0 && <HubAction compact title={tab === 'members' ? `Liên kết @${connection.login} với tôi` : `Dùng @${connection.login}`} variant={selectedId === connection.id ? 'primary' : 'secondary'} disabled={busy || disabled} onPress={() => void run(() => onSelect(connection))} />}
     </View>)}
     {(!!error || refresh.state === 'timeout') && <View style={{ gap: 8 }}><Text accessibilityRole="alert" style={s.error}>{error || 'Chưa thể kiểm tra tài khoản GitHub.'}</Text><HubAction compact title="Thử lại tài khoản" onPress={() => void refresh.check()} /></View>}
     <View style={s.row}><HubAction compact title={tab === 'settings' ? 'Liên kết tài khoản GitHub khác' : 'Xác minh tài khoản GitHub'} variant="primary" busy={busy} disabled={loading || disabled || !account} onPress={() => account && void run(() => beginGitHubOAuth(account.id, projectId, tab))} />

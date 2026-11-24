@@ -1,5 +1,19 @@
 import type { GitIdentity, OfficialMemberContribution } from '@/types/project-github';
 
+export function gitIdentitiesFor(identities: GitIdentity[], projectId: string, profileId: string, activeOnly = true) {
+  return identities.filter(x => x.projectId === projectId && x.userProfileId === profileId &&
+    (x.status === 0 || !activeOnly && x.status === 1)).sort((a, b) => {
+    const left = `${a.status}:${a.externalUsername.toLowerCase()}:${a.id}`;
+    const right = `${b.status}:${b.externalUsername.toLowerCase()}:${b.id}`;
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}
+export function gitIdentityForConnection(identities: GitIdentity[], projectId: string, profileId: string, providerAccountId: string) {
+  return gitIdentitiesFor(identities, projectId, profileId, false)
+    .find(x => String(x.externalAccountId) === providerAccountId);
+}
+
+// Compatibility for older callers; member UI must use the full collection above.
 export function gitIdentityFor(identities: GitIdentity[], profileId: string) {
   const owned = identities.filter(x => x.userProfileId === profileId);
   return owned.find(x => x.status === 0) ?? owned.find(x => x.status === 1);

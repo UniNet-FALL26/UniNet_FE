@@ -14,6 +14,16 @@ function load(file, imports = {}) {
   return exports;
 }
 const utility = load('src/utils/project-github.ts');
+test('member identities retain all accounts in stable order and isolate project/owner', () => {
+  const identity = (id, actor, status = 0, projectId = 'p', userProfileId = 'me') => ({ id, projectId, userProfileId, externalAccountId: actor, externalUsername: id, status });
+  const rows = [identity('b', 22), identity('foreign', 33, 0, 'other'), identity('a', 11), identity('inactive', 44, 1), identity('someone', 55, 0, 'p', 'another')];
+  assert.deepEqual(Array.from(utility.gitIdentitiesFor(rows, 'p', 'me'), x => x.id), ['a', 'b']);
+  assert.deepEqual(Array.from(utility.gitIdentitiesFor([...rows].reverse(), 'p', 'me'), x => x.id), ['a', 'b']);
+  assert.equal(utility.gitIdentityForConnection(rows, 'p', 'me', '44').id, 'inactive');
+  assert.equal(utility.gitIdentityForConnection(rows, 'p', 'me', '22').id, 'b');
+  assert.equal(utility.gitIdentityForConnection(rows, 'p', 'me', '33'), undefined);
+  assert.equal(rows.length, 5);
+});
 function service(request, base = 'http://localhost:5239/api') {
   return load('src/services/project-github.service.ts', { '@/constants/config': { API_URL: base }, '@/services/api': { apiRequest: request } });
 }
