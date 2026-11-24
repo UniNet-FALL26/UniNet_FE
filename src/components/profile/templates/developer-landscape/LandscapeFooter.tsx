@@ -19,7 +19,7 @@ export function LandscapeFooter({ data, theme, width, thumbnail, showTemplateFoo
     </View>}
     {showTemplateFooter && <View testID="landscape-footer" style={[s.footer, { backgroundColor: theme.footerBackground, paddingHorizontal: compact ? 22 : 40 }]}>
       <View style={[s.footerRow, compact && { flexDirection: 'column', alignItems: 'flex-start' }]}><View style={s.identity}><Text style={[s.monogram, { color: theme.accent }]}>{data.profile.fullName.trim().split(/\s+/).slice(-2).map(word => word[0]).join('').toUpperCase()}</Text><View style={{ flex: 1, minWidth: 0 }}><Text style={[s.identityName, { color: theme.heroText }]}>{data.profile.fullName}</Text>{!!data.portfolio.headline && <Text style={[s.small, { color: theme.heroMuted }]}>{data.portfolio.headline}</Text>}</View></View>
-        <View style={ui.chips}>{social.map((link, index) => <PortfolioLink key={`${link.label}-${index}`} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View>
+        <View style={ui.chips}>{social.map((link, index) => <PortfolioLink key={`${link.label}-${index}`} label={link.label} url={link.url} socialLink={link} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View>
       </View><Text style={[s.small, { color: theme.heroMuted, textAlign: compact ? 'left' : 'right', marginTop: 16 }]}>© {new Date().getFullYear()} {data.profile.fullName}. All rights reserved.</Text>
     </View>}
   </View>;

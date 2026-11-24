@@ -5,7 +5,7 @@ import type { PortfolioResponse, ProfileTheme } from '@/types/portfolio';
 import type { ProfileEditField, ProfileImageTarget } from '@/utils/profile-fields';
 import { profileEditorSections, type ProfileEditorSection, type ProfileSectionId } from '@/utils/profile-editor';
 
-export const ProfileEditContext = createContext<{ data: PortfolioResponse; disabled: boolean; onField: (field: ProfileEditField) => void; onPhoto: (target: ProfileImageTarget) => void; onAdd: (section: ProfileEditorSection) => void; onEditEducation: (index: number) => void; onEditCertificate: (index: number) => void } | null>(null);
+export const ProfileEditContext = createContext<{ data: PortfolioResponse; disabled: boolean; onField: (field: ProfileEditField) => void; onPhoto: (target: ProfileImageTarget) => void; onAdd: (section: ProfileEditorSection) => void; onEditEducation: (index: number) => void; onEditCertificate: (index: number) => void; onRemoveSocialLink: (index: number) => void } | null>(null);
 export const useProfileEditing = () => useContext(ProfileEditContext);
 export function EditCertificateEntry({ index, color }: { index: number; color: string }) {
   const editing = useProfileEditing();

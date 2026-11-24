@@ -1,5 +1,5 @@
 import { SymbolView } from 'expo-symbols';
-import { SectionAdd } from '@/components/profile/ProfileEditContext';
+import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { Linking, Pressable, StyleSheet, Text, View, type PressableProps } from 'react-native';
 import type { PropsWithChildren } from 'react';
 import type { ProfileTheme } from '@/types/portfolio';
@@ -28,12 +28,21 @@ export function PortfolioControl({ thumbnail, children, style, ...props }: Press
 export function Chip({ children, theme }: PropsWithChildren<{ theme: ProfileTheme }>) {
   return <View style={[ui.chip, { backgroundColor: theme.accentSoft }]}><Text style={[ui.chipText, { color: theme.accentStrong }]}>{children}</Text></View>;
 }
-export function PortfolioLink({ label, url, theme, thumbnail, subtle = false }: { label: string; url?: string | null; theme: ProfileTheme; thumbnail?: boolean; subtle?: boolean }) {
+export function PortfolioLink({ label, url, theme, thumbnail, subtle = false, socialLink }: { label: string; url?: string | null; theme: ProfileTheme; thumbnail?: boolean; subtle?: boolean; socialLink?: { label: string; url: string } }) {
+  const editing = useProfileEditing();
   if (thumbnail || isSampleLink(url)) return <Text style={[ui.linkText, { color: theme.accentStrong }]}>{label}</Text>;
   if (!/^https?:\/\//i.test(url!)) return null;
-  return <Pressable accessibilityRole="link" accessibilityLabel={label} onPress={() => { void Linking.openURL(url!).catch(() => {}); }} style={({ pressed }) => [ui.link, subtle && { paddingHorizontal: 0 }, pressed && ui.pressed]}>
+  const link = <Pressable accessibilityRole="link" accessibilityLabel={label} onPress={() => { void Linking.openURL(url!).catch(() => {}); }} style={({ pressed }) => [ui.link, subtle && { paddingHorizontal: 0 }, pressed && ui.pressed]}>
     <Text style={[ui.linkText, { color: theme.accentStrong }]}>{label}</Text><PortfolioIcon name="link" size={16} color={theme.accentStrong} />
   </Pressable>;
+  const index = socialLink && editing ? editing.data.portfolio.socialLinks.indexOf(socialLink) : -1;
+  if (!editing || index < 0) return link;
+  return <View style={ui.editableLink}>
+    {link}
+    <Pressable accessibilityRole="button" accessibilityLabel={`Gỡ liên kết ${label}`} accessibilityHint="Gỡ khỏi bản nháp. Bấm Lưu hồ sơ để áp dụng." disabled={editing.disabled} hitSlop={8} onPress={() => editing.onRemoveSocialLink(index)} style={({ hovered, pressed }) => [ui.removeLink, { backgroundColor: theme.heroPanel }, (hovered || pressed) && ui.pressed, editing.disabled && { opacity: 0.5 }]}>
+      <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={11} tintColor={theme.accentStrong} accessible={false} />
+    </Pressable>
+  </View>;
 }
 export function SectionTitle({ title, name, theme }: { title: string; name: keyof typeof symbols; theme: ProfileTheme }) {
   if (name === 'journey') return <View style={ui.journeyHeading}>
@@ -43,6 +52,8 @@ export function SectionTitle({ title, name, theme }: { title: string; name: keyo
   return <View style={ui.sectionHeading}><PortfolioIcon name={name} color={theme.accent} /><Text role="heading" aria-level={2} style={[ui.sectionTitle, { color: theme.text }]}>{title}</Text><SectionAdd title={title} theme={theme} /></View>;
 }
 export const ui = StyleSheet.create({
+  editableLink: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: '100%' },
+  removeLink: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   body: { fontSize: 13, lineHeight: 20 },
   small: { fontSize: 12, lineHeight: 19 },
   section: { marginBottom: 24 },

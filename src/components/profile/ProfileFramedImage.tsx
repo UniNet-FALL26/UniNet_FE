@@ -16,10 +16,10 @@ export function ProfileFramedImage({ uri, accessibilityLabel }: { uri: string; a
   const top = (frame.height - height) / 2 + crop.y * (frame.height - height) / 2;
 
   return <View onLayout={event => setFrame({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })} style={s.frame}>
-    <Image source={{ uri: source }} contentFit="fill" accessibilityLabel={accessibilityLabel} onLoad={event => {
+    <Image source={{ uri: source }} loading="eager" contentFit={scale ? 'fill' : 'cover'} accessibilityLabel={accessibilityLabel} onLoad={event => {
       const { width: naturalWidth, height: naturalHeight } = event.source;
       if (naturalWidth && naturalHeight) setImageSize(current => current.width === naturalWidth && current.height === naturalHeight ? current : { width: naturalWidth, height: naturalHeight });
-    }} style={{ position: 'absolute', width, height, left, top }} />
+    }} style={scale ? { position: 'absolute', width, height, left, top } : StyleSheet.absoluteFill} />
   </View>;
 }
 

@@ -29,7 +29,7 @@ export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = 
         <Text style={[s.footerName, { color: theme.heroText }]}>{data.profile.fullName}</Text>
         {!!(data.profile.nickname || data.portfolio.headline) && <Text style={[ui.small, { color: theme.heroMuted, marginTop: 4 }]}>{[data.profile.nickname, data.portfolio.headline].filter(value => value?.trim()).join(' · ')}</Text>}
       </View>
-      <View style={ui.chips}>{data.portfolio.socialLinks.map(link => <PortfolioLink key={link.label} label={link.label} url={link.url} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View>
+      <View style={ui.chips}>{data.portfolio.socialLinks.map((link, index) => <PortfolioLink key={`${link.label}-${index}`} label={link.label} url={link.url} socialLink={link} theme={{ ...theme, accentStrong: theme.heroText }} thumbnail={thumbnail} />)}<SectionAdd title="Liên kết cá nhân" theme={theme} /></View>
     </View>
     <View style={s.copyright}><Text style={[ui.small, { color: theme.muted }]}>© {new Date().getFullYear()} {data.profile.fullName}</Text><Text style={[ui.small, { color: theme.muted }]}>Build · Learn · Grow · Together</Text></View>
   </View>;

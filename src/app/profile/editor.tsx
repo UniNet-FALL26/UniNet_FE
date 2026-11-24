@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { ProfileEditableTemplate } from '@/components/profile/ProfileEditableTemplate';
 import { ProfileEntryForm } from '@/components/profile/ProfileEntryForm';
 import { ProfileProjectPicker } from '@/components/profile/ProfileProjectPicker';
+import { CreateProjectModal } from '@/components/projects/hub/CreateProjectModal';
 import { ProfileFieldForm } from '@/components/profile/ProfileFieldForm';
 import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
 import type { ImagePickerAsset } from 'expo-image-picker';
@@ -20,7 +21,7 @@ import { colors } from '@/constants/colors';
 import { ACCOUNT_ROLE } from '@/constants/roles';
 import { portfolioService } from '@/services/portfolio.service';
 import { authStore, useAuthStore } from '@/store/auth.store';
-import type { PortfolioContent, PortfolioResponse } from '@/types/portfolio';
+import type { PortfolioContent, PortfolioProject, PortfolioResponse } from '@/types/portfolio';
 import { profileEditorSections, type ProfileEditorSection } from '@/utils/profile-editor';
 import { updateProfileField, updateProfileImage, type ProfileEditField, type ProfileImageTarget } from '@/utils/profile-fields';
 import { createProfileDraft, isProfileDraftDirty, updateProfileAppearance } from '@/utils/profile-draft';
@@ -44,7 +45,10 @@ export default function ProfileEditorScreen() {
   const [message, setMessage] = useState('');
   const [section, setSection] = useState<ProfileEditorSection | null>(null);
   const [entryIndex, setEntryIndex] = useState<number | undefined>();
-  const [manualProject, setManualProject] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [projectSave, setProjectSave] = useState<PortfolioResponse | null>(null);
+  const [projectRefresh, setProjectRefresh] = useState(0);
+  const [projectNotice, setProjectNotice] = useState('');
   const [field, setField] = useState<ProfileEditField | null>(null);
   const [photo, setPhoto] = useState<{ target: ProfileImageTarget | 'avatarUrl' | 'coverUrl'; asset: ImagePickerAsset } | null>(null);
   const [choosingPhoto, setChoosingPhoto] = useState(false);
@@ -60,7 +64,8 @@ export default function ProfileEditorScreen() {
   const width = Math.min(frameWidth || windowWidth, 1120);
   useEffect(() => {
     pickerVersion.current++; setChoosingPhoto(false);
-    setLoaded(null); setBaseline(null); setError(''); setSection(null); setManualProject(false); setField(null); setPhoto(null); setMessage(''); setSaving(false); setLeaving(null);
+    setCreatingProject(false); setProjectSave(null); setProjectNotice('');
+    setLoaded(null); setBaseline(null); setError(''); setSection(null); setField(null); setPhoto(null); setMessage(''); setSaving(false); setLeaving(null);
     if (isLoading || !isAuthenticated || !account?.id) return;
     const controller = new AbortController();
     portfolioService.getMine(controller.signal).then(result => {
@@ -109,24 +114,42 @@ export default function ProfileEditorScreen() {
   const add = (content: PortfolioContent) => {
     if (!data || saving) return;
     setLoaded({ accountId: account!.id, data: { ...data, portfolio: content } });
-    setMessage(''); setSection(null); setEntryIndex(undefined); setManualProject(false);
+    setMessage(''); setSection(null); setEntryIndex(undefined);
   };
-  const save = async () => {
-    if (!data || !dirty || saveController.current || !account?.id) return;
+  const removeSocialLink = (index: number) => {
+    if (!data || saving || choosingPhoto) return;
+    setLoaded(current => {
+      if (!current || current.accountId !== account?.id) return current;
+      const portfolio = current.data.portfolio;
+      return { ...current, data: { ...current.data, portfolio: { ...portfolio, socialLinks: portfolio.socialLinks.filter((_, position) => position !== index) } } };
+    });
+    setMessage('');
+  };
+  const save = async (candidate = data) => {
+    if (!candidate || saveController.current || !account?.id) return false;
     const accountId = account.id;
     const controller = new AbortController(); saveController.current = controller;
     setSaving(true); setMessage('');
     try {
-      const result = await portfolioService.saveEditor(data, controller.signal);
+      const result = await portfolioService.saveEditor(candidate, controller.signal);
       if (!controller.signal.aborted) {
         setLoaded({ accountId, data: result }); setBaseline(result); setMessage('Đã lưu hồ sơ.');
         if (account.profile) authStore.updateAccount({ ...account, profile: { ...account.profile, fullName: result.profile.fullName, nickname: result.profile.nickname ?? account.profile.nickname, displayName: result.profile.nickname || result.profile.fullName, isVerified: result.profile.isVerified } });
+        return true;
       }
     } catch (cause) {
       if (!controller.signal.aborted) setMessage(cause instanceof Error ? cause.message : 'Chưa lưu được hồ sơ. Vui lòng thử lại.');
     } finally {
       if (!controller.signal.aborted) { saveController.current = null; setSaving(false); }
     }
+    return false;
+  };
+  const createProject = (projects: PortfolioProject[]) => {
+    if (!data || saving) return;
+    const candidate = { ...data, portfolio: { ...data.portfolio, projects } };
+    setMessage('');
+    if (baseline && isProfileDraftDirty(candidate, baseline)) setProjectSave(candidate);
+    else setCreatingProject(true);
   };
   // Static HTML cannot resolve query-selected appearance until the client hydrates.
   if (Platform.OS === 'web' && !hydrated) return <SafeAreaView style={s.safe} edges={safeAreaEdges}><View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải trình chỉnh sửa" color={colors.primary} /></View></SafeAreaView>;
@@ -139,13 +162,28 @@ export default function ProfileEditorScreen() {
     {isLoading ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải phiên đăng nhập" color={colors.primary} /></View> : !isAuthenticated ? <View style={s.state}><Text style={s.stateTitle}>Đăng nhập để tạo hồ sơ của bạn</Text><Text style={s.hint}>Mẫu đã chọn sẽ được giữ lại khi bạn quay lại trang này.</Text><Button title="Đăng nhập" onPress={() => router.push('/(auth)/login')} /></View> : error ? <View style={s.state}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Thử lại" onPress={() => setAttempt(value => value + 1)} /></View> : !data ? <View style={s.state}><ActivityIndicator accessibilityLabel="Đang tải hồ sơ của bạn" color={colors.primary} /></View> : <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.notice}><Text style={s.hint}>Lưu để áp dụng nội dung, mẫu và màu cho hồ sơ của bạn. Quyền riêng tư và chế độ hiển thị hiện tại được giữ nguyên.</Text>{dirty && <Text accessibilityLiveRegion="polite" style={s.pending}>Có thay đổi chưa lưu.</Text>}{!!message && <ActionFeedback type={message.startsWith('Đã ') ? 'success' : 'error'} message={message} />}</View>
       <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)} style={s.frame}>
-        <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={next => { setEntryIndex(undefined); setSection(next); }} onEditEducation={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'education')!); }} onEditCertificate={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'certificates')!); }} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} />
+        <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={next => { setEntryIndex(undefined); setSection(next); }} onEditEducation={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'education')!); }} onEditCertificate={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'certificates')!); }} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} onRemoveSocialLink={removeSocialLink} />
       </View>
     </ScrollView>}
-    {section && data && (section.id === 'projects' && !manualProject
+    {section && data && (section.id === 'projects'
       ? <ProfileProjectPicker key={account?.id} projects={data.portfolio.projects} limit={section.limit ?? 50}
-          onApply={projects => add({ ...data.portfolio, projects })} onManual={() => setManualProject(true)} onClose={() => setSection(null)} />
-      : <ProfileEntryForm key={`${account?.id}-${section.id}-${entryIndex ?? 'new'}`} section={section} data={data} entryIndex={entryIndex} onAdd={add} onClose={() => { setSection(null); setEntryIndex(undefined); setManualProject(false); }} />)}
+          visible={!creatingProject && !projectSave} refresh={projectRefresh} notice={projectNotice}
+          onApply={projects => add({ ...data.portfolio, projects })} onCreate={createProject}
+          onClose={() => setSection(null)} />
+      : <ProfileEntryForm key={`${account?.id}-${section.id}-${entryIndex ?? 'new'}`} section={section} data={data} entryIndex={entryIndex} onAdd={add} onClose={() => { setSection(null); setEntryIndex(undefined); }} />)}
+    {creatingProject && data && <CreateProjectModal onClose={() => setCreatingProject(false)} onCreated={() => {
+      setCreatingProject(false); setProjectRefresh(value => value + 1);
+      setProjectNotice('Đã tạo dự án thành công. Dự án sẽ có thể thêm vào hồ sơ sau khi hoàn thành.');
+    }} />}
+    <Modal visible={!!projectSave} transparent animationType="fade" onRequestClose={() => { if (!saving) setProjectSave(null); }}><View style={s.overlay}>
+      <View accessibilityViewIsModal role="dialog" aria-label="Lưu thay đổi hồ sơ" style={s.confirm}>
+        <Text accessibilityRole="header" style={s.stateTitle}>Lưu thay đổi trước khi tạo dự án?</Text>
+        <Text style={s.hint}>Hồ sơ có thay đổi chưa lưu. Lưu thông tin hiện tại và các dự án đang chọn để không mất thay đổi khi tạo dự án mới.</Text>
+        {!!message && !message.startsWith('Đã ') && <Text accessibilityRole="alert" style={s.error}>{message}</Text>}
+        <Button title="Lưu và tạo dự án" loading={saving} onPress={() => { if (projectSave) void save(projectSave).then(success => { if (success) { setProjectSave(null); setCreatingProject(true); } }); }} />
+        <Button title="Tiếp tục chỉnh sửa" variant="outline" disabled={saving} onPress={() => setProjectSave(null)} />
+      </View>
+    </View></Modal>
     {field && data && <ProfileFieldForm key={`${account?.id}-${field}`} data={data} field={field} onClose={() => setField(null)} onConfirm={next => { if (!saving && account) { setLoaded({ accountId: account.id, data: next }); setMessage(''); setField(null); } }} />}
     {photo && data && <ProfilePhotoForm portrait={photo.target === 'avatarUrl' && account?.role === ACCOUNT_ROLE.STUDENT} key={`${account?.id}-${typeof photo.target === 'string' ? photo.target : `${photo.target.section}-${photo.target.index}`}`} initialAsset={photo.asset} onClose={() => setPhoto(null)} onConfirm={url => { if (!saving && account) { const next = typeof photo.target === 'string' ? updateProfileField(data, photo.target, url) : updateProfileImage(data, photo.target, url); setLoaded({ accountId: account.id, data: next }); setMessage(''); setPhoto(null); } }} />}
     <Modal visible={!!leaving} transparent animationType="fade" onRequestClose={() => { pendingAction.current = null; pendingParent.current = null; setLeaving(null); }}><View style={s.overlay}>
