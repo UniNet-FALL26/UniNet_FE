@@ -20,7 +20,7 @@ function render(start, end, status = 0, report = null) {
     'react-native': { useWindowDimensions: () => ({ width: 1000 }) },
     '@/components/assessor/AssignmentDetailContent': { DetailHeader: 'DetailHeader', detailTabs: () => [{ key: 'schedule' }, { key: 'info' }] },
     '@/store/auth.store': { useAuthStore: () => ({ account: { id: 'user' } }) },
-    '@/components/assessor/assessor-ui': { assessorStyles: {}, assessorDate: () => '' },
+    '@/components/assessor/assessor-ui': { assessorDetailStyles: {}, assessorDate: () => '' },
     '@/services/assessor.service': { assessorService: { meetingAction: async (...args) => { calls.push(args); } } },
     '@/store/assessor-report-drafts': { assessorReportDrafts: { get: () => ({}) } },
   }).default;

@@ -1,6 +1,6 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 import type { AssessmentInput, AssessmentRubric } from '@/services/assessor.service';
-import { assessorStyles as s } from './assessor-ui';
+import { assessorDetailStyles as s } from './assessor-ui';
 import { colors } from '@/constants/colors';
 
 export function emptyAssessment(rubric: AssessmentRubric): AssessmentInput {
@@ -38,10 +38,10 @@ const displayPoints = (score: number) => score.toLocaleString('vi-VN', { maximum
 
 export function AssessmentForm({ rubric, value, onChange, disabled = false }: { rubric: AssessmentRubric; value: AssessmentInput; onChange?: (value: AssessmentInput) => void; disabled?: boolean }) {
   const preview = assessmentPreview(rubric, value);
-  return <View style={{ gap: 18 }}>
+  return <View style={{ gap: 12 }}>
     <Text style={s.sectionTitle}>Đánh giá theo tiêu chí</Text>
     <Text style={s.muted}>{rubric.code} · Phiên bản {rubric.version} · Điểm đạt {rubric.passingScore}/100. Chọn điểm 0–10 cho từng tiêu chí. Chọn “Chưa đủ minh chứng” khi chưa thể chấm; không dùng điểm 0 thay thế.</Text>
-    <View style={[s.input, { gap: 8, backgroundColor: colors.primaryLight }]}>
+    <View style={[s.input, { gap: 8, backgroundColor: colors.background }]}>
       <Text style={s.label}>{disabled ? 'Tổng điểm theo trọng số' : 'Tổng điểm dự kiến'}: {preview.total === null ? 'Chưa đủ minh chứng' : displayPoints(preview.total) + '/100'}</Text>
       <Text style={s.body}>Kết quả{disabled ? '' : ' dự kiến'}: {preview.outcome === 4 ? 'Chưa đủ minh chứng' : preview.outcome === 1 ? 'Đạt yêu cầu' : 'Không đạt'}</Text>
       <Text style={s.muted}>Đã chấm {rubric.criteria.filter(c => value.scores.some(row => row.code === c.code && row.score !== null)).length}/{rubric.criteria.length} tiêu chí. Điểm quy đổi = điểm chọn ÷ 10 × trọng số. Tổng điểm là tổng các điểm quy đổi.</Text>
@@ -63,7 +63,7 @@ export function AssessmentForm({ rubric, value, onChange, disabled = false }: { 
     {rubric.conditions.map(c => {
       const row = value.conditions.find(r => r.code === c.code); if (!row) return null;
       const change = (patch: Partial<typeof row>) => onChange?.({ ...value, conditions: value.conditions.map(r => r.code === c.code ? { ...r, ...patch } : r) });
-      return <View key={c.code} style={s.detailCriterion}><Text style={s.label}>{c.description}</Text><View style={s.actions}>{[{ label: 'Đạt', passed: true }, { label: 'Không đạt', passed: false }, { label: 'Chưa đủ cơ sở', passed: null }].map(option => <Pressable key={option.label} accessibilityRole="radio" accessibilityState={{ checked: row.passed === option.passed }} disabled={disabled || !onChange} onPress={() => change({ passed: option.passed })} style={[s.secondaryButton, row.passed === option.passed && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}><Text style={s.link}>{option.label}</Text></Pressable>)}</View><TextInput accessibilityLabel={`Lý do ${c.description}`} placeholder="Lý do kết luận (bắt buộc)" multiline maxLength={4000} value={row.reason} editable={!disabled && !!onChange} onChangeText={reason => change({ reason })} style={s.input} /></View>;
+      return <View key={c.code} style={s.detailCriterion}><Text style={s.label}>{c.description}</Text><View style={s.actions}>{[{ label: 'Đạt', passed: true }, { label: 'Không đạt', passed: false }, { label: 'Chưa đủ cơ sở', passed: null }].map(option => <Pressable hitSlop={6} key={option.label} accessibilityRole="radio" accessibilityState={{ checked: row.passed === option.passed }} disabled={disabled || !onChange} onPress={() => change({ passed: option.passed })} style={[s.secondaryButton, row.passed === option.passed && { borderColor: colors.primary, backgroundColor: colors.background }]}><Text style={s.link}>{option.label}</Text></Pressable>)}</View><TextInput accessibilityLabel={`Lý do ${c.description}`} placeholder="Lý do kết luận (bắt buộc)" multiline maxLength={4000} value={row.reason} editable={!disabled && !!onChange} onChangeText={reason => change({ reason })} style={s.input} /></View>;
     })}
   </View>;
 }
@@ -73,8 +73,8 @@ function ScoreInput({ name, score, disabled, onChange }: { name: string; score: 
   return <View style={{ gap: 8 }}>
     <Text style={s.label}>Điểm {name}: {score === null ? 'Chưa đủ minh chứng' : displayPoints(score / 10) + '/10'}</Text>
     <View accessibilityRole="radiogroup" accessibilityLabel={'Điểm ' + name + ' (0–10)'} style={s.actions}>
-      {Array.from({ length: 11 }, (_, point) => <Pressable key={point} accessibilityRole="radio" accessibilityLabel={name + ': ' + point + '/10'} accessibilityState={{ checked: score === point * 10 }} onPress={() => onChange(scoreFromTen(point))} style={[s.secondaryButton, { minWidth: 44, paddingHorizontal: 10 }, score === point * 10 && { borderColor: colors.primary, backgroundColor: colors.primary }]}><Text style={[s.link, score === point * 10 && { color: colors.surface }]}>{point}</Text></Pressable>)}
-      <Pressable accessibilityRole="radio" accessibilityLabel={name + ': Chưa đủ minh chứng'} accessibilityState={{ checked: score === null }} onPress={() => onChange(null)} style={[s.secondaryButton, score === null && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}><Text style={s.link}>Chưa đủ minh chứng</Text></Pressable>
+      {Array.from({ length: 11 }, (_, point) => <Pressable hitSlop={6} key={point} accessibilityRole="radio" accessibilityLabel={name + ': ' + point + '/10'} accessibilityState={{ checked: score === point * 10 }} onPress={() => onChange(scoreFromTen(point))} style={[s.secondaryButton, { minWidth: 32, paddingHorizontal: 8 }, score === point * 10 && { borderColor: colors.primary, backgroundColor: colors.primary }]}><Text style={[s.link, score === point * 10 && { color: colors.surface }]}>{point}</Text></Pressable>)}
+      <Pressable hitSlop={6} accessibilityRole="radio" accessibilityLabel={name + ': Chưa đủ minh chứng'} accessibilityState={{ checked: score === null }} onPress={() => onChange(null)} style={[s.secondaryButton, score === null && { borderColor: colors.primary, backgroundColor: colors.background }]}><Text style={s.link}>Chưa đủ minh chứng</Text></Pressable>
     </View>
   </View>;
 }

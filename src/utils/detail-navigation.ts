@@ -18,7 +18,7 @@ export function detailNavigation(pathname: string, role = 0, params: { id?: stri
   if (pathname === '/create') return make([crumb('Quản lý bài đăng', '/(company)/jobs'), crumb(params.id || params.jobId ? 'Chỉnh sửa bài đăng' : 'Tạo bài đăng')]);
   if (pathname === '/verification') return make([personal, crumb('Xác minh tổ chức')]);
   if (pathname === '/advertisement') return make([personal, crumb('Quảng cáo')]);
-  if (pathname === '/assessor-availability') return make([crumb('Danh sách thẩm định', '/(assessor)/assessor-assessments'), crumb('Lịch nhận thẩm định')]);
+  if (pathname === '/assessor-availability') return null;
   if (pathname.startsWith('/assessor-assessments/')) return make([crumb('Danh sách thẩm định', '/(assessor)/assessor-assessments'), crumb('Chi tiết thẩm định')]);
   if (pathname.startsWith('/workspace/')) return make([crumb('Không gian làm việc', '/(tabs)/workspace'), crumb('Công việc dự án')]);
   if (pathname.startsWith('/post/')) return make([crumb('Cộng đồng', role === 1 ? '/(company)/company-community' : role === 2 ? '/(assessor)/assessor-community' : '/(tabs)'), crumb('Bài viết')]);

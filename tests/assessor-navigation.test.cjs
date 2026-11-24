@@ -16,10 +16,11 @@ test('Assessor has an independent app home without changing existing user homes'
   assert.equal(accountHome(0), '/(tabs)'); assert.equal(accountHome(1), '/(company)/company-community');
   assert.equal(accountHome(2), '/(assessor)/assessor-community');
 });
-test('five Assessor destinations keep their order and detail pages select assessments', () => {
+test('schedule is an independent Assessor destination', () => {
   const { assessorTabs, assessorTabActive } = load('src/constants/assessor-navigation.ts');
-  assert.equal(assessorTabs.map(t => t.key).join(','), 'community,messages,assessments,notifications,profile');
+  assert.equal(assessorTabs.map(t => t.key).join(','), 'community,messages,assessments,schedule,notifications,profile');
   assert.equal(assessorTabActive('assessments', '/assessor-assessments/assigned-work'), true);
-  assert.equal(assessorTabActive('assessments', '/assessor-availability'), true);
+  assert.equal(assessorTabActive('assessments', '/assessor-availability'), false);
+  assert.equal(assessorTabActive('schedule', '/assessor-availability'), true);
   assert.equal(assessorTabActive('profile', '/assessor-assessments/assigned-work'), false);
 });

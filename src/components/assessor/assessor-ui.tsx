@@ -2,9 +2,9 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { colors } from '@/constants/colors';
 export const assignmentStatusLabels = ['Đang thẩm định', 'Hoàn thành', 'Quá hạn', 'Đã hủy'];
 export const assessorDate = (value: string | null | undefined) => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : 'Chưa có lịch';
-export function AssignmentStatus({ status }: { status: number }) {
+export function AssignmentStatus({ status, compact = false }: { status: number; compact?: boolean }) {
   const palette = status === 1 ? { backgroundColor: '#EAF8F0', color: '#21845A' } : status === 2 ? { backgroundColor: '#FFF0F0', color: '#BE3542' } : status === 3 ? { backgroundColor: '#F0F3F8', color: '#68788F' } : { backgroundColor: colors.primaryLight, color: colors.primary };
-  return <View style={{ backgroundColor: palette.backgroundColor, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, alignSelf: 'flex-start' }}><Text style={{ fontSize: 12, color: palette.color, fontWeight: '600' }}>{assignmentStatusLabels[status] || 'Chưa xác định'}</Text></View>;
+  return <View style={{ backgroundColor: palette.backgroundColor, paddingHorizontal: compact ? 8 : 10, paddingVertical: compact ? 3 : 5, borderRadius: compact ? 5 : 20, alignSelf: 'flex-start' }}><Text style={{ fontSize: compact ? 11 : 12, color: palette.color, fontWeight: '600' }}>{assignmentStatusLabels[status] || 'Chưa xác định'}</Text></View>;
 }
 export function AssessorState({ loading, error, retry, empty }: { loading?: boolean; error?: string; retry?: () => void; empty?: string }) {
   return <View style={assessorStyles.state}>{loading ? <><ActivityIndicator color={colors.primary} /><Text style={assessorStyles.muted}>Đang tải dữ liệu…</Text></> : error ? <><Text accessibilityRole="alert" style={assessorStyles.error}>{error}</Text>{retry && <Pressable accessibilityRole="button" onPress={retry} style={assessorStyles.secondaryButton}><Text style={assessorStyles.link}>Thử lại</Text></Pressable>}</> : <><Text style={assessorStyles.sectionTitle}>{empty || 'Chưa có công việc thẩm định'}</Text><Text style={assessorStyles.muted}>Thông tin sẽ xuất hiện tại đây khi được cập nhật.</Text></>}</View>;
@@ -34,3 +34,31 @@ export const assessorStyles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }, secondaryButton: { minHeight: 42, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, link: { color: colors.primary, fontSize: 13, fontWeight: '600' }, card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 20, gap: 14 },
   state: { padding: 28, minHeight: 200, alignItems: 'center', justifyContent: 'center', gap: 14 }, error: { color: colors.error, fontSize: 13, lineHeight: 22 }, label: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface, padding: 12, fontSize: 14, color: colors.textPrimary }, divider: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 },
 });
+
+// Detail-only overrides keep the list/profile layouts unchanged.
+export const assessorDetailStyles = {
+  ...assessorStyles,
+  ...StyleSheet.create({
+    content: { flexGrow: 1, width: '100%', maxWidth: 1160, alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 14, paddingBottom: 28 },
+    mobileContent: { paddingHorizontal: 12, paddingVertical: 12, gap: 12 },
+    detailMeetingCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, gap: 10 },
+    detailReportCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, gap: 12 },
+    detailSectionHeading: { gap: 3, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+    detailReportIntro: { paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+    detailProgressTrack: { height: 3, borderRadius: 2, backgroundColor: '#E8ECF1', overflow: 'hidden' },
+    detailProgressFill: { height: 3, borderRadius: 2, backgroundColor: colors.primary },
+    detailCriterion: { padding: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, gap: 8 },
+    heading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+    sectionTitle: { color: colors.textPrimary, fontSize: 14, lineHeight: 20, fontWeight: '600' },
+    muted: { color: colors.textSecondary, fontSize: 12, lineHeight: 19 },
+    body: { color: colors.textPrimary, fontSize: 12, lineHeight: 19 },
+    label: { color: colors.textPrimary, fontSize: 12, lineHeight: 19, fontWeight: '600' },
+    link: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+    eyebrow: { color: colors.textSecondary, fontSize: 11, fontWeight: '500', letterSpacing: 0 },
+    input: { borderWidth: 1, borderColor: colors.border, borderRadius: 6, backgroundColor: colors.surface, padding: 10, fontSize: 12, lineHeight: 19, color: colors.textPrimary },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+    button: { minHeight: 36, borderRadius: 6, paddingHorizontal: 12 },
+    secondaryButton: { minHeight: 36, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+    mobileButton: { minHeight: 44 }, buttonText: { fontSize: 12, fontWeight: '600' },
+  }),
+};

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
 const runtime = process.env.CODEX_PLAYWRIGHT_PATH || path.join(process.env.USERPROFILE, '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const { chromium } = require(runtime);
 const root = path.resolve('dist/assessor-detail-web');
+const liveOrigin = process.env.ASSESSOR_DETAIL_TEST_ORIGIN;
 const server = http.createServer((req, res) => {
   let name = decodeURIComponent(new URL(req.url, 'http://localhost').pathname).replace(/^\/+/, '');
   if (name.startsWith('assessor-assessments/')) name = 'assessor-assessments/[id]';
@@ -14,11 +15,13 @@ const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', type); fs.createReadStream(file).pipe(res);
 });
 (async () => {
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${server.address().port}`;
+  if (!liveOrigin) await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = liveOrigin || `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   try {
     const page = await browser.newPage({ timezoneId: 'Asia/Ho_Chi_Minh' });
+    if (liveOrigin) await page.route(origin + '/**', route => route.request().isNavigationRequest()
+      ? route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body,#root{height:100%;margin:0}body{overflow:hidden;display:flex}#root{display:flex;flex:1}</style></head><body><div id="root"></div><script src="/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&transform.routerRoot=src%2Fapp"></script></body></html>' }) : route.fallback());
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     const profile = { id: 'profile', fullName: 'Chuyên gia UniNet', nickname: null, avatarUrl: null, isVerified: false };
     const account = { id: 'user', email: 'fixture@example.com', role: 2, status: 1, profileComplete: true, profile };
@@ -44,6 +47,8 @@ const server = http.createServer((req, res) => {
       await page.setViewportSize({ width, height: 1000 });
       await page.goto(origin + '/assessor-assessments/fixture');
       await page.getByRole('heading', { name: 'Tổng quan kết quả', exact: true }).waitFor();
+      const hero = page.getByRole('region', { name: 'Chi tiết thẩm định', exact: true });
+      assert.equal(await hero.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)', 'Light, neutral project header');
       assert.equal(await page.getByRole('tab', { name: 'Minh chứng', exact: true }).count(), 0);
       await page.getByText('Required condition 4', { exact: true }).waitFor();
       await page.getByText('Verified condition 4', { exact: true }).waitFor();
@@ -58,6 +63,35 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.getByText('Hạn báo cáo', { exact: true }).count(), 0);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `info overflow at ${width}`);
       await page.screenshot({ path: path.join(output, `info-${width}.png`), fullPage: true });
+      await page.getByTestId('assessor-content').getByRole('tab', { name: 'Lịch làm việc', exact: true }).click();
+      const schedule = page.getByRole('region', { name: 'Lịch và phòng thẩm định', exact: true });
+      await schedule.waitFor();
+      const borders = await schedule.evaluate(el => { const s = getComputedStyle(el); return [s.borderTopWidth, s.borderRightWidth, s.borderBottomWidth, s.borderLeftWidth, s.borderTopColor, s.borderLeftColor]; });
+      assert.deepEqual(borders.slice(0, 4), ['1px', '1px', '1px', '1px'], 'No thick accent border');
+      assert.equal(borders[4], borders[5], 'Neutral, equal card borders');
+      await page.getByRole('tab', { name: 'Nhật ký', exact: true }).click();
+      await page.getByRole('heading', { name: 'Nhật ký thẩm định', exact: true }).waitFor();
+    }
+    data.report = null; data.assignment.status = 0; data.assignment.completedAt = null;
+    data.assignment.meetingEndAt = null; data.assessmentRubric = rubric;
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(origin + '/assessor-assessments/fixture');
+      const meeting = page.getByRole('region', { name: 'Lịch và phòng thẩm định', exact: true });
+      await meeting.waitFor();
+      const meetingButton = page.getByRole('button', { name: 'Tạo / lấy phòng họp', exact: true });
+      assert.ok((await meetingButton.boundingBox()).height <= (width < 700 ? 44 : 36));
+      assert.equal(await meeting.evaluate(el => el.scrollWidth > el.clientWidth), false);
+      await page.screenshot({ path: path.join(output, `schedule-${width}.png`), fullPage: false });
+      await page.getByRole('tab', { name: 'Lập báo cáo', exact: true }).click();
+      const report = page.getByRole('region', { name: 'Báo cáo thẩm định', exact: true });
+      await report.waitFor();
+      assert.equal(await report.evaluate(el => getComputedStyle(el).borderTopWidth), '1px');
+      await page.getByRole('textbox', { name: 'Tóm tắt thẩm định', exact: true }).fill('Báo cáo thử nghiệm giao diện.');
+      assert.equal(await report.evaluate(el => el.scrollWidth > el.clientWidth), false, `Report fits ${width}px`);
+      const button = page.getByRole('button', { name: 'Gửi báo cáo', exact: true });
+      assert.ok((await button.boundingBox()).height <= (width < 700 ? 44 : 36));
+      await page.screenshot({ path: path.join(output, `report-${width}.png`), fullPage: false });
     }
     assert.deepEqual(errors, []); console.log('PASS: detail tabs, expanding criteria, missing fields, and responsive layouts at 1440/1024/768/390/320px');
   } finally { await browser.close(); server.close(); }

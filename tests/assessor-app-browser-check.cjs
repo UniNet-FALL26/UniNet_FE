@@ -2,7 +2,7 @@ const { chromium } = require('C:/Users/minec/.cache/codex-runtimes/codex-primary
 const assert = require('node:assert/strict'), fs = require('node:fs');
 const origin = process.env.ASSESSOR_TEST_ORIGIN || 'http://127.0.0.1:8088';
 const guid = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0');
-const labels = ['Cộng đồng', 'Nhắn tin', 'Danh sách thẩm định', 'Thông báo', 'Hồ sơ'];
+const labels = ['Cộng đồng', 'Nhắn tin', 'Danh sách thẩm định', 'Lịch làm việc', 'Thông báo', 'Hồ sơ'];
 (async () => {
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', timezoneId: 'Asia/Ho_Chi_Minh' });
@@ -60,14 +60,15 @@ const labels = ['Cộng đồng', 'Nhắn tin', 'Danh sách thẩm định', 'Th
         { key: 'community', label: labels[0], ready: () => page.getByText(post.description, { exact: true }) },
         { key: 'messages', label: labels[1], ready: () => page.getByRole('heading', { name: 'Chưa có cuộc trò chuyện', exact: true }) },
         { key: 'assessments', label: labels[2], ready: () => page.getByText(detail.project.title, { exact: true }) },
-        { key: 'notifications', label: labels[3], ready: () => page.getByText(notification.title, { exact: true }) },
-        { key: 'profile', label: labels[4], ready: () => page.getByRole('heading', { name: profile.fullName, exact: true }) },
+        { key: 'schedule', label: labels[3], ready: () => page.getByRole('heading', { name: 'Lịch làm việc của tôi', exact: true }) },
+        { key: 'notifications', label: labels[4], ready: () => page.getByText(notification.title, { exact: true }) },
+        { key: 'profile', label: labels[5], ready: () => page.getByRole('heading', { name: profile.fullName, exact: true }) },
       ];
       for (const width of [1920, 1440, 1024, 768, 390, 320]) {
         await page.setViewportSize({ width, height: width < 700 ? 844 : 1000 });
         const nav = page.getByTestId(width >= 1024 ? 'assessor-header-navigation' : 'assessor-footer-navigation').and(page.getByRole('tablist'));
         if (width >= 1024) {
-          assert.equal(await page.getByTestId('assessor-header-main').getByRole('tab').count(), 3);
+          assert.equal(await page.getByTestId('assessor-header-main').getByRole('tab').count(), 4);
           const actions = page.getByTestId('assessor-header-actions');
           assert.equal(await actions.getByRole('tab').count(), 2);
           assert.equal(await actions.getByText('Thông báo', { exact: true }).count(), 0, 'desktop notification uses an icon action like Student');
@@ -142,7 +143,7 @@ const labels = ['Cộng đồng', 'Nhắn tin', 'Danh sách thẩm định', 'Th
       await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
       await page.getByText(detail.project.title, { exact: true }).waitFor();
       profile.major = null;
-      await nav.getByRole('tab', { name: labels[4], exact: true }).click();
+      await nav.getByRole('tab', { name: labels[5], exact: true }).click();
       await page.getByText('Chưa cập nhật', { exact: true }).waitFor();
       assert.equal(portfolioReads, 0); assert.deepEqual(errors, []);
       if (startupErrors.length) console.warn('Known baseline issue: login emits React hydration #418 before entering Assessor; no Assessor runtime errors.');
@@ -171,10 +172,18 @@ const labels = ['Cộng đồng', 'Nhắn tin', 'Danh sách thẩm định', 'Th
     await page.screenshot({ path: 'dist/assessor-check/profile-mobile.png', fullPage: true });
     await mobileNav.getByRole('tab', { name: 'Danh sách thẩm định', exact: true }).click(); await page.getByText(detail.project.title, { exact: true }).waitFor(); await page.screenshot({ path: 'dist/assessor-check/assessments-mobile.png', fullPage: true });
     failList = true; await page.getByRole('button', { name: 'Tải lại danh sách thẩm định' }).click(); await page.getByText('Không tải được danh sách thử nghiệm', { exact: true }).first().waitFor(); failList = false; await page.getByRole('button', { name: 'Thử lại', exact: true }).click(); await page.getByText(detail.project.title, { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Lịch làm việc', exact: true }).click();
-    const future = new Date(Date.now() + 2 * 86400000); const pad = n => String(n).padStart(2, '0'); const day = `${future.getFullYear()}-${pad(future.getMonth() + 1)}-${pad(future.getDate())}`;
-    await page.getByRole('textbox', { name: 'Bắt đầu khung giờ' }).fill(day + ' 09:00'); await page.getByRole('textbox', { name: 'Kết thúc khung giờ' }).fill(day + ' 11:00'); await page.getByRole('button', { name: 'Thêm khung giờ', exact: true }).click();
-    await page.getByRole('button', { name: 'Xóa khung giờ', exact: true }).click(); await page.getByRole('button', { name: 'Xác nhận xóa', exact: true }).click(); await page.getByText('Chưa có khung giờ rảnh', { exact: true }).waitFor(); assert.equal(createdSlots, 1); assert.equal(deletedSlots, 1);
+    await mobileNav.getByRole('tab', { name: 'Lịch làm việc', exact: true }).click();
+    const future = new Date(Date.now() + 2 * 86400000);
+    await page.getByRole('region', { name: 'Lịch tháng', exact: true }).getByRole('button', { name: `Ngày ${future.getDate()}/${future.getMonth() + 1}/${future.getFullYear()}`, exact: true }).click();
+    await page.getByRole('button', { name: 'Thêm khung giờ cho ngày này', exact: true }).click();
+    const chooseTime = async (label, hour) => {
+      await page.getByRole('button', { name: label.startsWith('Bắt') ? 'Giờ bắt đầu' : 'Giờ kết thúc', exact: true }).click();
+      await page.getByRole('button', { name: `Giờ ${hour}`, exact: true }).click();
+      await page.getByRole('button', { name: 'Phút 00', exact: true }).click();
+      await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+    };
+    await chooseTime('Bắt đầu khung giờ', '09'); await chooseTime('Kết thúc khung giờ', '11'); await page.getByRole('button', { name: 'Lưu khung giờ', exact: true }).click();
+    await page.getByRole('button', { name: /^Xóa khung giờ/ }).click(); await page.getByRole('button', { name: 'Xác nhận xóa', exact: true }).click(); await page.getByText('Chưa có khung giờ đăng ký trong ngày này.', { exact: true }).waitFor(); assert.equal(createdSlots, 1); assert.equal(deletedSlots, 1);
     for (const width of [320, 768, 1024, 1440]) { await page.setViewportSize({ width, height: 900 }); await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth); const nav = page.getByTestId(width >= 1024 ? 'assessor-header-navigation' : 'assessor-footer-navigation').and(page.getByRole('tablist')); await nav.getByRole('tab', { name: 'Cộng đồng', exact: true }).click(); await page.getByText(post.description, { exact: true }).waitFor(); }
     assert(reads > 0); assert.equal(portfolioReads, 0); assert.deepEqual(errors, []); console.log('Assessor login, five tabs, assignment lifecycle, draft retention, notifications, profile and responsive navigation: OK');
   } catch (e) { fs.mkdirSync('dist/assessor-check', { recursive: true }); await page.screenshot({ path: 'dist/assessor-check/failure.png', fullPage: true }); fs.writeFileSync('dist/assessor-check/failure.txt', await page.locator('body').innerText()); throw e; }

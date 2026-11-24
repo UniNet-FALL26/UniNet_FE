@@ -38,7 +38,7 @@ export function AssessorShell({ children }: { children?: ReactNode } = {}) {
       </Pressable>;
   };
   const navigation = <View testID={desktop ? 'assessor-header-navigation' : 'assessor-footer-navigation'} accessibilityRole="tablist" accessibilityLabel="Điều hướng thẩm định viên" style={desktop ? s.nav : [s.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-    {desktop ? <><View testID="assessor-header-main" style={s.mainNav}>{assessorTabs.slice(0, 3).map(renderTab)}</View><View testID="assessor-header-actions" style={s.headerActions}>{assessorTabs.slice(3).map(renderTab)}</View></> : assessorTabs.map(renderTab)}
+    {desktop ? <><View testID="assessor-header-main" style={s.mainNav}>{assessorTabs.filter(tab => tab.key !== 'notifications' && tab.key !== 'profile').map(renderTab)}</View><View testID="assessor-header-actions" style={s.headerActions}>{assessorTabs.filter(tab => tab.key === 'notifications' || tab.key === 'profile').map(renderTab)}</View></> : assessorTabs.map(renderTab)}
   </View>;
   return <SafeAreaView edges={['top']} style={s.root}>
     {desktop && <View testID="assessor-header" style={s.header}><View style={[s.headerInner, width < 1200 && s.compactHeader]}>
