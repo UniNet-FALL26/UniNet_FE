@@ -87,6 +87,15 @@ async function responseError(response: Response, path: string, method = "GET") {
   );
 }
 
+// An expired GitHub authorization is independent from the UniNet JWT. Preserve
+// the local session so the user can authorize GitHub again instead of logging out.
+async function isGitHubAuthorizationFailure(response: Response, path: string) {
+  if (response.status !== 401 || !/^\/(?:api\/)?(?:github(?:\/|$)|projects\/[^/]+\/git(?:\/|$))/.test(path)) return false;
+  const body: unknown = await response.clone().json().catch(() => null);
+  return !!body && typeof body === 'object' && 'code' in body &&
+    typeof body.code === 'string' && body.code.startsWith('GITHUB_');
+}
+
 export async function refreshSession(
   expected?: AuthSession,
 ): Promise<LoginResponse> {
@@ -185,6 +194,7 @@ async function requestJson<T>(
   );
   if (
     response.status === 401 &&
+    !(await isGitHubAuthorizationFailure(response, path)) &&
     !authPath &&
     original &&
     headers.get("Authorization") === `Bearer ${original.accessToken}`
@@ -198,7 +208,7 @@ async function requestJson<T>(
     if (!current || current.generation !== original.generation) throw changed();
     headers.set("Authorization", `Bearer ${current.accessToken}`);
     response = await fetchResponse(path, { ...options, headers });
-    if (response.status === 401) {
+    if (response.status === 401 && !(await isGitHubAuthorizationFailure(response, path))) {
       await tokenStorage.clear(current);
       throw expired();
     }
@@ -253,6 +263,7 @@ async function requestMultipart<T>(
 
   if (
     response.status === 401 &&
+    !(await isGitHubAuthorizationFailure(response, path)) &&
     !authPath &&
     original &&
     headers["authorization"] === `Bearer ${original.accessToken}`
@@ -268,7 +279,7 @@ async function requestMultipart<T>(
     headers["authorization"] = `Bearer ${current.accessToken}`;
     response = await fetchResponse(path, { ...options, headers });
 
-    if (response.status === 401) {
+    if (response.status === 401 && !(await isGitHubAuthorizationFailure(response, path))) {
       await tokenStorage.clear(current);
       throw expired();
     }

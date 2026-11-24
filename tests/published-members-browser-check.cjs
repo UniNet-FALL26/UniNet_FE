@@ -1,0 +1,100 @@
+// Runs real Expo UI against isolated API fixtures. No live mutations or credentials.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const origin='http://localhost:8081',artifacts=path.join(require('node:os').tmpdir(),'uninet-contribution-ui');fs.mkdirSync(artifacts,{recursive:true});
+(async()=>{
+ const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});let checks=0;
+ const passed=name=>{checks++;console.log('PASS '+checks+' '+name)};
+ const sample=JSON.parse(fs.readFileSync('src/data/profile-sample.json','utf8'));
+ const ids=['self-profile','other-profile','third-profile','outside-profile'],names=['An','Bình','Chi','Ngoài dự án'],projectId='contribution-fixture';
+ let publicVersion=1,publicFailure=false,noPublication=false; let completed=false,mode='OfficialV2',gitSnapshot=null,cohort=null,peer=null,run=null,published=false,incomplete=false,dropCapture=false,dropRun=false,peerConflict=false,deny=false;
+ const versions=[],historyRuns=new Map();const writes=[],reads=[],errors=[];let stallWorkflow=false,releaseWorkflow,workflowReached;
+ const blank=()=>({contractVersion:'1',projectId,mode,canManage:true,projectCompleted:completed,blockers:completed?[]:['ProjectNotCompleted'],publishedRunId:published?'run-1':null,latestGitSnapshotId:gitSnapshot?.snapshotId??null,latestPeerCohortId:cohort?.id??null,peerState:cohort?['Open','Collecting','ReadyToClose','Closed'][cohort.status]:null,peerSubmittedCount:cohort?.submittedCount??null,peerRequiredCount:cohort?.requiredCount??null,latestPeerSnapshotId:peer?.snapshotId??null,latestRunId:run?.id??null});
+ const snapshot=()=>({contractVersion:'1',projectId,snapshotId:'git-1',createdAt:new Date().toISOString(),observationCutoff:new Date().toISOString(),policyVersion:2,restrictedCount:0,entryCount:49,versionCount:38,coverageReceiptCount:28});
+ const ready=()=>({contractVersion:'1',snapshotId:'git-1',gitState:incomplete?'Incomplete':'Ready',inputHash:'git-input-secret-hash',categories:[{category:'Commit',status:incomplete?'Incomplete':'Complete',eligibleActivityCount:4,externalActivityCount:0,excludedActivityCount:5,limitations:incomplete?['IncompleteSourceEvidence']:[]},{category:'Review',status:'NotApplicable',eligibleActivityCount:0,externalActivityCount:0,excludedActivityCount:0,limitations:['VerifiedEmptyReviewCoverage']}],limitations:[] ,members:[],externalGitShare:0});
+ const makeRun=requestId=>({contractVersion:'1',id:'run-1',projectId,requestId,state:'Draft',revision:0,resultHash:'result-private-hash',publishedAt:null,finalizedAt:null,calculation:{projectId,gitEvidenceSnapshotId:'git-1',peerSnapshotId:'peer-1',inputHash:'run-input-private-hash',calculationStatus:'Ready',categories:[],results:ids.map((id,i)=>({userId:id,fullName:names[i],gitScore:60-i*10,peerScore:80,contributionPercent:[50,30,20][i]})),externalContributionPercent:0}});
+ const pageOf=items=>({items,page:1,pageSize:50,totalCount:items.length});
+ const repo=n=>({id:'assoc-'+n,projectId,repository:{fullName:n===1?'fixture/mln-repo':'fixture/shared-repo',providerRepositoryId:n,isPrivate:true},accessStatus:1,unlinkedAt:null,syncPaused:false,credentialSource:1,syncReadiness:'PendingWorker'});
+ async function harness(viewer=0){
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});await page.bringToFront();page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('Unexpected text'))errors.push(m.text());});
+  const account={id:'account-'+viewer,email:'member'+viewer+'@fixture.test',role:0,profileComplete:true,profile:{...sample.profile,id:ids[viewer],fullName:names[viewer]}};
+  const project=id=>({id,title:id===projectId?'Dự án Contribution':'Dự án khác',description:'Kiểm thử giao diện đóng góp',technologies:['TypeScript'],status:completed?2:1,visibility:0,isOwner:viewer===0&&id===projectId,isMember:viewer<3,creator:{id:ids[0],fullName:names[0],avatarUrl:null},members:ids.slice(0,3).map((id,i)=>({id:'member-'+i,userId:id,fullName:names[i],avatarUrl:null,role:i===0?'Creator':'Member',status:0,joinedAt:'2026-11-01'})),details:{description:null,features:[],results:{},documents:[],media:[],links:[],startDate:null,completedAt:completed?new Date().toISOString():null},recruitment:null,myReview:null,chatRoomId:null,createdAt:'2026-11-01',updatedAt:'2026-11-01'});
+  await page.route('**/hubs/**',route=>route.abort());
+  await page.route('**/api/**',async route=>{
+   const q=route.request(),url=new URL(q.url()),p=url.pathname,m=q.method();assert.equal(url.origin,'http://localhost:5239');const ok=value=>route.fulfill({json:value}),fail=(code,status=409)=>route.fulfill({status,json:{code}});if(m==='OPTIONS')return route.fulfill({status:204});reads.push({viewer,p,m});
+   if(p.endsWith('/auth/login'))return ok({account,accessToken:'fixture-token',refreshToken:'fixture-refresh',requiresProfileCompletion:false});if(p.endsWith('/auth/me'))return ok(account);if(p.endsWith('/profile/portfolio/me'))return ok({...sample,profile:account.profile});
+   if(viewer<0&&p.includes('/project-hub/'))return fail('UNAUTHORIZED',401);
+   if(/^\/api\/project-hub\/(contribution-fixture|contribution-other)$/.test(p))return ok(project(p.split('/').at(-1)));
+   if(p.includes('/contribution-other/contribution/v2/'))return fail('FORBIDDEN',403);
+   if(p.endsWith('/git/repositories'))return ok(pageOf([repo(1),repo(2)]));if(p.endsWith('/git/sync-status'))return ok({items:[1,2].map(n=>({projectGitRepositoryId:'assoc-'+n,latestJob:{status:2},syncPaused:false}))});
+   if(viewer===3&&p.endsWith('/git/identities'))throw Error('Outsider identity read forbidden');
+   if(p.endsWith('/git/identities'))return ok(pageOf([{id:'identity',projectId,userProfileId:ids[0],status:0}]));if(p.endsWith('/git/identities/identity/history'))return ok(pageOf([{occurredAt:new Date(Date.now()-5000).toISOString()}]));
+   if(p.endsWith('/profile/skills'))return ok([]);
+   if(!p.includes('/contribution/v2/')){if(m!=='GET')throw Error('Unexpected mutation '+p);return ok(p.includes('/unread')?{count:0}:{items:[],total:0});}
+   const endpoint=p.split('/contribution/v2')[1];
+   if(m==='GET'){
+    if(deny)return fail('FORBIDDEN',403);
+    if(endpoint==='/results/public'){
+     if(publicFailure)return fail('FORBIDDEN',403);
+     return ok({projectId,publishedRunId:noPublication?null:'public-v'+publicVersion,version:noPublication?null:publicVersion,publishedAt:noPublication?null:new Date().toISOString(),members:noPublication?[]:ids.slice(0,3).map((userProfileId,i)=>({userProfileId,contributionPercent:(publicVersion===1?[84.59,15.41,0]:[83.5,16.5,0])[i]}))});
+    }
+    if(endpoint==='/workflow'){
+     const result={...blank(),canManage:viewer===0,...(viewer!==0?{latestGitSnapshotId:null,latestPeerSnapshotId:null,latestRunId:null}: {})};
+     if(stallWorkflow){stallWorkflow=false;workflowReached?.();await new Promise(resolve=>{releaseWorkflow=resolve});}return ok(result);
+    }
+    if(endpoint==='/version-capabilities')return ok({supported:true,canAdjust:true,canOpenPeerRound:!cohort||cohort.status===3,currentPublishedRunId:published?run.id:null});
+    if(endpoint.startsWith('/versions'))return ok({contractVersion:'1',page:1,pageSize:20,total:versions.length,items:versions});
+    if(endpoint==='/snapshots/git-1')return ok(gitSnapshot);if(endpoint==='/snapshots/git-1/readiness')return ok(ready());
+    if(endpoint.startsWith('/snapshots/git-1/memberships'))return ok({contractVersion:'1',page:1,pageSize:20,total:2,items:[1,2].map(n=>({associationId:'assoc-'+n,repositoryId:'repo-'+n,observationId:'o-'+n,versionId:'v-'+n,category:'commits',validationStatus:'Valid',reason:'Valid'}))});
+    if(endpoint==='/peer-cohorts/cohort-1')return ok(cohort);if(endpoint==='/peer-snapshots/peer-1')return ok(peer);
+    if(endpoint==='/runs/run-1')return ok(run);if(endpoint.startsWith('/runs/run-1/'))return ok({contractVersion:'1',page:1,pageSize:20,total:0,items:[]});
+    if(endpoint==='/results/me')return published?ok({contractVersion:'1',projectId,runId:'run-1',publishedAt:new Date().toISOString(),userId:ids[viewer],gitShare:40,peerShare:60,contributionPercent:[50,30,20][viewer]}):fail('OFFICIAL_NOT_PUBLISHED',404);
+    return fail('NOT_FOUND',404);
+   }
+   const body=JSON.parse(q.postData()||'{}');writes.push({viewer,endpoint,body});
+   if(viewer!==0&&!endpoint.includes('/evaluations/'))return fail('FORBIDDEN',403);
+   if(endpoint==='/snapshots'){assert.ok(Date.parse(body.observationCutoff)<=Date.now());assert.ok(completed);gitSnapshot=snapshot();if(dropCapture){dropCapture=false;return route.abort('failed');}return ok({snapshotId:'git-1'});}
+   if(endpoint==='/peer-cohorts'){assert.deepEqual([...body.participantIds].sort(),[...ids].sort());cohort={id:'cohort-1',projectId,status:0,participantIds:ids,submittedCount:0,requiredCount:6,snapshotId:null,ratings:[]};return ok(cohort);}
+   if(endpoint.includes('/evaluations/')){
+    const target=decodeURIComponent(endpoint.split('/').at(-1));assert.notEqual(target,ids[viewer]);assert.ok(Number.isInteger(body.score)&&body.score>=1&&body.score<=5);let r=cohort.ratings.find(x=>x.evaluatorId===ids[viewer]&&x.evaluateeId===target);
+    if(peerConflict){peerConflict=false;if(r)r.revision++;return fail('PEER_REVISION_CONFLICT');}
+    if(r){assert.equal(body.expectedRevision,r.revision);r.score=body.score;r.comment=body.comment;r.revision++;}else{assert.equal(body.expectedRevision,null);cohort.ratings.push({evaluatorId:ids[viewer],evaluateeId:target,score:body.score,comment:body.comment,revision:0,updatedAt:new Date().toISOString()});}
+    cohort.submittedCount=cohort.ratings.length;cohort.status=cohort.submittedCount===6?2:1;return ok(cohort);
+   }
+   if(endpoint==='/peer-cohorts/cohort-1/close'){assert.equal(cohort.submittedCount,6);cohort.status=3;cohort.snapshotId='peer-1';peer={contractVersion:'1',snapshotId:'peer-1',cohortId:cohort.id,state:'Ready',inputHash:'peer-private-hash',createdAt:new Date().toISOString(),participantCount:3,policyVersion:'ExperimentalPeerV1',scores:{}};return ok({peerSnapshotId:'peer-1'});}
+   if(endpoint==='/runs'){assert.equal(body.gitSnapshotId,'git-1');assert.equal(body.peerSnapshotId,'peer-1');if(run)assert.equal(run.requestId,body.requestId);run??=makeRun(body.requestId);if(dropRun){dropRun=false;return route.abort('failed');}return ok(run);}
+   if(endpoint.startsWith('/runs/run-1/')){
+    if(endpoint.endsWith('/approve-and-publish')){assert.equal(body.expectedRevision,run.revision);assert.equal(body.expectedPublishedRunId,published?run.id:null);run.state='Published';run.revision+=3;run.publishedAt=new Date().toISOString();published=true;versions.unshift({version:versions.length+1,runId:run.id,publishedAt:run.publishedAt,isCurrent:true,replacedByRunId:null,supersededAt:null,reason:body.reason});historyRuns.set(run.id,structuredClone(run));return ok(run);}
+    const action=endpoint.split('/').at(-1);assert.equal(body.expectedRevision,run.revision);const next={submit:'Review',approve:'Approved',reject:'Rejected',finalize:'Finalized',publish:'Published'}[action];if(action==='reject')assert.ok(body.feedback?.trim());run.state=next;run.revision++;if(action==='publish'){published=true;run.publishedAt=new Date().toISOString();}return ok(run);
+   }
+   throw Error('Unexpected mutation '+p);
+  });
+  await page.route(origin+'/**',route=>route.request().isNavigationRequest()?route.fulfill({contentType:'text/html',body:'<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}body{overflow:hidden;display:flex}#root{display:flex;flex:1}</style></head><body><div id="root"></div><script src="/index.bundle?platform=web&dev=true&hot=false&transform.routerRoot=src%2Fapp"></script></body></html>'}):route.fallback());
+  if(viewer>=0){await page.goto(origin+'/login',{timeout:120000});await page.getByRole('textbox',{name:'Email',exact:true}).fill(account.email);await page.getByRole('textbox',{name:'Mật khẩu',exact:true}).fill('fixture-password');await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await page.waitForURL(u=>!u.pathname.includes('/login'));}
+  async function open(id=projectId){await page.goto(`${origin}/group/${id}?tab=contribution`);try{await page.getByRole('tab',{name:'Đóng góp',exact:true}).click();}catch(e){console.log('BODY', (await page.locator('body').innerText()).slice(-3000));console.log('ERRORS',errors);console.log('READS',reads.slice(-12));throw e;}await page.getByText('Tổng kết đóng góp của các thành viên',{exact:true}).waitFor();}
+  return {page,open};
+ }
+ try{
+ completed=true;published=true;run={...makeRun('published-request'),state:'Published',publishedAt:new Date().toISOString()};
+ for(const viewer of [0,1,2,3]){
+  const {page}=await harness(viewer);await page.goto(origin+'/group/'+projectId+'?tab=members');await page.getByRole('tab',{name:'Thành viên',exact:true}).click();
+  await page.getByText('Đóng góp phiên bản 1 — Đã công bố.',{exact:true}).waitFor();
+  const rows=page.getByTestId('project-member-row');assert.equal(await rows.count(),3);
+  await rows.filter({hasText:'An'}).getByText('84,59%',{exact:true}).waitFor();await rows.filter({hasText:'Bình'}).getByText('15,41%',{exact:true}).waitFor();await rows.filter({hasText:'Chi'}).getByText('0%',{exact:true}).waitFor();
+  assert.equal(reads.filter(x=>x.viewer===viewer&&x.p.endsWith('/results/me')).length,0);
+  if(viewer===3)assert.equal(reads.filter(x=>x.viewer===3&&x.p.includes('/git/identities')).length,0);
+  passed(['Creator','Member B','Member C','Outsider'][viewer]+' sees all public Published values, no own-score endpoint');
+  if(viewer===3){
+   publicVersion=2;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Đóng góp phiên bản 2 — Đã công bố.',{exact:true}).waitFor();await page.getByText('83,5%',{exact:true}).waitFor();passed('Publication version updates on foreground without scoring');
+   publicFailure=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Bạn cần quyền xem dự án để xem điểm đã công bố.',{exact:true}).waitFor();assert.equal(await page.getByText('83,5%',{exact:true}).count(),0);passed('403 clears cached values');
+   publicFailure=false;noPublication=true;await page.getByRole('button',{name:'Thử lại điểm đóng góp',exact:true}).click();await page.getByText('Điểm đóng góp chưa được công bố.',{exact:true}).waitFor();assert.equal(await page.getByText('0%',{exact:true}).count(),0);passed('No publication is not zero');
+   noPublication=false;publicVersion=1;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('84,59%',{exact:true}).waitFor();
+   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(artifacts,'public-members-mobile.png'),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));passed('Mobile rows keep readable Published percentages');
+   await page.goto(origin+'/group/contribution-other?tab=members');await page.getByRole('tab',{name:'Thành viên',exact:true}).click();await page.getByText('Bạn cần quyền xem dự án để xem điểm đã công bố.',{exact:true}).waitFor();assert.equal(await page.getByText('84,59%',{exact:true}).count(),0);passed('Project switch cannot leak previous results');
+  }
+  await page.close();
+ }
+ const guest=await harness(-1);await guest.page.goto(origin+'/group/'+projectId+'?tab=members');await guest.page.getByRole('button',{name:'Thử lại',exact:true}).waitFor();assert.equal(await guest.page.getByText('84,59%',{exact:true}).count(),0);await guest.page.close();passed('Guest follows existing authenticated Project Detail policy and sees no scores');
+ assert.equal(writes.length,0);assert.deepEqual(errors,[]);console.log(`PASS ${checks} public member browser scenarios; all API requests intercepted, no live mutations`);
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e.stack||e.message);process.exitCode=1});

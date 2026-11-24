@@ -57,7 +57,10 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test:external-projects": "node --test scripts/test-external-projects.cjs"
+    "test:external-projects": "node --test scripts/test-external-projects.cjs",
+    "web:github-e2e": "node scripts/start-github-frontend-e2e.cjs",
+    "test:contribution": "node --test tests/contribution.test.cjs",
+    "test:project-github": "node --test tests/project-github.test.cjs tests/github-refresh.test.cjs tests/github-repository-access.test.cjs tests/github-provider-auth.test.cjs tests/project-members.test.cjs tests/project-hub-routing.test.cjs tests/project-service.test.cjs tests/api-feedback.test.cjs"
   },
   "private": true,
   "overrides": {
