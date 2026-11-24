@@ -22,6 +22,7 @@ const names = {
   share: ['square.and.arrow.up', 'share'], more: ['ellipsis', 'more_horiz'], play: ['play.circle', 'play_circle_outline'],
   invite: ['person.badge.plus', 'person_add'], chevron: ['chevron.down', 'expand_more'], warning: ['exclamationmark.triangle', 'warning_amber'],
   tag: ['tag', 'sell'], save: ['square.and.arrow.down', 'save'],
+  qrcode: ['qrcode', 'qr_code_2'], refresh: ['arrow.clockwise', 'refresh'],
   globe: ['globe', 'language'], code: ['chevron.left.forwardslash.chevron.right', 'code'],
   message: ['bubble.left', 'chat_bubble_outline'],
 } as const;

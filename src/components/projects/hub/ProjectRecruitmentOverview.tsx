@@ -36,7 +36,6 @@ export function ProjectRecruitmentOverview({ project, onSaved, onClose, onEdit, 
   const status = recruitment.status === 2 ? 'Đã đóng tuyển' : recruitment.status === 0 ? 'Chưa đăng tuyển' : expired ? 'Đã hết hạn tuyển' : 'Đang tuyển thành viên';
   return <HubModal title="Thông tin tuyển thành viên" icon="people" compact wide={false} maxWidth={520} subtitle={project.title}
     onClose={busy ? () => undefined : onClose} footer={<>
-      <HubAction compact title="Đóng" onPress={onClose} disabled={busy} />
       {project.isOwner && onSaved && recruitment.status === 1 && <HubAction compact title="Đóng tuyển" onPress={() => void closeRecruitment()} busy={busy} />}
       {project.isOwner && onEdit && project.status !== 2 && project.status !== 3 && <HubAction compact title="Chỉnh sửa" icon="edit" variant="primary" onPress={onEdit} disabled={busy} />}
       {footerAction}

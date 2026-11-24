@@ -1,5 +1,34 @@
 # Project documents table
 
+## Responsive layout (2026-11-24)
+
+- Latest: upload uses a borderless icon button with accessible label and busy
+  indicator, aligned to the title on every viewport. Compact document rows now
+  use bottom separators instead of outlined cards. Chrome fixture verifies
+  alignment at 320/375/768/1024/1440px, border styles and the full upload flow.
+  Focused ESLint passes.
+
+- Follow-up: compact rows now show only file icon, wrapping filename and menu.
+  Format/size/uploader/date move to the shared read-only “Thông tin tài liệu”
+  HubModal, opened through “Xem thông tin” for all viewers on both layouts.
+  Compact bulk selection is omitted; desktop selection is unchanged.
+- Verified popup open/close/reopen, metadata and missing-value fallbacks,
+  read-only member access and compact metadata hiding in the Chrome fixture.
+
+- Replace horizontal ScrollView/measured table width with a 100% width table;
+  table and header now share equal 16px card insets.
+- Measure panel content width; below 850px render a vertical document list with
+  wrapping filename, format/size, uploader/date and existing action menu.
+- Compact header stacks upload button; footer stacks count and pagination.
+  Checkboxes, file menu, menu items and compact page buttons use 44px targets.
+- Existing mutation handlers, selection, permissions and dialogs are shared.
+- Browser fixture passed at 320/375/768/1024/1440px: equal insets, no panel
+  overflow, long filename wrapping, metadata, menu bounds, selection, upload,
+  rename/download/delete retry, member/visitor permissions and empty state.
+- Updated stale fixture for POST resources/documents and member upload rights.
+  Focused ESLint passes. Full TypeScript check remains blocked by unrelated
+  opportunities.tsx and AssessorProfilePosts.tsx errors.
+
 ## Upload metadata fix
 
 - Root cause: document JSON/API originally exposed only URL/name/type despite

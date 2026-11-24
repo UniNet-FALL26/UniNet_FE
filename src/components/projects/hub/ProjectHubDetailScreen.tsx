@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { projectHubService } from '@/services/project-hub.service';
 import { projectVerificationService } from '@/services/project-verification.service';
@@ -18,6 +18,7 @@ import { overviewGuides, type OverviewGuideId } from '@/utils/project-overview-c
 import { ProjectReceivedInvitation } from './ProjectReceivedInvitation';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
 import { ProjectDocumentsPanel } from './ProjectDocumentsPanel';
+import { ProjectMediaPanel } from './ProjectMediaPanel';
 import { ProjectSummaryModal } from './ProjectSummaryModal';
 import { ProjectLinksModal } from './ProjectLinksModal';
 import { ProjectLinkIcon } from './ProjectLinkIcon';
@@ -111,12 +112,12 @@ export function ProjectHubDetailScreen() {
     } catch (cause) { if (request === imageRequest.current) setResourceError({ kind, message: messageOf(cause) }); }
     finally { if (request === imageRequest.current) { resourceLocked.current = false; setAddingResource(null); } }
   }
-  async function updateDocuments(documents: HubFile[]) {
-    if (!project?.isOwner || resourceLocked.current) throw new Error('Vui lòng chờ thao tác tài liệu hiện tại hoàn tất.');
+  async function updateResources(kind: 'documents' | 'media', files: HubFile[]) {
+    if (!project?.isOwner || resourceLocked.current) throw new Error('Vui lòng chờ thao tác tệp hiện tại hoàn tất.');
     const request = imageRequest.current;
-    resourceLocked.current = true; setAddingResource('documents'); setResourceError(null);
+    resourceLocked.current = true; setAddingResource(kind); setResourceError(null);
     try {
-      const value = await projectHubService.update(project.id, { details: { ...project.details, documents } });
+      const value = await projectHubService.update(project.id, { details: { ...project.details, [kind]: files } });
       if (request === imageRequest.current) saved(value);
     } finally {
       if (request === imageRequest.current) { resourceLocked.current = false; setAddingResource(null); }
@@ -166,8 +167,8 @@ export function ProjectHubDetailScreen() {
       {tab === 'settings' && (project.isOwner || project.isMember) && <ProjectSettingsPanel project={project} onManage={show} onSaved={saved} />}
       {tab === 'verification' && verificationResult && <VerificationResultPanel result={verificationResult} />}
       {tab === 'overview' && <ProjectOverview project={project} editingDisabled={addingResource !== null} onEdit={() => show('overview')} onReview={() => show('review')} />}
-      {tab === 'documents' && <ProjectDocumentsPanel key={project.id} project={project} onAdd={() => void addResource('documents')} onUpdate={updateDocuments} busy={addingResource !== null} error={resourceError?.kind === 'documents' ? resourceError.message : ''} />}
-      {tab === 'media' && <ResourcesPanel project={project} kind="media" onAdd={() => void addResource('media')} busy={addingResource !== null} error={resourceError?.kind === 'media' ? resourceError.message : ''} />}
+      {tab === 'documents' && <ProjectDocumentsPanel key={project.id} project={project} onAdd={() => void addResource('documents')} onUpdate={files => updateResources('documents', files)} busy={addingResource !== null} error={resourceError?.kind === 'documents' ? resourceError.message : ''} />}
+      {tab === 'media' && <ProjectMediaPanel key={project.id} project={project} onAdd={() => void addResource('media')} onUpdate={files => updateResources('media', files)} busy={addingResource !== null} error={resourceError?.kind === 'media' ? resourceError.message : ''} />}
       {tab === 'members' && <HubPanel compact title={`Thành viên (${activeMembers.length})`} icon="people" action={!compact ? memberActions : undefined}>
         {compact && memberActions}
         {displayMembers.map(item => <View key={item.id} testID="project-member-row" style={styles.member}><PersonAvatar person={item} size={32} /><View style={{ flex: 1 }}><Text style={styles.name}>{item.fullName}{item.userId === account?.profile?.id || (project.isOwner && item.userId === project.creator.id) ? ' (Bạn)' : ''}</Text><Text style={styles.muted}>{item.role}{item.status === 1 ? ' · Đã kết thúc tham gia' : item.status === 2 ? ' · Đã rời dự án' : ''}</Text></View>{project.isOwner && item.userId !== project.creator.id && item.status === 0 && <HubAction compact title="Quản lý" variant="quiet" onPress={() => setMember(item)} />}</View>)}
@@ -225,15 +226,6 @@ function OverviewSection({ section, icon, children, last, reserveAction }: { sec
   return <View style={[styles.overviewSection, !last && { borderBottomWidth: 1, borderColor: c.line }]}><View style={[styles.sectionHeading, reserveAction && { paddingRight: 30 }]}><HubIcon name={icon} size={20} /><Text accessibilityRole="header" aria-level={2} style={[ui.heading, { fontSize: 15, flexShrink: 1 }]}>{overviewGuides[section].title}</Text><ProjectOverviewHelp section={section} /></View><View style={{ paddingLeft: 28 }}>{children}</View></View>;
 }
 function InfoRow({ label, icon, children }: { label: string; icon: HubIconName; children: ReactNode }) { return <View style={styles.infoRow}><HubIcon name={icon} size={17} color={c.textSecondary} /><Text style={styles.infoLabel}>{label}</Text><View style={{ flex: 1, alignItems: 'flex-end' }}>{children}</View></View>; }
-function ResourcesPanel({ project, kind, onAdd, busy, error }: { project: HubProject; kind: 'documents' | 'media'; onAdd: () => void; busy: boolean; error: string }) {
-  const files = project.details[kind]; const media = kind === 'media';
-  return <HubPanel compact title={media ? 'Hình ảnh & Video demo' : 'Tài liệu dự án'} icon={media ? 'image' : 'document'} action={!media && (project.isOwner || project.isMember) ? <HubAction compact title="Tải lên" icon="upload" busy={busy} onPress={onAdd} style={styles.uploadButton} /> : undefined}>
-    {!files.length ? <View style={styles.resourceEmpty}><HubIcon name={media ? 'image' : 'document'} size={38} /><Text style={styles.muted}>{media ? 'Chưa có hình ảnh hoặc video demo.' : 'Chưa có tài liệu được chia sẻ.'}</Text></View> : <View style={media ? styles.mediaGrid : { gap: 10 }}>{files.map((file, i) => <Resource key={`${file.url}-${i}`} file={file} media={media} />)}</View>}
-    {(project.isOwner || project.isMember) && media && <View style={{ alignSelf: 'flex-start' }}><HubAction compact title="Thêm hình ảnh / video" icon="plus" busy={busy} onPress={onAdd} /></View>}
-    {!!error && <Text accessibilityRole="alert" style={ui.error}>{error}</Text>}
-  </HubPanel>;
-}
-function Resource({ file, media }: { file: HubFile; media: boolean }) { return <Pressable accessibilityRole="link" accessibilityLabel={`Mở ${file.name}`} onPress={() => openProjectUrl(file.url)} style={media ? styles.media : styles.document}>{media ? <>{file.type === 'image' ? <Image source={{ uri: file.url }} style={styles.mediaImage} resizeMode="cover" /> : <View style={[styles.mediaImage, { backgroundColor: c.blueWash, justifyContent: 'center', alignItems: 'center' }]}><HubIcon name="play" size={38} /></View>}<View style={styles.mediaLabel}><Text numberOfLines={2} style={[styles.infoValue, { flex: 1 }]}>{file.name}</Text><HubIcon name="external" size={15} /></View></> : <><HubIcon name="document" size={20} /><Text style={[styles.infoValue, { flex: 1 }]}>{file.name}</Text><HubIcon name="external" size={17} /></>}</Pressable>; }
 function VerificationResultPanel({ result }: { result: VerificationFinalResult }) {
   const passed = result.status === 1;
   return <View style={{ gap: 14 }}>
@@ -264,7 +256,6 @@ function VerificationResultPanel({ result }: { result: VerificationFinalResult }
 const styles = StyleSheet.create({
   memberActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   memberActionCompact: { minHeight: 32, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  uploadButton: { backgroundColor: c.primaryLight, borderWidth: 0, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, minHeight: 36, gap: 7 },
   editableTitle: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' },
   screen: { flex: 1, backgroundColor: c.canvas }, page: { width: '100%', maxWidth: 1380, alignSelf: 'center', padding: 24, paddingBottom: 40 }, compactPage: { padding: 14, paddingBottom: 28 },
   camera: { position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
@@ -273,5 +264,5 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', justifyContent: 'flex-end', paddingVertical: 12 }, toolbarActions: { flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' }, notice: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.blueWash, paddingLeft: 12, borderRadius: 8, marginBottom: 10 },
   tabs: { minWidth: '100%', borderBottomWidth: 1, borderColor: c.line, marginBottom: 16 }, tab: { minHeight: 44, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' }, tabActive: { borderBottomColor: c.primary }, content: { flexDirection: 'row', gap: 18, alignItems: 'flex-start' }, sidebar: { width: 300, gap: 14 },
   overviewSection: { paddingVertical: 13, gap: 9 }, sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 }, tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, tile: { flex: 1, minWidth: 140, padding: 12, gap: 6, borderRadius: 9 }, resultTile: { minWidth: 140, backgroundColor: '#F3F6FC' }, tileHeading: { flexDirection: 'row', alignItems: 'center', gap: 7 }, tileTitle: { color: c.primary, fontSize: 13, fontWeight: '600', flexShrink: 1 }, infoRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5, borderBottomWidth: 1, borderColor: '#F0F3F8' }, infoLabel: { color: c.ink, fontSize: 11, width: 88 }, infoValue: { color: c.ink, fontSize: 12, lineHeight: 19 }, creator: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }, link: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 36, borderBottomWidth: 1, borderColor: '#F0F3F8' },
-  member: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line }, name: { color: c.ink, fontSize: 13, fontWeight: '600' }, resourceEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 28, gap: 13 }, document: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: c.canvas, borderWidth: 1, borderColor: c.line, borderRadius: 8 }, mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, media: { flexGrow: 1, flexBasis: 200, maxWidth: 400, borderRadius: 9, borderWidth: 1, borderColor: c.line, overflow: 'hidden' }, mediaImage: { width: '100%', height: 140 }, mediaLabel: { flexDirection: 'row', padding: 10, gap: 8, alignItems: 'center' },
+  member: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line }, name: { color: c.ink, fontSize: 13, fontWeight: '600' },
 });
