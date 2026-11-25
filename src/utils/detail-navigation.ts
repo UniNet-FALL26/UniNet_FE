@@ -22,7 +22,11 @@ export function detailNavigation(pathname: string, role = 0, params: { id?: stri
   if (pathname.startsWith('/assessor-assessments/')) return make([crumb('Danh sách thẩm định', '/(assessor)/assessor-assessments'), crumb('Chi tiết thẩm định')]);
   if (pathname.startsWith('/workspace/')) return make([crumb('Không gian làm việc', '/(tabs)/workspace'), crumb('Công việc dự án')]);
   if (pathname.startsWith('/post/')) return make([crumb('Cộng đồng', role === 1 ? '/(company)/company-community' : role === 2 ? '/(assessor)/assessor-community' : '/(tabs)'), crumb('Bài viết')]);
-  if (pathname.startsWith('/profile/view/')) return make([crumb('Cộng đồng', '/(tabs)'), crumb('Hồ sơ sinh viên')]);
+  if (pathname.startsWith('/profile/view/')) {
+    const label = role === 1 ? 'Hồ sơ đối tác' : role === 2 ? 'Hồ sơ thẩm định viên' : role === 0 ? 'Hồ sơ sinh viên' : 'Hồ sơ thành viên';
+    const community = role === 1 ? '/(company)/company-community' : role === 2 ? '/(assessor)/assessor-community' : '/(tabs)';
+    return make([crumb('Cộng đồng', community), crumb(label)]);
+  }
   if (pathname.startsWith('/profile/')) {
     const appearance = new URLSearchParams();
     if (params.template) appearance.set('template', params.template);

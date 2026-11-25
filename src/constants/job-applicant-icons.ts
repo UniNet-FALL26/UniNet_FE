@@ -16,5 +16,6 @@ export const jobApplicationIcons = {
   skills: { ios: 'chart.bar', android: 'bar_chart', web: 'bar_chart' },
   benefitsSection: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' },
   viewCv: { ios: 'eye', android: 'visibility', web: 'visibility' },
+  message: { ios: 'bubble.left.and.bubble.right', android: 'chat_bubble_outline', web: 'chat_bubble_outline' },
   changeStatus: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' },
 } as const;
