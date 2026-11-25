@@ -22,10 +22,6 @@ export default function CompanyJobs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
-  const [confirmation, setConfirmation] = useState<{ action: 'close' | 'reopen' | 'delete'; job: CompanyJob } | null>(null);
-  const [confirmationBusy, setConfirmationBusy] = useState(false);
-  const [confirmationError, setConfirmationError] = useState('');
-
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -49,27 +45,6 @@ export default function CompanyJobs() {
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [filter, query, page, pageSize, reload]));
-
-  const requestConfirmation = (action: 'close' | 'reopen' | 'delete', job: CompanyJob) => {
-    setConfirmationError('');
-    setConfirmation({ action, job });
-  };
-
-  const confirmJobAction = async () => {
-    if (!confirmation || confirmationBusy) return;
-    setConfirmationBusy(true);
-    setConfirmationError('');
-    try {
-      if (confirmation.action === 'delete') await companyService.deleteJob(confirmation.job.id);
-      else await companyService.updateJobStatus(confirmation.job.id, confirmation.action === 'close' ? 2 : 1);
-      setConfirmation(null);
-      setReload(value => value + 1);
-    } catch (cause) {
-      setConfirmationError(cause instanceof Error ? cause.message : 'Vui lòng thử lại.');
-    } finally {
-      setConfirmationBusy(false);
-    }
-  };
 
   const totalItems = data?.totalItems ?? 0;
   const totalPages = Math.max(1, data?.totalPages ?? 1);
@@ -116,7 +91,7 @@ export default function CompanyJobs() {
       </View>
       {isWideWeb && <ScrollView horizontal contentContainerStyle={s.tableScroll}>
         <View style={s.table}>
-          <View style={[s.tableRow, s.tableHeader]}>{['Bài đăng tuyển dụng', 'Địa điểm', 'Mức lương', 'Hạn ứng tuyển', 'Ứng viên', 'Cập nhật', 'Trạng thái', 'Thao tác'].map((label, index) => <Text key={label} style={[s.tableHeadText, index === 0 ? s.colTitle : index === 2 ? s.colSalary : index === 6 ? s.colStatus : index === 7 ? s.colActions : s.col]}>{label}</Text>)}</View>
+          <View style={[s.tableRow, s.tableHeader]}>{['Bài đăng tuyển dụng', 'Địa điểm', 'Mức lương', 'Hạn ứng tuyển', 'Ứng viên', 'Cập nhật', 'Trạng thái'].map((label, index) => <Text key={label} style={[s.tableHeadText, index === 0 ? s.colTitle : index === 2 ? s.colSalary : index === 6 ? s.colStatus : s.col]}>{label}</Text>)}</View>
           {!loading && !error && visibleJobs.map(job => <View key={job.id} style={s.tableRow}>
             <View style={s.colTitle}>
               <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/(company)/job-detail' as never, params: { jobId: job.id } as never })}><Text style={s.jobTitle}>{job.title}</Text></Pressable>
@@ -128,13 +103,6 @@ export default function CompanyJobs() {
             <Pressable accessibilityRole="link" accessibilityLabel={`Xem ${job.applicantCount} hồ sơ của ${job.title}`} style={[s.col, s.cell]} onPress={() => router.push({ pathname: '/(company)/job-detail', params: { jobId: job.id } })}><CompanyIcon name={jobIcons.applicants} size={17} color={c.blue} /><Text style={s.link}>{job.applicantCount} hồ sơ</Text></Pressable>
             <Text style={[s.col, s.cellText]}>{formatCompanyDate(job.updatedAt)}</Text>
             <View style={s.colStatus}><Tag tone={statusTone[job.status]}>{companyJobStatusLabel[job.status]}</Tag></View>
-            <View style={[s.buttons, s.colActions]}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Xem chi tiết bài đăng" style={s.iconButton} onPress={() => router.push({ pathname: '/(company)/job-detail' as never, params: { jobId: job.id } as never })}><CompanyIcon name={jobIcons.views} size={17} color={c.ink} /></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa bài đăng" style={s.iconButton} onPress={() => router.push({ pathname: '/(company)/create', params: { jobId: job.id } })}><CompanyIcon name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={17} color={c.ink} /></Pressable>
-              {job.status === 1 && <Pressable accessibilityRole="button" accessibilityLabel="Đóng bài đăng" style={s.iconButton} onPress={() => requestConfirmation('close', job)}><CompanyIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} color={c.ink} /></Pressable>}
-              {job.status === 2 && <Pressable accessibilityRole="button" accessibilityLabel="Mở lại bài đăng" style={s.iconButton} onPress={() => requestConfirmation('reopen', job)}><CompanyIcon name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }} size={18} color={c.ink} /></Pressable>}
-              <Pressable accessibilityRole="button" accessibilityLabel="Xóa bài đăng" style={[s.iconButton, s.deleteButton]} onPress={() => requestConfirmation('delete', job)}><CompanyIcon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={17} color={c.rose} /></Pressable>
-            </View>
           </View>)}
         </View>
       </ScrollView>}
@@ -155,19 +123,6 @@ export default function CompanyJobs() {
       </View>
     </Card>
   </PageScroll>
-    {confirmation && <View style={s.confirmOverlay}>
-      <View style={s.confirmDialog}>
-        <Text style={s.confirmTitle}>{confirmation?.action === 'delete' ? 'Xóa bài tuyển dụng?' : confirmation?.action === 'reopen' ? 'Mở lại bài tuyển dụng?' : 'Đóng bài tuyển dụng?'}</Text>
-        <Text style={s.confirmMessage}>{confirmation?.action === 'delete' ? `Bạn có chắc muốn xóa “${confirmation?.job.title}”? Thao tác này không thể hoàn tác.` : confirmation?.action === 'reopen' ? `Bài “${confirmation?.job.title}” sẽ được đăng lại và tiếp tục nhận hồ sơ. Bạn có muốn mở lại không?` : `Bài “${confirmation?.job.title}” sẽ ngừng nhận hồ sơ mới. Bạn có muốn đóng bài này không?`}</Text>
-        {!!confirmationError && <Text accessibilityRole="alert" style={s.confirmError}>{confirmationError}</Text>}
-        <View style={s.confirmActions}>
-          <ActionButton title="Hủy" variant="outline" onPress={() => { if (!confirmationBusy) setConfirmation(null); }} />
-          <Pressable accessibilityRole="button" disabled={confirmationBusy} onPress={() => void confirmJobAction()} style={[s.confirmAction, confirmation?.action === 'delete' ? s.confirmDelete : s.confirmClose]}>
-            <Text style={s.confirmActionText}>{confirmationBusy ? 'Đang xử lý…' : confirmation?.action === 'delete' ? 'Xóa bài' : confirmation?.action === 'reopen' ? 'Mở lại bài' : 'Đóng bài'}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>}
   </CompanyPage>;
 }
 
@@ -204,7 +159,7 @@ const s = StyleSheet.create({
   filterText: { color: c.ink, fontSize: 12, fontWeight: '600' },
   filterTextActive: { color: c.blue },
   tableScroll: { flexGrow: 1 },
-  table: { flex: 1, minWidth: 1060 },
+  table: { flex: 1, minWidth: 904 },
   tableRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line, paddingHorizontal: 14, gap: 10, paddingVertical: 12 },
   tableHeader: { minHeight: 40, paddingVertical: 10, borderBottomWidth: 0, borderRadius: 6, backgroundColor: '#EAF1F9' },
   tableHeadText: { color: c.ink, fontSize: 12, fontWeight: '700' },
@@ -212,11 +167,9 @@ const s = StyleSheet.create({
   col: { flex: 1, minWidth: 85 },
   colSalary: { flex: 1.6, minWidth: 145 },
   colStatus: { width: 100, flexShrink: 0 },
-  colActions: { width: 146, flexDirection: 'row', alignItems: 'center', gap: 6 },
   cell: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   cellText: { color: c.ink, fontSize: 12, lineHeight: 18, flexShrink: 1 },
   iconButton: { width: 32, height: 34, borderRadius: 7, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
-  deleteButton: { backgroundColor: '#FFF5F5', borderColor: '#F6E5E5' },
   link: { color: c.blue, fontSize: 12, fontWeight: '700', flexShrink: 1 },
   jobCard: { gap: 10, marginBottom: 12 },
   jobCardPressed: { opacity: 0.8 },
@@ -236,4 +189,4 @@ const s = StyleSheet.create({
   error: { color: c.rose, fontSize: 13, lineHeight: 20 },
   emptyTitle: { color: c.ink, fontSize: 15, fontWeight: '700' },
   emptyText: { color: c.muted, fontSize: 13, lineHeight: 20 },
-cardTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, justifyContent: 'space-between' }, jobTitle: { flex: 1, color: c.ink, fontSize: 14, lineHeight: 20, fontWeight: '700' }, jobSubtitle: { color: c.muted, fontSize: 12, lineHeight: 18 }, jobTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, metaGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 4, borderTopWidth: 1, borderColor: c.line, paddingTop: 10 }, metaLabel: { color: c.muted, fontSize: 9 }, metaValue: { color: c.ink, fontSize: 10, fontWeight: '800', marginTop: 4 }, buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, confirmOverlay: { ...StyleSheet.absoluteFill, zIndex: 10000, elevation: 10000, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20 }, confirmDialog: { width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, backgroundColor: '#FFF', gap: 10 }, confirmTitle: { color: c.ink, fontSize: 15, fontWeight: '900' }, confirmMessage: { color: c.ink, fontSize: 12, lineHeight: 18 }, confirmError: { color: c.rose, fontSize: 11, lineHeight: 16 }, confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 6 }, confirmAction: { minHeight: 40, paddingHorizontal: 16, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, confirmClose: { backgroundColor: c.blue }, confirmDelete: { backgroundColor: c.rose }, confirmActionText: { color: '#FFF', fontSize: 11, fontWeight: '800' } });
+cardTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, justifyContent: 'space-between' }, jobTitle: { flex: 1, color: c.ink, fontSize: 14, lineHeight: 20, fontWeight: '700' }, jobSubtitle: { color: c.muted, fontSize: 12, lineHeight: 18 }, jobTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, metaGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 4, borderTopWidth: 1, borderColor: c.line, paddingTop: 10 }, metaLabel: { color: c.muted, fontSize: 9 }, metaValue: { color: c.ink, fontSize: 10, fontWeight: '800', marginTop: 4 } });

@@ -120,14 +120,12 @@ test('empty results disable paging and mobile preserves cards', async () => {
   assert.equal(mobile.actions.length, 0);
 });
 
-test('delete is confirmed and missing last page moves to the previous page', async () => {
+test('desktop list omits job actions and recovers when the current page disappears', async () => {
   const reply = {};
   const app = setup(1440, reply); await app.load(); app.click('Trang sau'); await app.load();
-  app.click('Xóa bài đăng'); assert.equal(app.actions.length, 0);
-  assert.ok(app.html().includes('Xóa bài tuyển dụng?'));
-  app.click('Hủy'); assert.equal(app.actions.length, 0);
-  app.click('Xóa bài đăng'); await app.click('Xóa bài');
-  assert.equal(app.actions[0][0], 'delete'); assert.equal(app.actions[0][1], sampleJob.id);
+  assert.ok(!app.html().includes('Thao tác'));
+  for (const label of ['Xem chi tiết bài đăng', 'Chỉnh sửa bài đăng', 'Đóng bài đăng', 'Mở lại bài đăng', 'Xóa bài đăng']) assert.equal(app.control(label), undefined, label);
+  assert.equal(app.actions.length, 0);
   Object.assign(reply, { totalPages: 1, totalItems: 10, jobs: [] });
   await app.load(); await app.load();
   assert.equal(app.requests.at(-1).page, 1);

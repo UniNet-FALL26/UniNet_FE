@@ -200,7 +200,7 @@ const s = StyleSheet.create({
   cardStatusText: { color: '#647C99', fontSize: 9, fontWeight: '700' },
   cardStatusSelectedText: { color: c.blue },
 
-  detailScroll: { flex: 1, backgroundColor: '#EEF5FF' },
+  detailScroll: { flex: 1, backgroundColor: c.page },
   mobileHeader: { minHeight: 56, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FBFF', borderBottomWidth: 1, borderBottomColor: c.line, flexShrink: 0 },
   mobileBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   mobilePage: { padding: 16 },
