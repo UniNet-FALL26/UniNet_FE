@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CommunityPostFooter } from './CommunityPostFooter';
 import { CommunityPostMedia } from './CommunityPostMedia';
+import { useAuthStore } from '@/store/auth.store';
+import { ACCOUNT_ROLE } from '@/constants/roles';
 
 type Props = {
   post: PostResponse;
@@ -31,7 +33,18 @@ export function CommunityPostDescription({ text }: { text: string }) {
 }
 
 export function CommunityPostCard({ post, menuOpen, onMenuChange, onOpen, onOpenMedia, onLike, onShare, onSave, onEdit, onDelete, onReport }: Props) {
+  const { account } = useAuthStore();
   const name = post.authorNickname || post.authorName;
+  const openAuthorProfile = () => {
+    if (account?.profile?.id === post.authorUserId) {
+      if (account.role === ACCOUNT_ROLE.STUDENT) router.push('/(tabs)/profile');
+      else if (account.role === ACCOUNT_ROLE.PARTNER) router.push('/(company)/profile');
+      else if (account.role === ACCOUNT_ROLE.ASSESSOR) router.push('/(assessor)/assessor-profile');
+      else router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } });
+      return;
+    }
+    router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } });
+  };
   const actions = [
     { label: post.isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết', run: onSave, danger: false },
     ...(onEdit ? [{ label: 'Sửa bài viết', run: onEdit, danger: false }] : []),
@@ -40,7 +53,7 @@ export function CommunityPostCard({ post, menuOpen, onMenuChange, onOpen, onOpen
   ];
   return <View testID={`community-post-${post.id}`} style={[s.card, menuOpen && s.raised]}>
     <View style={[s.header, menuOpen && s.raised]}>
-      <Pressable accessibilityRole="link" accessibilityLabel={`Xem hồ sơ của ${name}`} onPress={() => router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } })} style={s.author}>
+      <Pressable accessibilityRole="link" accessibilityLabel={account?.profile?.id === post.authorUserId ? 'Mở hồ sơ của bạn' : `Xem hồ sơ của ${name}`} onPress={openAuthorProfile} style={s.author}>
         <View testID="community-author-avatar" style={s.avatar}>{post.authorAvatar ? <Image source={{ uri: post.authorAvatar }} style={StyleSheet.absoluteFill} /> : <Text style={s.initial}>{name?.charAt(0)?.toUpperCase()}</Text>}</View>
         <View style={s.authorCopy}><Text style={s.name}>{name}</Text><Text style={s.date}>{new Date(post.createdAt).toLocaleDateString('vi-VN')}</Text></View>
       </Pressable>

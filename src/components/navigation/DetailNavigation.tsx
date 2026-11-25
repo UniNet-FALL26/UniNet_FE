@@ -8,7 +8,7 @@ import { detailNavigation, type NavigationCrumb } from '@/utils/detail-navigatio
 import { useDismissDetail } from './NavigationDismissContext';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type Options = { title?: string; crumbs?: NavigationCrumb[]; fallback?: string; projectId?: string; onBack?: () => void; onParentNavigate?: (href: string) => void; backLabel?: string; disabled?: boolean; actions?: ReactNode; mobileActions?: ReactNode };
+type Options = { title?: string; crumbs?: NavigationCrumb[]; fallback?: string; projectId?: string; role?: number; onBack?: () => void; onParentNavigate?: (href: string) => void; backLabel?: string; disabled?: boolean; actions?: ReactNode; mobileActions?: ReactNode };
 type Registration = { owner: symbol; options: Options };
 const Context = createContext<{ update: (registration: Registration) => void; remove: (owner: symbol) => void } | null>(null);
 
@@ -37,7 +37,7 @@ function NavigationBar({ options }: { options?: Options }) {
   const { account } = useAuthStore();
   const dismissDetail = useDismissDetail();
   const desktop = useWindowDimensions().width >= 1024;
-  const route = detailNavigation(pathname, account?.role, { ...params, projectId: options?.projectId || params.projectId });
+  const route = detailNavigation(pathname, options?.role ?? account?.role, { ...params, projectId: options?.projectId || params.projectId });
   if (!route && !options) return null;
   const crumbs = options?.crumbs || route?.crumbs || [{ label: options?.title || 'Chi tiết' }];
   const back = options?.onBack || (() => router.canGoBack() ? router.back() : router.replace((options?.fallback || route?.fallback || '/(tabs)') as Href));
