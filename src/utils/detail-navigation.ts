@@ -12,6 +12,8 @@ export function detailNavigation(pathname: string, role = 0, params: { id?: stri
   const project = crumb('Chi tiết dự án', projectId ? `/group/${encodeURIComponent(projectId)}` : undefined);
   const make = (crumbs: NavigationCrumb[], fallback?: string): DetailRoute => ({ crumbs, fallback: fallback || crumbs.slice(0, -1).reverse().find(item => item.href)?.href || profile });
   if (pathname === '/settings') return make([personal, crumb('Cài đặt')]);
+  if (pathname === '/terms') return make([personal, crumb('Cài đặt', '/settings'), crumb('Điều khoản dịch vụ')], '/settings');
+  if (pathname === '/privacy') return make([personal, crumb('Cài đặt', '/settings'), crumb('Chính sách bảo mật')], '/settings');
   if (pathname === '/company') return make([personal, crumb('Tổng quan đối tác')]);
   if (pathname === '/wallet') return make([personal, crumb('Ví thu nhập')]);
   if (pathname === '/job-detail') return make([crumb('Quản lý bài đăng', '/(company)/jobs'), crumb('Chi tiết')]);

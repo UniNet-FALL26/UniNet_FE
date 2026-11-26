@@ -23,7 +23,7 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
   const safeAreaEdges = useScreenSafeAreaEdges();
   const { account, isAuthenticated, isLoading } = useAuthStore();
   const { logout, loading: loggingOut, error: logoutError, clearError } = useAuth();
-  const [dialog, setDialog] = useState<'account' | 'terms' | 'privacy' | null>(null);
+  const [dialog, setDialog] = useState<'account' | null>(null);
   const params = useLocalSearchParams<{ account?: string }>();
   const navigation = useNavigation<NavigationProp<{ settings: { account?: string } }>>();
   const wide = useWindowDimensions().width >= 900 && !embedded;
@@ -56,7 +56,8 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
   const initials = name.trim().split(/\s+/).slice(-2).map(word => word[0]).join('').toUpperCase();
   const role = student ? 'Sinh vi\u00ean' : partner ? '\u0110\u1ed1i t\u00e1c' : account?.role === ACCOUNT_ROLE.ASSESSOR ? 'Th\u1ea9m \u0111\u1ecbnh vi\u00ean' : 'Qu\u1ea3n tr\u1ecb vi\u00ean';
   const busy = loggingOut;
-  const openDialog = (value: 'account' | 'terms' | 'privacy') => { clearError(); setDialog(value); if (value === 'account' && student) void verification.refresh(); };
+  const openDialog = (value: 'account') => { clearError(); setDialog(value); if (value === 'account' && student) void verification.refresh(); };
+  const openLegalPage = (path: '/terms' | '/privacy') => { clearError(); router.push(path as Href); };
   const closeDialog = () => { if (!loggingOut) { setDialog(null); clearError(); } };
   return <SafeAreaView style={[s.safe, embedded && s.embeddedSafe]} edges={embedded ? [] : safeAreaEdges}>
     {!embedded && <DetailNavigation title="Cài đặt" backLabel="Quay lại hồ sơ cá nhân" disabled={busy} />}
@@ -90,8 +91,8 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
           <View style={s.section}>
             <View style={s.sectionHeading}><Text role="heading" aria-level={2} style={s.sectionTitle}>Điều khoản & chính sách</Text><Text style={s.body}>Tìm hiểu các chính sách của UniNet.</Text></View>
             <View style={s.group}>
-              <SettingsRow title="Điều khoản dịch vụ" description="Các điều khoản khi sử dụng UniNet." name={{ ios: 'doc.text', android: 'description', web: 'description' }} disabled={busy} onPress={() => openDialog('terms')} />
-              <SettingsRow title="Chính sách bảo mật" description="Thông tin về quyền riêng tư của bạn." name={{ ios: 'hand.raised', android: 'privacy_tip', web: 'privacy_tip' }} disabled={busy} onPress={() => openDialog('privacy')} />
+              <SettingsRow title="Điều khoản dịch vụ" description="Các điều khoản khi sử dụng UniNet." name={{ ios: 'doc.text', android: 'description', web: 'description' }} disabled={busy} onPress={() => openLegalPage('/terms')} />
+              <SettingsRow title="Chính sách bảo mật" description="Thông tin về quyền riêng tư của bạn." name={{ ios: 'hand.raised', android: 'privacy_tip', web: 'privacy_tip' }} disabled={busy} onPress={() => openLegalPage('/privacy')} />
             </View>
           </View>
           <View style={s.logoutGroup}><SettingsRow title="Đăng xuất" description="Kết thúc phiên trên thiết bị này." name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} danger disabled={busy} loading={loggingOut} onPress={() => { void signOut(); }} /></View>
@@ -108,20 +109,15 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
     </ScrollView>
     {dialog === 'account' && student && account && isAuthenticated && <StudentVerificationModal key={account.id} account={account} name={name} schoolName={school?.accountId === account.id ? school.name : undefined} value={verification.value} loading={verification.loading} error={verification.error} onRefresh={verification.refresh} onSubmitted={verification.submitted} onClose={closeDialog} />}
     {dialog === 'account' && partner && account && isAuthenticated && <PartnerAccountModal key={account.id} account={account} name={name} onClose={closeDialog} onStatusChange={onPartnerVerificationStatusChange} />}
-    <Modal visible={dialog !== null && !(dialog === 'account' && (student || partner))} transparent animationType="fade" onRequestClose={closeDialog}>
+    <Modal visible={dialog === 'account' && !(student || partner)} transparent animationType="fade" onRequestClose={closeDialog}>
       <View style={s.scrim}>
       <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={closeDialog} />{dialog !== null && <ToastHost modal />}<View role="dialog" aria-modal accessibilityViewIsModal style={s.dialog}>
-        <View style={s.dialogHeading}><Text role="heading" aria-level={2} style={[s.sectionTitle, { flex: 1 }]}>{dialog === 'account' ? 'Thông tin tài khoản' : dialog === 'terms' ? 'Điều khoản dịch vụ' : 'Chính sách bảo mật'}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng" disabled={loggingOut} onPress={closeDialog} style={({ pressed }) => [s.back, pressed && s.pressed]}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={20} tintColor={colors.textPrimary} /></Pressable></View>
-        {dialog === 'account' ? <>
-          <View style={s.detail}><Text style={s.body}>Tên hiển thị</Text><Text selectable style={s.detailValue}>{name}</Text></View>
-          <View style={s.detail}><Text style={s.body}>Email đăng nhập</Text><Text selectable style={s.detailValue}>{account?.email}</Text></View>
-          <View style={s.detail}><Text style={s.body}>Vai trò</Text><Text style={s.detailValue}>{role}</Text></View>
-          <View style={s.detail}><Text style={s.body}>Xác minh hồ sơ</Text><Text style={s.detailValue}>{account?.profile?.isVerified ? 'Đã xác minh' : 'Chưa xác minh'}</Text></View>
-          <Button style={s.actionButton} textStyle={s.actionButtonText} title="Đóng thông tin" variant="outline" onPress={closeDialog} />
-        </> : <>
-          <Text style={s.body}>{dialog === 'terms' ? 'Điều khoản dịch vụ chưa được cung cấp.' : 'Chính sách bảo mật chưa được cung cấp.'}</Text>
-          <Button style={s.actionButton} textStyle={s.actionButtonText} title="Đã hiểu" variant="outline" onPress={closeDialog} />
-        </>}
+        <View style={s.dialogHeading}><Text role="heading" aria-level={2} style={[s.sectionTitle, { flex: 1 }]}>Thông tin tài khoản</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng" disabled={loggingOut} onPress={closeDialog} style={({ pressed }) => [s.back, pressed && s.pressed]}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={20} tintColor={colors.textPrimary} /></Pressable></View>
+        <View style={s.detail}><Text style={s.body}>Tên hiển thị</Text><Text selectable style={s.detailValue}>{name}</Text></View>
+        <View style={s.detail}><Text style={s.body}>Email đăng nhập</Text><Text selectable style={s.detailValue}>{account?.email}</Text></View>
+        <View style={s.detail}><Text style={s.body}>Vai trò</Text><Text style={s.detailValue}>{role}</Text></View>
+        <View style={s.detail}><Text style={s.body}>Xác minh hồ sơ</Text><Text style={s.detailValue}>{account?.profile?.isVerified ? 'Đã xác minh' : 'Chưa xác minh'}</Text></View>
+        <Button style={s.actionButton} textStyle={s.actionButtonText} title="Đóng thông tin" variant="outline" onPress={closeDialog} />
       </View></View>
     </Modal>
   </SafeAreaView>;
