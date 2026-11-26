@@ -74,8 +74,16 @@ export type ProjectListParams = {
   skillnames?: string[];
   recruitmentStatus?: ApiRecruitmentStatus;
 };
+export type ProjectSpecialization = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+};
+
 export type ProjectDetail = ProjectListItem & {
   externalDetails?: DraftData | null;
+  specialization?: ProjectSpecialization | null;
   status: ApiProjectStatus;
   updatedAt: string | null;
   roleRequirements: {

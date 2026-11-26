@@ -1,3 +1,5 @@
+import type { ProjectSpecialization } from './project';
+
 export type HubFile = { url: string; name: string; type: 'image' | 'video' | 'document';
   sizeBytes?: number | null; uploadedAt?: string | null; uploadedBy?: HubPerson | null };
 export type HubLink = { label: string; url: string };
@@ -26,6 +28,7 @@ export type HubProject = {
   isOwner: boolean; isMember: boolean; creator: HubPerson; details: HubDetails;
   recruitment: HubRecruitment | null; members: HubMember[];
   myReview: { challenges: string | null; lessonsLearned: string | null } | null;
+  specialization?: ProjectSpecialization | null;
   chatRoomId: string | null; createdAt: string; updatedAt: string;
 };
 export type HubPage = { items: HubProject[]; total: number; page: number; pageSize: number };
