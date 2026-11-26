@@ -9,6 +9,7 @@ import { ds, verificationDate } from '@/components/projects/VerificationDossierU
 import { formatProjectUpdatedAt } from '@/utils/project-updated-at';
 import { projectDisplayMembers } from '@/utils/project-members';
 import { useAuthStore } from '@/store/auth.store';
+import type { ProjectSpecialization } from '@/types/project';
 import type { HubFile, HubMember, HubProject } from '@/types/project-hub';
 import { HubAction, HubIcon, HubModal, HubPanel, HubStatus, ProjectCover, hubColors as c, ui, type HubIconName } from './ProjectHubUI';
 import { BulletList, messageOf, openProjectUrl } from './ProjectHubFields';
@@ -27,11 +28,12 @@ import { pickProjectAsset, releaseProjectImage, selectProjectImage, type Project
 import { PersonalReviewModal } from './PersonalReviewModal';
 import { ProjectPencilButton } from './ProjectPencilButton';
 import { ProjectTechnologiesCard } from './ProjectTechnologiesCard';
+import { ProjectSpecializationModal } from './ProjectSpecializationModal';
 import { ProjectImagePreviewModal } from './ProjectImagePreviewModal';
 import { ApplyProjectModal, InviteMemberModal, MemberRoleModal, PersonAvatar, ProjectRequestsModal, RecruitmentModal } from './ProjectCommunityModals';
 
 type Tab = 'overview' | 'members' | 'documents' | 'media' | 'verification' | 'settings';
-type ModalKind = 'links' | 'summary' | 'overview' | 'community' | 'invite' | 'requests' | 'review' | 'apply' | 'complete' | 'delete' | 'leave' | null;
+type ModalKind = 'links' | 'summary' | 'overview' | 'specialization' | 'community' | 'invite' | 'requests' | 'review' | 'apply' | 'complete' | 'delete' | 'leave' | null;
 const date = (value: string | null) => value ? new Date(value.slice(0, 10) + 'T12:00:00').toLocaleDateString('vi-VN') : 'Chưa cập nhật';
 const overviewTabs: { id: Tab; label: string; icon: HubIconName }[] = [
   { id: 'overview', label: 'Tổng quan', icon: 'folder' }, { id: 'members', label: 'Thành viên', icon: 'people' },
@@ -50,6 +52,7 @@ export function ProjectHubDetailScreen() {
   const [addingResource, setAddingResource] = useState<'documents' | 'media' | null>(null);
   const [resourceError, setResourceError] = useState<{ kind: 'documents' | 'media'; message: string } | null>(null);
   const [verification, setVerification] = useState<{ key: string; result: VerificationFinalResult } | null>(null);
+  const [specialization, setSpecialization] = useState<ProjectSpecialization | null | undefined>(undefined);
   const [recruitmentClock, setRecruitmentClock] = useState<{ deadline: string; now: number } | null>(null);
   const recruitmentDeadline = project?.recruitment?.deadline;
   const verificationKey = project?.id === projectId && (project?.isOwner || project?.isMember) && account?.id
@@ -57,9 +60,9 @@ export function ProjectHubDetailScreen() {
   const verificationResult = verificationKey && verification?.key === verificationKey ? verification.result : null;
   const { width } = useWindowDimensions(); const compact = width < 800; const columns = width >= 1050;
   useFocusEffect(useCallback(() => {
-    const controller = new AbortController(); setLoading(true); setProject(null); setError(''); setTab('overview'); setImageFile(null); setImageError(''); setPickingImage(false); pickerLocked.current = false; setResourceError(null); setAddingResource(null); resourceLocked.current = false;
+    const controller = new AbortController(); setLoading(true); setProject(null); setSpecialization(undefined); setError(''); setTab('overview'); setImageFile(null); setImageError(''); setPickingImage(false); pickerLocked.current = false; setResourceError(null); setAddingResource(null); resourceLocked.current = false;
     if (!projectId) { setLoading(false); setError('Không tìm thấy mã dự án.'); return () => controller.abort(); }
-    projectHubService.get(projectId, controller.signal).then(value => { if (!controller.signal.aborted) setProject(value); }).catch(cause => { if (!controller.signal.aborted) setError(messageOf(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    projectHubService.get(projectId, controller.signal).then(value => { if (!controller.signal.aborted) { setProject(value); if (value.specialization !== undefined) setSpecialization(value.specialization); } }).catch(cause => { if (!controller.signal.aborted) setError(messageOf(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => { controller.abort(); imageRequest.current++; };
   }, [projectId, account?.id, attempt]));
   useFocusEffect(useCallback(() => {
@@ -174,7 +177,7 @@ export function ProjectHubDetailScreen() {
         {displayMembers.map(item => <View key={item.id} testID="project-member-row" style={styles.member}><PersonAvatar person={item} size={32} /><View style={{ flex: 1 }}><Text style={styles.name}>{item.fullName}{item.userId === account?.profile?.id || (project.isOwner && item.userId === project.creator.id) ? ' (Bạn)' : ''}</Text><Text style={styles.muted}>{item.role}{item.status === 1 ? ' · Đã kết thúc tham gia' : item.status === 2 ? ' · Đã rời dự án' : ''}</Text></View>{project.isOwner && item.userId !== project.creator.id && item.status === 0 && <HubAction compact title="Quản lý" variant="quiet" onPress={() => setMember(item)} />}</View>)}
       </HubPanel>}
     </View><View style={[styles.sidebar, !columns && { width: '100%' }]}>
-      <HubPanel compact title="Thông tin dự án" icon="info"><InfoRow icon="person" label="Chủ dự án"><View style={styles.creator}><PersonAvatar person={project.creator} size={22} /><Text style={[styles.infoValue, { flexShrink: 1 }]}>{project.creator.fullName}</Text></View></InfoRow><InfoRow icon="calendar" label="Ngày bắt đầu"><Text style={styles.infoValue}>{date(project.details.startDate)}</Text></InfoRow><InfoRow icon="calendar" label="Ngày kết thúc"><Text style={styles.infoValue}>{date(project.details.actualEndDate ?? null)}</Text></InfoRow><InfoRow icon="people" label="Thành viên"><Text style={styles.infoValue}>{activeMembers.length} thành viên</Text></InfoRow><InfoRow icon="clock" label="Cập nhật gần đây"><Text testID="project-last-updated" style={styles.infoValue}>{formatProjectUpdatedAt(project.updatedAt)}</Text></InfoRow><InfoRow icon="info" label="Trạng thái"><HubStatus compact status={project.status} /></InfoRow></HubPanel>
+      <HubPanel compact title="Thông tin dự án" icon="info"><InfoRow icon="person" label="Chủ dự án"><View style={styles.creator}><PersonAvatar person={project.creator} size={22} /><Text style={[styles.infoValue, { flexShrink: 1 }]}>{project.creator.fullName}</Text></View></InfoRow><InfoRow icon="calendar" label="Ngày bắt đầu"><Text style={styles.infoValue}>{date(project.details.startDate)}</Text></InfoRow><InfoRow icon="calendar" label="Ngày kết thúc"><Text style={styles.infoValue}>{date(project.details.actualEndDate ?? null)}</Text></InfoRow><InfoRow icon="people" label="Thành viên"><Text style={styles.infoValue}>{activeMembers.length} thành viên</Text></InfoRow><InfoRow icon="clock" label="Cập nhật gần đây"><Text testID="project-last-updated" style={styles.infoValue}>{formatProjectUpdatedAt(project.updatedAt)}</Text></InfoRow>{specialization !== undefined && <InfoRow icon="tag" label="Chuyên ngành"><Text testID="project-specialization-value" style={styles.infoValue}>{specialization ? specialization.name : 'Chưa chọn chuyên ngành'}</Text></InfoRow>}<InfoRow icon="info" label="Trạng thái"><HubStatus compact status={project.status} /></InfoRow>{project.isOwner && <HubAction compact testID="project-specialization-trigger" title="Cập nhật chuyên ngành" icon="tag" onPress={() => show('specialization')} style={{ marginTop: 6 }} />}</HubPanel>
       <ProjectTechnologiesCard key={project.id} project={project} canEdit={project.isOwner} onSaved={saved} />
       <HubPanel compact title="Liên kết" icon="link" style={{ paddingRight: project.isOwner ? 42 : 16 }}>{project.isOwner && <ProjectPencilButton corner label="Chỉnh sửa liên kết dự án" disabled={addingResource !== null} onPress={() => show('links')} />}{project.details.links.length ? project.details.links.map((link, i) => <Pressable key={i} accessibilityRole="link" onPress={() => openProjectUrl(link.url)} style={styles.link}><ProjectLinkIcon label={link.label} size={19} /><Text numberOfLines={1} style={[styles.infoValue, { flex: 1 }]}>{link.label}</Text><HubIcon name="external" size={16} color={c.textSecondary} /></Pressable>) : <Text style={styles.muted}>Chưa có liên kết dự án.</Text>}</HubPanel>
         {!verificationResult && project.isOwner && project.status === 2 && <ProjectVerificationCard project={project} />}
@@ -184,6 +187,7 @@ export function ProjectHubDetailScreen() {
     {imageFile && <ProjectImagePreviewModal initialFile={imageFile} onClose={() => setImageFile(null)} onConfirm={async logoUrl => { setProject(await projectHubService.update(project.id, { logoUrl })); setNotice(''); }} />}
     {modal === 'overview' && <ProjectOverviewModal project={project} onSaved={saved} onClose={closeModal} />}
     {modal === 'summary' && <ProjectSummaryModal project={project} onSaved={saved} onClose={closeModal} />}
+    {modal === 'specialization' && project.isOwner && <ProjectSpecializationModal project={project} onLoaded={setSpecialization} onSaved={value => { setSpecialization(value); setNotice(''); }} onClose={closeModal} />}
     {modal === 'links' && project.isOwner && <ProjectLinksModal project={project} onSaved={saved} onClose={closeModal} />}
     {modal === 'community' && <RecruitmentModal project={project} onSaved={saved} onClose={() => show('requests')} />}
     {modal === 'invite' && <InviteMemberModal project={project} onClose={() => show('requests')} onInvited={() => setNotice('Đã gửi lời mời tham gia dự án.')} />}
