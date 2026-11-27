@@ -200,13 +200,15 @@ export function ProjectHubDetailScreen() {
 }
 
 function ProjectOverview({ project, onReview, onEdit, editingDisabled }: { project: HubProject; onReview: () => void; onEdit: () => void; editingDisabled: boolean }) {
+  const { width } = useWindowDimensions();
+  const pairStyle = [styles.tiles, width < 600 && styles.stackedTiles];
   const { details } = project; const results = details.results;
   const canReview = project.isOwner || project.isMember;
   return <View style={{ gap: 14 }}>
     <HubPanel compact style={{ gap: 0 }}>
       {project.isOwner && <ProjectPencilButton label="Chỉnh sửa nội dung dự án" onPress={onEdit} disabled={editingDisabled} corner />}
       <OverviewSection section="introduction" icon="book" reserveAction={project.isOwner}><Text style={styles.description}>{details.description?.trim() || overviewGuides.introduction.empty}</Text></OverviewSection>
-      <OverviewSection section="problemSolution" icon="target"><View style={styles.tiles}><View style={[styles.tile, { backgroundColor: '#FFF2F2' }]}><View style={styles.tileHeading}><HubIcon name="target" color="#D64A4A" /><Text style={[styles.tileTitle, { color: '#BA3030' }]}>Vấn đề</Text></View><Text style={styles.description}>{results.problem?.trim() || 'Hãy nêu ai đang gặp khó khăn, trong hoàn cảnh nào và vấn đề đó ảnh hưởng đến họ ra sao.'}</Text></View><View style={[styles.tile, { backgroundColor: '#ECF8EF' }]}><View style={styles.tileHeading}><HubIcon name="bulb" color="#188C42" /><Text style={[styles.tileTitle, { color: '#188C42' }]}>Giải pháp</Text></View><Text style={styles.description}>{results.solution?.trim() || 'Hãy giải thích cách dự án xử lý khó khăn đó và lợi ích khác biệt mang lại cho người dùng.'}</Text></View></View></OverviewSection>
+      <OverviewSection section="problemSolution" icon="target"><View testID="project-problem-solution" style={pairStyle}><View style={[styles.tile, { backgroundColor: '#FFF2F2' }]}><View style={styles.tileHeading}><HubIcon name="target" color="#D64A4A" /><Text style={[styles.tileTitle, { color: '#BA3030' }]}>Vấn đề</Text></View><Text style={styles.description}>{results.problem?.trim() || 'Hãy nêu ai đang gặp khó khăn, trong hoàn cảnh nào và vấn đề đó ảnh hưởng đến họ ra sao.'}</Text></View><View style={[styles.tile, { backgroundColor: '#ECF8EF' }]}><View style={styles.tileHeading}><HubIcon name="bulb" color="#188C42" /><Text style={[styles.tileTitle, { color: '#188C42' }]}>Giải pháp</Text></View><Text style={styles.description}>{results.solution?.trim() || 'Hãy giải thích cách dự án xử lý khó khăn đó và lợi ích khác biệt mang lại cho người dùng.'}</Text></View></View></OverviewSection>
       <OverviewSection section="objectives" icon="flag"><BulletList values={results.objectives ?? []} empty={overviewGuides.objectives.empty} /></OverviewSection>
       <OverviewSection section="features" icon="layers"><BulletList values={details.features} check empty={overviewGuides.features.empty} /></OverviewSection>
       <OverviewSection section={project.status === 2 ? 'achievements' : 'results'} icon="trophy" last>
@@ -219,7 +221,7 @@ function ProjectOverview({ project, onReview, onEdit, editingDisabled }: { proje
     </HubPanel>
     {canReview && <HubPanel compact title="Tổng kết cá nhân" icon="book">
       <ProjectPencilButton label="Chỉnh sửa tổng kết cá nhân" onPress={onReview} corner />
-      <View style={styles.tiles}>
+      <View testID="project-personal-review" style={pairStyle}>
         <View style={[styles.tile, styles.resultTile]}><View style={styles.tileHeading}><HubIcon name="warning" color={c.warning} /><Text style={styles.tileTitle}>Khó khăn của tôi</Text></View><Text style={styles.description}>{project.myReview?.challenges || 'Chưa có tổng kết cá nhân.'}</Text></View>
         <View style={[styles.tile, styles.resultTile]}><View style={styles.tileHeading}><HubIcon name="book" /><Text style={styles.tileTitle}>Bài học kinh nghiệm</Text></View><Text style={styles.description}>{project.myReview?.lessonsLearned || 'Ghi lại những điều bạn học được từ dự án.'}</Text></View>
       </View>
@@ -258,6 +260,7 @@ function VerificationResultPanel({ result }: { result: VerificationFinalResult }
 }
 
 const styles = StyleSheet.create({
+  stackedTiles: { flexDirection: 'column', flexWrap: 'nowrap' },
   memberActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   memberActionCompact: { minHeight: 32, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   editableTitle: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' },
