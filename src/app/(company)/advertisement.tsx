@@ -116,7 +116,59 @@ export default function CompanyAdvertisementScreen() {
     destinationUrl: "",
   });
   const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
+  const [formErrors, setFormErrors] = useState<{
+    title?: string;
+    content?: string;
+    destinationUrl?: string;
+  }>({});
 
+  const isValidHttpUrl = (value: string) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
+
+  const validateCreateForm = () => {
+    const errors: {
+      title?: string;
+      content?: string;
+      destinationUrl?: string;
+    } = {};
+
+    const title = form.title.trim();
+    const content = form.content.trim();
+    const destinationUrl = form.destinationUrl.trim();
+
+    if (!title) {
+      errors.title = "Tiêu đề chiến dịch không được để trống.";
+    } else if (title.length > 255) {
+      errors.title = "Tiêu đề không được vượt quá 255 ký tự.";
+    }
+
+    if (!content) {
+      errors.content = "Nội dung chi tiết không được để trống.";
+    }
+
+    if (!destinationUrl) {
+      errors.destinationUrl = "URL đích không được để trống.";
+    } else if (!isValidHttpUrl(destinationUrl)) {
+      errors.destinationUrl =
+        "URL đích phải bắt đầu bằng http:// hoặc https://";
+    }
+
+    setFormErrors(errors);
+
+    const firstError = errors.title || errors.content || errors.destinationUrl;
+    if (firstError) {
+      toast.error(firstError);
+      return false;
+    }
+
+    return true;
+  };
   const [submitting, setSubmitting] = useState(false);
   const [payingCampaignId, setPayingCampaignId] = useState<string | null>(null);
 
@@ -493,7 +545,7 @@ export default function CompanyAdvertisementScreen() {
       toast.error("Vui lòng nhập đầy đủ tiêu đề và nội dung.");
       return;
     }
-
+    if (!validateCreateForm()) return;
     setSubmitting(true);
     try {
       if (currentCampaignId) {
@@ -858,7 +910,11 @@ export default function CompanyAdvertisementScreen() {
         onRequestClose={handleCancel}
       >
         <View style={styles.modalOverlay}>
-      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={handleCancel} />
+          <Pressable
+            accessible={false}
+            style={StyleSheet.absoluteFill}
+            onPress={handleCancel}
+          />
           {modalStep > 0 && <ToastHost modal />}
           <View
             style={[styles.modalContent, modalStep === 2 && { height: "80%" }]}
@@ -882,12 +938,25 @@ export default function CompanyAdvertisementScreen() {
                       Tên chiến dịch <Text style={styles.asterisk}>*</Text>
                     </Text>
                     <TextInput
-                      style={styles.inputField}
+                      style={[
+                        styles.inputField,
+                        formErrors.title && { borderColor: colors.error },
+                      ]}
                       placeholder="Nhập tên chiến dịch..."
                       placeholderTextColor={colors.textSecondary}
+                      maxLength={255}
                       value={form.title}
-                      onChangeText={(txt) => setForm({ ...form, title: txt })}
+                      onChangeText={(txt) => {
+                        setForm({ ...form, title: txt });
+                        if (formErrors.title)
+                          setFormErrors({ ...formErrors, title: undefined });
+                      }}
                     />
+                    {formErrors.title && (
+                      <Text style={{ fontSize: 12, color: colors.error }}>
+                        {formErrors.title}
+                      </Text>
+                    )}
                   </View>
 
                   <View style={styles.formGroup}>
@@ -898,13 +967,23 @@ export default function CompanyAdvertisementScreen() {
                       style={[
                         styles.inputField,
                         { height: 100, textAlignVertical: "top" },
+                        formErrors.content && { borderColor: colors.error },
                       ]}
                       placeholder="Mô tả nội dung bạn muốn truyền tải..."
                       placeholderTextColor={colors.textSecondary}
                       multiline
                       value={form.content}
-                      onChangeText={(txt) => setForm({ ...form, content: txt })}
+                      onChangeText={(txt) => {
+                        setForm({ ...form, content: txt });
+                        if (formErrors.content)
+                          setFormErrors({ ...formErrors, content: undefined });
+                      }}
                     />
+                    {formErrors.content && (
+                      <Text style={{ fontSize: 12, color: colors.error }}>
+                        {formErrors.content}
+                      </Text>
+                    )}
                   </View>
 
                   {/* Hiển thị 1 ảnh đã chọn */}
@@ -992,17 +1071,34 @@ export default function CompanyAdvertisementScreen() {
 
                   <View style={styles.formGroup}>
                     <Text style={styles.inputLabel}>
-                      URL đích khi click (Tùy chọn)
+                      URL đích khi click <Text style={styles.asterisk}>*</Text>
                     </Text>
                     <TextInput
-                      style={styles.inputField}
+                      style={[
+                        styles.inputField,
+                        formErrors.destinationUrl && {
+                          borderColor: colors.error,
+                        },
+                      ]}
                       placeholder="https://yourwebsite.com"
                       placeholderTextColor={colors.textSecondary}
+                      autoCapitalize="none"
+                      keyboardType="url"
                       value={form.destinationUrl}
-                      onChangeText={(txt) =>
-                        setForm({ ...form, destinationUrl: txt })
-                      }
+                      onChangeText={(txt) => {
+                        setForm({ ...form, destinationUrl: txt });
+                        if (formErrors.destinationUrl)
+                          setFormErrors({
+                            ...formErrors,
+                            destinationUrl: undefined,
+                          });
+                      }}
                     />
+                    {formErrors.destinationUrl && (
+                      <Text style={{ fontSize: 12, color: colors.error }}>
+                        {formErrors.destinationUrl}
+                      </Text>
+                    )}
                   </View>
                 </ScrollView>
 
@@ -1500,9 +1596,13 @@ export default function CompanyAdvertisementScreen() {
         }
       >
         <View style={styles.modalOverlay}>
-      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() =>
-          setPaymentPopup((prev) => ({ ...prev, visible: false }))
-        } />
+          <Pressable
+            accessible={false}
+            style={StyleSheet.absoluteFill}
+            onPress={() =>
+              setPaymentPopup((prev) => ({ ...prev, visible: false }))
+            }
+          />
           <View style={styles.resultPopupCard}>
             <View
               style={[

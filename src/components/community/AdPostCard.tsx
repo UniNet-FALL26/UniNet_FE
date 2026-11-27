@@ -1,12 +1,12 @@
 import { colors } from "@/constants/colors";
 import { SymbolView } from "expo-symbols";
 import {
-    Image,
-    Linking,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 // Định nghĩa đúng kiểu dữ liệu trả về từ API Quảng Cáo
@@ -70,7 +70,7 @@ export function AdPostCard({ ad }: AdPostCardProps) {
 
       {/* Nội dung quảng cáo */}
       <View style={styles.contentWrapper}>
-        {ad.title ? <Text style={styles.adTitle}>{ad.title}</Text> : null}
+        {/* {ad.title ? <Text style={styles.adTitle}>{ad.title}</Text> : null} */}
         <Text style={styles.description} numberOfLines={3}>
           {ad.content}
         </Text>
