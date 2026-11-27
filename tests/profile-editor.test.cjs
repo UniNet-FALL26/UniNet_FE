@@ -55,7 +55,7 @@ function real() {
 }
 test('all persisted JSON content sections have form definitions', () => {
   const { profileEditorSections } = editor();
-  assert.deepEqual(Array.from(profileEditorSections, x => x.id), ['basic', 'skills', 'projects', 'education', 'experience', 'certificates', 'activities', 'languages', 'articles', 'socialLinks']);
+  assert.deepEqual(Array.from(profileEditorSections, x => x.id), ['interests', 'basic', 'skills', 'projects', 'education', 'experience', 'certificates', 'activities', 'languages', 'articles', 'socialLinks']);
 });
 test('adding project appends real content, preserves privacy/appearance/empty sections, never mutates input', () => {
   const { addProfileEntry } = editor();

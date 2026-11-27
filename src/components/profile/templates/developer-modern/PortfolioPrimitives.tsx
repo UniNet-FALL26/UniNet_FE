@@ -1,7 +1,7 @@
 import { SymbolView } from 'expo-symbols';
 import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { Linking, Pressable, StyleSheet, Text, View, type PressableProps } from 'react-native';
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 import type { ProfileTheme } from '@/types/portfolio';
 import { isSampleLink } from '@/components/profile/profile-media';
 
@@ -44,12 +44,12 @@ export function PortfolioLink({ label, url, theme, thumbnail, subtle = false, so
     </Pressable>
   </View>;
 }
-export function SectionTitle({ title, name, theme }: { title: string; name: keyof typeof symbols; theme: ProfileTheme }) {
+export function SectionTitle({ title, name, theme, action }: { title: string; name: keyof typeof symbols; theme: ProfileTheme; action?: ReactNode }) {
   if (name === 'journey') return <View style={ui.journeyHeading}>
     <View style={[ui.sectionHeading, { marginBottom: 0 }]}><PortfolioIcon name={name} color={theme.accent} /><Text role="heading" aria-level={2} style={[ui.sectionTitle, { color: theme.text, flexShrink: 1 }]}>{title}</Text></View>
     <SectionAdd title={title} theme={theme} />
   </View>;
-  return <View style={ui.sectionHeading}><PortfolioIcon name={name} color={theme.accent} /><Text role="heading" aria-level={2} style={[ui.sectionTitle, { color: theme.text }]}>{title}</Text><SectionAdd title={title} theme={theme} /></View>;
+  return <View style={ui.sectionHeading}><PortfolioIcon name={name} color={theme.accent} /><Text role="heading" aria-level={2} style={[ui.sectionTitle, { color: theme.text, flexShrink: 1 }]}>{title}</Text><SectionAdd title={title} theme={theme} />{action && <View style={{ marginLeft: 'auto' }}>{action}</View>}</View>;
 }
 export const ui = StyleSheet.create({
   editableLink: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: '100%' },

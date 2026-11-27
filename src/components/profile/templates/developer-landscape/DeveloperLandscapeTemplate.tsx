@@ -8,9 +8,10 @@ import { LandscapeArticles, LandscapeCertificates } from './LandscapeExtras';
 import { LandscapeFooter } from './LandscapeFooter';
 import type { PortraitMode } from './ProfilePortrait';
 import { useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { ProfileInterests } from '@/components/profile/ProfileInterests';
 
 export type DeveloperLandscapeTemplateProps = DeveloperModernTemplateProps & { portraitMode?: PortraitMode; showTemplateFooter?: boolean };
-const defaultOrder = ['skills', 'journey', 'certificates', 'articles', 'other-projects'];
+const defaultOrder = ['skills', 'journey', 'certificates', 'interests', 'articles', 'other-projects'];
 export function DeveloperLandscapeTemplate(props: DeveloperLandscapeTemplateProps) {
   const editing = useProfileEditing();
   const { data, width, thumbnail, onSectionLayout } = props;
@@ -24,6 +25,7 @@ export function DeveloperLandscapeTemplate(props: DeveloperLandscapeTemplateProp
   const remaining = data.portfolio.projects.filter(project => project.projectId || !project.featured);
   const shared = { portfolio: data.portfolio, theme, width: contentWidth, thumbnail, demo: props.demo };
   const sections: Record<string, React.ReactNode> = {
+    interests: <ProfileInterests interests={data.portfolio.interests} theme={theme} />,
     skills: editing || data.portfolio.skills.length ? <LandscapeSkills {...shared} mobile={width < 768} /> : null,
     journey: editing || data.portfolio.education.length + data.portfolio.experience.length ? <LandscapeJourney {...shared} /> : null,
     certificates: editing || data.portfolio.certificates.length ? <LandscapeCertificates {...shared} /> : null,

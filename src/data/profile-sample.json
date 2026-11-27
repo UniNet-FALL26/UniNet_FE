@@ -13,13 +13,20 @@
     "isVerified": false
   },
   "portfolio": {
+    "interests": [
+      "Đọc sách", "Nhiếp ảnh", "Du lịch", "Cầu lông", "Âm nhạc", "Nấu ăn", "Chạy bộ", "Cà phê", "Hội họa", "Làm vườn", "Điện ảnh", "Đạp xe",
+      "Bóng đá", "Bóng rổ", "Bóng chuyền", "Bóng bàn", "Tennis", "Bơi lội", "Yoga", "Gym", "Leo núi", "Đi bộ", "Cắm trại", "Câu cá",
+      "Ca hát", "Guitar", "Piano", "Nhảy múa", "Viết lách", "Thủ công", "Thiết kế", "Thời trang",
+      "Lập trình", "Robot", "Thiên văn", "Khoa học", "Học ngoại ngữ", "Chơi game", "Cờ vua", "Board game", "Podcast", "Anime",
+      "Thú cưng", "Thiện nguyện", "Ẩm thực", "Làm bánh", "Sưu tầm", "Thiền"
+    ],
     "headline": "Software Developer",
     "careerObjective": "Mình xây dựng những sản phẩm số hữu ích, kết nối con người và biến ý tưởng thành trải nghiệm thực tế.",
     "location": "Hồ Chí Minh, Việt Nam",
     "availability": "Sẵn sàng cho cơ hội mới",
     "contactEmail": "quyen.dev@example.com",
     "cvUrl": null,
-    "appearance": { "profile": { "template": "developer-modern", "theme": "blue", "font": "Inter", "sectionOrder": ["featured-projects", "stats", "skills", "journey", "other-projects", "certificates", "activities", "languages", "articles"], "hiddenSections": [] } },
+    "appearance": { "profile": { "template": "developer-modern", "theme": "blue", "font": "Inter", "sectionOrder": ["featured-projects", "stats", "skills", "journey", "other-projects", "certificates", "activities", "languages", "interests", "articles"], "hiddenSections": [] } },
     "skills": [
       { "name": "React", "category": "Frontend", "level": 2, "yearsOfExperience": 2, "iconUrl": null },
       { "name": "Next.js", "category": "Frontend", "level": 2, "yearsOfExperience": 1, "iconUrl": null },

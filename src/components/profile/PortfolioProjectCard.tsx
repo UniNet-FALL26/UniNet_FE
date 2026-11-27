@@ -1,18 +1,21 @@
 import { StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import { router } from 'expo-router';
 import type { PortfolioProject, ProfileTheme } from '@/types/portfolio';
 import { ProjectCard } from '@/components/projects/hub/ProjectCard';
 import { FullProjectImage } from '@/components/projects/hub/FullProjectImage';
 import { HubIcon, hubColors as c } from '@/components/projects/hub/ProjectHubUI';
-import { EditPhoto } from './ProfileEditContext';
+import { EditPhoto, useProfileEditing } from './ProfileEditContext';
 import { isSampleLink, profileMedia } from './profile-media';
 import { PortfolioLink } from './templates/developer-modern/PortfolioPrimitives';
 
-export function PortfolioProjectCard({ project, width, theme, thumbnail, testID }: { project: PortfolioProject; width: DimensionValue; theme: ProfileTheme; thumbnail?: boolean; testID?: string }) {
+export function PortfolioProjectCard({ project, width, theme, thumbnail, testID, onNavigate }: { project: PortfolioProject; width: DimensionValue; theme: ProfileTheme; thumbnail?: boolean; testID?: string; onNavigate?: () => void }) {
+  const editing = useProfileEditing();
   const source = profileMedia(project.coverUrl);
   const role = typeof project.role === 'string' ? project.role.trim() : '';
   const completed = project.completedAt ? new Date(project.completedAt) : null;
   const date = completed && !Number.isNaN(completed.getTime()) ? completed.toLocaleDateString('vi-VN') : null;
   return <ProjectCard title={project.title} description={project.description} technologies={project.technologies} width={width} headingLevel={3} testID={testID}
+    onOpen={project.projectId && !thumbnail && !editing ? () => { onNavigate?.(); router.push({ pathname: '/group/[id]', params: { id: project.projectId! } }); } : undefined}
     cover={source ? <FullProjectImage source={source} label={`Ảnh dự án ${project.title}`} /> : undefined}
     accessory={<EditPhoto color={c.primary} right={8} bottom={8} size={28} entry={{ section: 'projects', item: project, label: `dự án ${project.title}` }} />}
     footer={<>

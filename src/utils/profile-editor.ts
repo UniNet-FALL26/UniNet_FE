@@ -30,7 +30,7 @@ export function updateProfileSkills(content: PortfolioContent, skillIds: readonl
   return next;
 }
 
-export type ProfileSectionId = 'basic' | 'skills' | 'projects' | 'education' | 'experience' | 'certificates' | 'activities' | 'languages' | 'articles' | 'socialLinks';
+export type ProfileSectionId = 'basic' | 'skills' | 'projects' | 'education' | 'experience' | 'certificates' | 'activities' | 'languages' | 'articles' | 'socialLinks' | 'interests';
 export type ProfileFormField = { key: string; label: string; kind?: 'url' | 'email' | 'number' | 'list' | 'boolean' | 'skill' | 'date' | 'year'; placeholder?: string; required?: boolean; multiline?: boolean; max?: number; min?: number; integer?: boolean };
 export type ProfileEditorSection = { id: ProfileSectionId; title: string; fields: ProfileFormField[]; limit?: number };
 const title: ProfileFormField = { key: 'title', label: 'Tên / tiêu đề', required: true, max: 255 };
@@ -43,6 +43,7 @@ const educationHints: Record<string, string> = {
   description: 'VD: Chuyên ngành, thành tích hoặc hoạt động nổi bật',
 };
 export const profileEditorSections: ProfileEditorSection[] = [
+  { id: 'interests', title: 'Sở thích cá nhân', limit: 48, fields: [] },
   { id: 'basic', title: 'Giới thiệu & liên hệ', fields: [
     { key: 'headline', label: 'Chức danh', max: 255 }, { key: 'careerObjective', label: 'Giới thiệu / mục tiêu nghề nghiệp', multiline: true },
     { key: 'location', label: 'Địa điểm', max: 255 }, { key: 'availability', label: 'Trạng thái công việc', max: 100 },

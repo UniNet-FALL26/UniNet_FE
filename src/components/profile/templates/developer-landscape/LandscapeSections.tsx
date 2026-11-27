@@ -1,8 +1,8 @@
 import { formatProfileMilestonePeriod } from '@/utils/profile-milestone';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { EditEducationEntry, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { Image } from 'expo-image';
-import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
+import { ProfileProjectsGallery } from '@/components/profile/ProfileProjectsGallery';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject } from '@/types/portfolio';
 import { profileMedia } from '@/components/profile/profile-media';
@@ -13,15 +13,13 @@ import { landscapeJourney } from './landscape-data';
 
 export type SectionProps = { portfolio: PortfolioContent; theme: LandscapeTheme; width: number; thumbnail?: boolean; demo?: boolean };
 export const tileWidth = (width: number, columns: number) => Math.max(0, (width - (columns - 1) * 12) / columns);
-export function LandscapeHeading({ title, subtitle, eyebrow, icon, theme }: { title: string; subtitle: string; eyebrow: string; icon: 'project' | 'skill' | 'journey' | 'certificate' | 'article'; theme: LandscapeTheme }) {
-  return <View style={s.heading}><PortfolioIcon name={icon} color={theme.accentStrong} size={26} /><View style={s.shrink}><Text style={[s.eyebrow, { color: theme.accentStrong }]}>{eyebrow}</Text><View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}><Text role="heading" aria-level={2} style={[s.title, { color: theme.text }]}>{title}</Text><SectionAdd title={title} theme={theme} /></View><Text style={[s.caption, { color: theme.muted }]}>{subtitle}</Text></View></View>;
+export function LandscapeHeading({ title, subtitle, eyebrow, icon, theme, action }: { title: string; subtitle: string; eyebrow: string; icon: 'project' | 'skill' | 'journey' | 'certificate' | 'article'; theme: LandscapeTheme; action?: ReactNode }) {
+  return <View style={s.heading}><PortfolioIcon name={icon} color={theme.accentStrong} size={26} /><View style={s.shrink}><Text style={[s.eyebrow, { color: theme.accentStrong }]}>{eyebrow}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Text role="heading" aria-level={2} style={[s.title, { color: theme.text, flexShrink: 1 }]}>{title}</Text><SectionAdd title={title} theme={theme} />{action && <View style={{ marginLeft: 'auto' }}>{action}</View>}</View><Text style={[s.caption, { color: theme.muted }]}>{subtitle}</Text></View></View>;
 }
 export function LandscapeProjects({ projects, title, theme, width, thumbnail }: Omit<SectionProps, 'portfolio'> & { projects: PortfolioProject[]; title: string }) {
   const editing = useProfileEditing();
   if (!projects.length && !editing) return null;
-  const columns = width >= 810 ? 3 : width >= 540 ? 2 : 1;
-  return <View style={s.section}><LandscapeHeading title={title} eyebrow="PROJECTS" subtitle="Những sản phẩm mình đã xây dựng, từ ý tưởng đến sản phẩm thực tế." icon="project" theme={theme} />
-    <View style={s.grid}>{projects.map((project, index) => <PortfolioProjectCard key={`${project.title}-${index}`} project={project} width={tileWidth(width, columns)} theme={theme} thumbnail={thumbnail} testID="landscape-project" />)}</View>
+  return <View style={s.section}><ProfileProjectsGallery projects={projects} theme={theme} width={width} thumbnail={thumbnail} cardTestID="landscape-project" heading={action => <LandscapeHeading title={title} eyebrow="PROJECTS" subtitle="Những sản phẩm mình đã xây dựng, từ ý tưởng đến sản phẩm thực tế." icon="project" theme={theme} action={action} />} />
   </View>;
 }
 export function LandscapeSkills({ portfolio, theme, width, thumbnail, demo = false, mobile = false }: SectionProps & { mobile?: boolean }) {

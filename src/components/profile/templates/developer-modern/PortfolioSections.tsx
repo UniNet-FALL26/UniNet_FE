@@ -1,6 +1,6 @@
 import { formatProfileMilestonePeriod } from '@/utils/profile-milestone';
 import { Image } from 'expo-image';
-import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
+import { ProfileProjectsGallery } from '@/components/profile/ProfileProjectsGallery';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
 import { profileMedia } from '@/components/profile/profile-media';
@@ -10,11 +10,10 @@ import { EditCertificateEntry, EditEducationEntry, EditField, EditPhoto, useProf
 import { portfolioMetrics, type ProfileEditField } from '@/utils/profile-fields';
 
 export type SectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; compact: boolean; thumbnail?: boolean; demo?: boolean };
-export function ProjectSection({ projects, title, theme, compact, thumbnail }: Omit<SectionProps, 'portfolio'> & { projects: PortfolioProject[]; title: string }) {
+export function ProjectSection({ projects, title, theme, thumbnail }: Omit<SectionProps, 'portfolio'> & { projects: PortfolioProject[]; title: string }) {
   const editing = useProfileEditing();
   if (!projects.length && !editing) return null;
-  const columns = compact ? 1 : 3;
-  return <View style={ui.section}><SectionTitle title={title} name="project" theme={theme} /><View style={ui.row}>{projects.map((project, index) => <PortfolioProjectCard key={`${project.title}-${index}`} project={project} width={compact ? '100%' : `${(100 - (columns - 1) * 2) / columns}%`} theme={theme} thumbnail={thumbnail} />)}</View></View>;
+  return <View style={ui.section}><ProfileProjectsGallery projects={projects} theme={theme} thumbnail={thumbnail} heading={action => <SectionTitle title={title} name="project" theme={theme} action={action} />} /></View>;
 }
 export function Statistics({ portfolio, theme, compact }: SectionProps) {
   const editing = useProfileEditing();

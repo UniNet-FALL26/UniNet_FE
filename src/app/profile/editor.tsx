@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { ProfileEditableTemplate } from '@/components/profile/ProfileEditableTemplate';
 import { ProfileEntryForm } from '@/components/profile/ProfileEntryForm';
 import { ProfileProjectPicker } from '@/components/profile/ProfileProjectPicker';
+import { ProfileInterestsPicker } from '@/components/profile/ProfileInterestsPicker';
 import { CreateProjectModal } from '@/components/projects/hub/CreateProjectModal';
 import { ProfileFieldForm } from '@/components/profile/ProfileFieldForm';
 import { ProfilePhotoForm } from '@/components/profile/ProfilePhotoForm';
@@ -165,7 +166,9 @@ export default function ProfileEditorScreen() {
         <ProfileEditableTemplate templateId={template.id} key={`${account?.id}-${template.id}`} data={data} theme={theme} width={width} disabled={saving || choosingPhoto} onAdd={next => { setEntryIndex(undefined); setSection(next); }} onEditEducation={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'education')!); }} onEditCertificate={index => { setEntryIndex(index); setSection(profileEditorSections.find(item => item.id === 'certificates')!); }} onField={next => { if (next === "avatarUrl" || next === "coverUrl") void choosePhoto(next); else setField(next); }} onPhoto={target => { void choosePhoto(target); }} onRemoveSocialLink={removeSocialLink} />
       </View>
     </ScrollView>}
-    {section && data && (section.id === 'projects'
+    {section && data && (section.id === 'interests'
+      ? <ProfileInterestsPicker key={account?.id} interests={data.portfolio.interests} theme={theme} onApply={interests => add({ ...data.portfolio, interests })} onClose={() => setSection(null)} />
+      : section.id === 'projects'
       ? <ProfileProjectPicker key={account?.id} projects={data.portfolio.projects} limit={section.limit ?? 50}
           visible={!creatingProject && !projectSave} refresh={projectRefresh} notice={projectNotice}
           onApply={projects => add({ ...data.portfolio, projects })} onCreate={createProject}

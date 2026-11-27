@@ -79,7 +79,7 @@ export function EditPhoto({ field = 'avatarUrl', color, right = 12, bottom = 12,
 export function SectionAdd({ title, theme }: { title: string; theme: ProfileTheme }) {
   const editing = useProfileEditing();
   if (!editing) return null;
-  const ids: ProfileSectionId[] = /Hành trình/.test(title) ? ['education'] : /Kỹ năng/.test(title) ? ['skills'] : /Dự án/.test(title) ? ['projects'] : /Chứng chỉ/.test(title) ? ['certificates'] : /Blog|Bài viết/.test(title) ? ['articles'] : /Hoạt động/.test(title) ? ['activities'] : /Ngôn ngữ/.test(title) ? ['languages'] : /Liên kết/.test(title) ? ['socialLinks'] : [];
+  const ids: ProfileSectionId[] = /Sở thích/.test(title) ? ['interests'] : /Hành trình/.test(title) ? ['education'] : /Kỹ năng/.test(title) ? ['skills'] : /Dự án/.test(title) ? ['projects'] : /Chứng chỉ/.test(title) ? ['certificates'] : /Blog|Bài viết/.test(title) ? ['articles'] : /Hoạt động/.test(title) ? ['activities'] : /Ngôn ngữ/.test(title) ? ['languages'] : /Liên kết/.test(title) ? ['socialLinks'] : [];
   return <View style={s.controls}>{ids.map(id => {
     const original = profileEditorSections.find(item => item.id === id)!;
     const section = id === 'projects' && title !== 'Dự án nổi bật' ? { ...original, fields: original.fields.filter(field => field.key !== 'featured') } : original;

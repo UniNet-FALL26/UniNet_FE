@@ -17,6 +17,7 @@ export type PortfolioMilestone = { title: string; organization?: string | null; 
 export type PortfolioCertificate = { title: string; issuer: string; year?: string | null; logoUrl?: string | null; url?: string | null };
 export type PortfolioArticle = { title: string; date?: string | null; coverUrl?: string | null; url: string };
 export type PortfolioContent = {
+  interests?: string[] | null;
   yearsOfExperience?: number | null; gpa?: string | null;
   headline: string | null; careerObjective: string | null; location: string | null; availability: string | null;
   contactEmail: string | null; cvUrl: string | null;

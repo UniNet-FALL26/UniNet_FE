@@ -5,9 +5,10 @@ import { DeveloperHero } from './DeveloperHero';
 import { ArticleSection, CertificateSection, ExtraSection, JourneySection, ProjectSection, SkillSection, Statistics } from './PortfolioSections';
 import { PortfolioLink, ui } from './PortfolioPrimitives';
 import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { ProfileInterests } from '@/components/profile/ProfileInterests';
 
 export type DeveloperModernTemplateProps = { data: PortfolioResponse; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean; heroAction?: ReactNode; onNavigate?: (id: string) => void; onSectionLayout?: (id: string, y: number) => void };
-const defaultOrder = ['stats', 'skills', 'journey', 'other-projects', 'certificates', 'activities', 'articles'];
+const defaultOrder = ['stats', 'skills', 'journey', 'other-projects', 'certificates', 'activities', 'interests', 'articles'];
 export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = false, heroAction, onNavigate, onSectionLayout }: DeveloperModernTemplateProps) {
   const editing = useProfileEditing();
   const compact = width < 720;
@@ -18,6 +19,7 @@ export function DeveloperModernTemplate({ data, theme, width, thumbnail, demo = 
     'other-projects': <ProjectSection projects={data.portfolio.projects.filter(project => project.projectId || !project.featured)} title="Dự án bản thân" {...props} />,
     certificates: <CertificateSection {...props} />, articles: <ArticleSection {...props} />,
     activities: <ExtraSection section="activities" {...props} />,
+    interests: <ProfileInterests interests={data.portfolio.interests} theme={theme} />,
   };
   const requestedOrder = !editing && appearance?.sectionOrder?.length ? appearance.sectionOrder : defaultOrder;
   const order = [...new Set([...requestedOrder, ...defaultOrder])].filter(id => sections[id] && (editing || !appearance?.hiddenSections?.includes(id)));

@@ -5,8 +5,9 @@ import { isSampleLink } from '@/components/profile/profile-media';
 import { ShowcaseHero } from './ShowcaseHero';
 import { ShowcaseArticles, ShowcaseCertificates, ShowcaseJourney, ShowcaseProjects, ShowcaseSkills } from './ShowcaseSections';
 import { SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
+import { ProfileInterests } from '@/components/profile/ProfileInterests';
 
-const defaultOrder = ['skills', 'journey', 'certificates', 'articles', 'other-projects'];
+const defaultOrder = ['skills', 'journey', 'certificates', 'interests', 'articles', 'other-projects'];
 export function DeveloperShowcaseTemplate(props: DeveloperModernTemplateProps) {
   const editing = useProfileEditing();
   const { data, theme, width, thumbnail, onSectionLayout } = props;
@@ -16,6 +17,7 @@ export function DeveloperShowcaseTemplate(props: DeveloperModernTemplateProps) {
   const appearance = data.portfolio.appearance?.profile;
   const visible = (id: string) => !!editing || !appearance?.hiddenSections?.includes(id);
   const sections: Record<string, React.ReactNode> = {
+    interests: <ProfileInterests interests={data.portfolio.interests} theme={theme} />,
     skills: editing || data.portfolio.skills.length > 0 ? <ShowcaseSkills {...shared} /> : null,
     journey: editing || data.portfolio.education.length + data.portfolio.experience.length > 0 ? <ShowcaseJourney {...shared} /> : null,
     certificates: editing || data.portfolio.certificates.length > 0 ? <ShowcaseCertificates {...shared} /> : null,

@@ -1,6 +1,7 @@
 import { formatProfileMilestonePeriod } from '@/utils/profile-milestone';
 import { Image } from 'expo-image';
-import { PortfolioProjectCard } from '@/components/profile/PortfolioProjectCard';
+import type { ReactNode } from 'react';
+import { ProfileProjectsGallery } from '@/components/profile/ProfileProjectsGallery';
 import { EditCertificateEntry, EditEducationEntry, EditPhoto, SectionAdd, useProfileEditing } from '@/components/profile/ProfileEditContext';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PortfolioContent, PortfolioProject, ProfileTheme } from '@/types/portfolio';
@@ -10,16 +11,14 @@ import { PortfolioIcon, PortfolioLink, ui } from '../developer-modern/PortfolioP
 
 export type ShowcaseSectionProps = { portfolio: PortfolioContent; theme: ProfileTheme; width: number; thumbnail?: boolean; demo?: boolean };
 const cardWidth = (width: number, columns: number) => Math.floor((width - (columns - 1) * 12) / columns);
-export function ShowcaseHeading({ eyebrow, title, theme }: { eyebrow: string; title: string; theme: ProfileTheme }) {
+export function ShowcaseHeading({ eyebrow, title, theme, action }: { eyebrow: string; title: string; theme: ProfileTheme; action?: ReactNode }) {
   const sectionTitle = eyebrow === 'KỸ NĂNG' ? 'Kỹ năng' : eyebrow === 'CHỨNG CHỈ' ? 'Chứng chỉ' : eyebrow.startsWith('BLOG') ? 'Bài viết' : title;
-  return <View style={s.heading}><Text style={[s.eyebrow, { color: theme.accentStrong }]}>{eyebrow}</Text><View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}><Text role="heading" aria-level={2} style={[s.title, { color: theme.text }]}>{title}</Text><SectionAdd title={sectionTitle} theme={theme} /></View></View>;
+  return <View style={s.heading}><Text style={[s.eyebrow, { color: theme.accentStrong }]}>{eyebrow}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Text role="heading" aria-level={2} style={[s.title, { color: theme.text, flexShrink: 1 }]}>{title}</Text><SectionAdd title={sectionTitle} theme={theme} />{action && <View style={{ marginLeft: 'auto' }}>{action}</View>}</View></View>;
 }
 export function ShowcaseProjects({ projects, theme, width, thumbnail }: Omit<ShowcaseSectionProps, 'portfolio'> & { projects: PortfolioProject[] }) {
   const editing = useProfileEditing();
   if (!projects.length && !editing) return null;
-  const columns = width >= 810 ? 3 : width >= 540 ? 2 : 1;
-  return <View style={s.section}><ShowcaseHeading eyebrow="DỰ ÁN" title="Dự án của tôi" theme={theme} />
-    <View style={s.grid}>{projects.map((project, index) => <PortfolioProjectCard key={`${project.title}-${index}`} project={project} width={cardWidth(width, columns)} theme={theme} thumbnail={thumbnail} testID="showcase-project-card" />)}</View>
+  return <View style={s.section}><ProfileProjectsGallery projects={projects} theme={theme} width={width} thumbnail={thumbnail} cardTestID="showcase-project-card" heading={action => <ShowcaseHeading eyebrow="DỰ ÁN" title="Dự án của tôi" theme={theme} action={action} />} />
   </View>;
 }
 export function ShowcaseSkills({ portfolio, theme, width, thumbnail, demo = false }: ShowcaseSectionProps) {
