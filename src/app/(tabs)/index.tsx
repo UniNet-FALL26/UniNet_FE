@@ -1,19 +1,22 @@
-import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { CommentModal } from "@/components/community/CommentModal";
-import { CommunityOpportunitiesCard } from "@/components/community/CommunityOpportunitiesCard";
-import { ACCOUNT_ROLE } from "@/constants/roles";
 import { CommunityComposer } from "@/components/community/CommunityComposer";
-import { CommunityPostCard, CommunityPostDescription as ExpandableDescription } from "@/components/community/CommunityPostCard";
 import { CommunityMediaLightbox } from "@/components/community/CommunityMediaLightbox";
-import { shareCommunityPost } from "@/utils/share-community-post";
+import { CommunityOpportunitiesCard } from "@/components/community/CommunityOpportunitiesCard";
+import {
+  CommunityPostCard,
+  CommunityPostDescription as ExpandableDescription,
+} from "@/components/community/CommunityPostCard";
 import { UpdatePostModal } from "@/components/community/UpdatePostModal";
 import { colors } from "@/constants/colors";
+import { ACCOUNT_ROLE } from "@/constants/roles";
+import { useScreenSafeAreaEdges } from "@/hooks/useScreenSafeAreaEdges";
 import { reportApiFailure } from "@/services/api";
 import {
   communityService,
   type PostResponse,
 } from "@/services/community.service";
 import { useAuthStore } from "@/store/auth.store";
+import { shareCommunityPost } from "@/utils/share-community-post";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +32,7 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type ViewToken,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 // Danh sách các lý do báo cáo
@@ -43,7 +47,7 @@ const REPORT_REASONS = [
 // Cpn xử lý Description xem thêm
 const AD_FREQUENCY = 5;
 function mergeFeedPosts(current: PostResponse[], incoming: PostResponse[]) {
-  const byId = new Map(current.map(post => [post.id, post]));
+  const byId = new Map(current.map((post) => [post.id, post]));
   for (const post of incoming) byId.set(post.id, post);
   return Array.from(byId.values());
 }
@@ -54,19 +58,32 @@ export default function CommunityScreen() {
   const phone = width < 600;
   const wideFeed = width >= 1280;
   const { isAuthenticated, account } = useAuthStore();
-  const showOpportunities = isAuthenticated && account?.role === ACCOUNT_ROLE.STUDENT;
+  const showOpportunities =
+    isAuthenticated && account?.role === ACCOUNT_ROLE.STUDENT;
   const [detailPostId, setDetailPostId] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<PostResponse[]>([]);
-  const { postId: requestedPostId } = useLocalSearchParams<{ postId?: string }>();
+  const { postId: requestedPostId } = useLocalSearchParams<{
+    postId?: string;
+  }>();
   useEffect(() => {
     if (!requestedPostId) return;
     const controller = new AbortController();
-    communityService.getPostById(requestedPostId, controller.signal).then(post => {
-      if (controller.signal.aborted) return;
-      setPosts(current => current.some(item => item.id === post.id) ? current : [post, ...current]);
-      setDetailPostId(post.id);
-    }).catch(error => { if (!controller.signal.aborted) reportApiFailure(error, 'Không mở được bài viết.'); });
+    communityService
+      .getPostById(requestedPostId, controller.signal)
+      .then((post) => {
+        if (controller.signal.aborted) return;
+        setPosts((current) =>
+          current.some((item) => item.id === post.id)
+            ? current
+            : [post, ...current],
+        );
+        setDetailPostId(post.id);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          reportApiFailure(error, "Không mở được bài viết.");
+      });
     return () => controller.abort();
   }, [requestedPostId, account?.id]);
 
@@ -77,7 +94,31 @@ export default function CommunityScreen() {
   const [hasMore, setHasMore] = useState(true);
   const feedRequest = useRef<AbortController | null>(null);
   const loadedPage = useRef(0);
+  const impressedAdKeys = useRef<Set<string>>(new Set());
 
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50, // Ad hiển thị ít nhất 50% diện tích
+    minimumViewTime: 500, // Hiển thị tối thiểu 500ms mới tính 1 impression
+  }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      for (const token of viewableItems) {
+        if (!token.isViewable || token.item?.type !== "AD") continue;
+
+        // Dùng token.item.id (vd: "ad-123-pos-5") để mỗi vị trí hiển thị chỉ gọi 1 lần
+        const trackKey: string = token.item.id;
+        const campaignId = token.item.data?.campaignId ?? token.item.data?.id;
+
+        if (campaignId && !impressedAdKeys.current.has(trackKey)) {
+          impressedAdKeys.current.add(trackKey);
+          void communityService
+            .trackAdImpression(String(campaignId))
+            .catch((err) => console.warn("Lỗi trackAdImpression:", err));
+        }
+      }
+    },
+  ).current;
   const [optionsPostId, setOptionsPostId] = useState<string | null>(null);
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(
     null,
@@ -147,51 +188,69 @@ export default function CommunityScreen() {
     return combined;
   }, [posts, adPool]);
 
-  const fetchFeed = useCallback(async (pageNum: number, isRefresh = false) => {
-    if (pageNum > 1 && (feedRequest.current || pageNum <= loadedPage.current)) return;
-    feedRequest.current?.abort();
-    const controller = new AbortController();
-    feedRequest.current = controller;
-    if (isRefresh) setRefreshing(true);
-    else if (pageNum === 1) setLoading(true);
+  const fetchFeed = useCallback(
+    async (pageNum: number, isRefresh = false) => {
+      if (pageNum > 1 && (feedRequest.current || pageNum <= loadedPage.current))
+        return;
+      feedRequest.current?.abort();
+      const controller = new AbortController();
+      feedRequest.current = controller;
+      if (isRefresh) setRefreshing(true);
+      else if (pageNum === 1) setLoading(true);
 
-    try {
-      // Lấy mới kho quảng cáo nếu là trang 1 hoặc refresh
-      if (pageNum === 1 || isRefresh) fetchAdPool();
+      try {
+        // Lấy mới kho quảng cáo và reset danh sách đã track impression nếu là trang 1 hoặc refresh
+        if (pageNum === 1 || isRefresh) {
+          impressedAdKeys.current.clear();
+          fetchAdPool();
+        }
 
-      const data = await communityService.getPosts({
-        page: pageNum,
-        pageSize: 10,
-      }, controller.signal);
-      if (controller.signal.aborted || feedRequest.current !== controller) return;
-      const fetchedPosts: PostResponse[] = Array.isArray(data)
-        ? data
-        : ((data as any)?.data ?? []);
+        const data = await communityService.getPosts(
+          {
+            page: pageNum,
+            pageSize: 10,
+          },
+          controller.signal,
+        );
+        if (controller.signal.aborted || feedRequest.current !== controller)
+          return;
+        const fetchedPosts: PostResponse[] = Array.isArray(data)
+          ? data
+          : ((data as any)?.data ?? []);
 
-      if (isRefresh || pageNum === 1) setPosts(current => {
-        const linkedPost = current.find(post => post.id === requestedPostId);
-        return mergeFeedPosts(linkedPost ? [linkedPost] : [], fetchedPosts);
-      });
-      else setPosts(current => mergeFeedPosts(current, fetchedPosts));
+        if (isRefresh || pageNum === 1)
+          setPosts((current) => {
+            const linkedPost = current.find(
+              (post) => post.id === requestedPostId,
+            );
+            return mergeFeedPosts(linkedPost ? [linkedPost] : [], fetchedPosts);
+          });
+        else setPosts((current) => mergeFeedPosts(current, fetchedPosts));
 
-      loadedPage.current = pageNum;
-      setHasMore(fetchedPosts.length >= 10);
-      setPage(pageNum);
-    } catch (error) {
-      if (!controller.signal.aborted && feedRequest.current === controller) console.error(error);
-    } finally {
-      if (feedRequest.current === controller) {
-        feedRequest.current = null;
-        setLoading(false);
-        setRefreshing(false);
+        loadedPage.current = pageNum;
+        setHasMore(fetchedPosts.length >= 10);
+        setPage(pageNum);
+      } catch (error) {
+        if (!controller.signal.aborted && feedRequest.current === controller)
+          console.error(error);
+      } finally {
+        if (feedRequest.current === controller) {
+          feedRequest.current = null;
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
-    }
-  }, [requestedPostId]);
+    },
+    [requestedPostId],
+  );
 
   useFocusEffect(
     useCallback(() => {
       fetchFeed(1);
-      return () => { feedRequest.current?.abort(); feedRequest.current = null; };
+      return () => {
+        feedRequest.current?.abort();
+        feedRequest.current = null;
+      };
     }, [fetchFeed]),
   );
 
@@ -277,7 +336,12 @@ export default function CommunityScreen() {
       if (ad.destinationUrl) {
         // TODO: Gọi API đếm lượt click (clickCount) ở đây
         console.log("Đã click Ad ID:", ad.id);
-
+        const campaignId = ad.campaignId ?? ad.id;
+        if (campaignId) {
+          void communityService
+            .trackAdClick(String(campaignId))
+            .catch((error) => console.warn("Lỗi trackAdClick:", error));
+        }
         try {
           // Mở URL (Sẽ mở tab mới trên Web hoặc mở trình duyệt mặc định trên Mobile)
           await Linking.openURL(ad.destinationUrl);
@@ -306,7 +370,9 @@ export default function CommunityScreen() {
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
               >
-                <Text style={[styles.authorName, styles.adAuthorName]}>{displayName}</Text>
+                <Text style={[styles.authorName, styles.adAuthorName]}>
+                  {displayName}
+                </Text>
                 <SymbolView
                   name={{
                     ios: "checkmark.seal.fill",
@@ -321,12 +387,21 @@ export default function CommunityScreen() {
             </View>
           </View>
           <View style={styles.adBadge}>
-            <SymbolView name={{ ios: 'megaphone.fill', android: 'campaign', web: 'campaign' }} size={14} tintColor={colors.primary} accessible={false} />
+            <SymbolView
+              name={{
+                ios: "megaphone.fill",
+                android: "campaign",
+                web: "campaign",
+              }}
+              size={14}
+              tintColor={colors.primary}
+              accessible={false}
+            />
             <Text style={styles.adBadgeText}>Quảng cáo</Text>
           </View>
         </View>
 
-        {ad.title && (
+        {/* {ad.title && (
           <Text
             style={{
               fontSize: 15,
@@ -337,7 +412,7 @@ export default function CommunityScreen() {
           >
             {ad.title}
           </Text>
-        )}
+        )} */}
 
         {/* 
           Lưu ý: Nếu người dùng click vào chữ "Xem thêm" trong ExpandableDescription, 
@@ -348,7 +423,12 @@ export default function CommunityScreen() {
 
         <View style={styles.mediaContainer}>
           {ad.mediaUrl && (
-            <Pressable accessibilityRole="link" accessibilityLabel={ad.title || displayName} onPress={handleAdClick} style={styles.adMediaBox}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={ad.title || displayName}
+              onPress={handleAdClick}
+              style={styles.adMediaBox}
+            >
               <Image
                 source={{ uri: ad.mediaUrl }}
                 style={styles.imageBackdrop}
@@ -367,76 +447,110 @@ export default function CommunityScreen() {
           )}
         </View>
 
-          <Pressable accessibilityRole="link" accessibilityLabel="Xem ngay" onPress={handleAdClick} style={styles.adCtaRow}>
-            <SymbolView name={{ ios: "link", android: "link", web: "link" }} size={20} tintColor={colors.textSecondary} />
-            <Text style={styles.adDestinationText} numberOfLines={1}>
-              {displayUrl}
-            </Text>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Xem ngay"
+          onPress={handleAdClick}
+          style={styles.adCtaRow}
+        >
+          <SymbolView
+            name={{ ios: "link", android: "link", web: "link" }}
+            size={20}
+            tintColor={colors.textSecondary}
+          />
+          <Text style={styles.adDestinationText} numberOfLines={1}>
+            {displayUrl}
+          </Text>
 
-            {/* Đổi từ Pressable thành View vì toàn bộ Card đã click được rồi */}
-            <View style={styles.adCtaButton}>
-              <Text style={styles.adCtaButtonText}>Xem ngay</Text>
-            </View>
-          </Pressable>
+          {/* Đổi từ Pressable thành View vì toàn bộ Card đã click được rồi */}
+          <View style={styles.adCtaButton}>
+            <Text style={styles.adCtaButtonText}>Xem ngay</Text>
+          </View>
+        </Pressable>
       </View>
     );
   };
   const renderPostCard = ({ item }: { item: PostResponse }) => {
-    const owner = account?.id === item.authorUserId || account?.profile?.id === item.authorUserId;
-    return <CommunityPostCard
-      post={item}
-      menuOpen={optionsPostId === item.id}
-      onMenuChange={open => setOptionsPostId(open ? item.id : null)}
-      onOpen={() => setDetailPostId(item.id)}
-      onOpenMedia={index => openLightbox(item, index)}
-      onLike={() => void handleToggleReaction(item.id)}
-      onShare={() => void shareCommunityPost(item.id, item.description || 'UniNet')}
-      onSave={() => void handleToggleBookmark(item.id)}
-      onEdit={owner ? () => setEditingPost(item) : undefined}
-      onDelete={owner ? () => setDeleteConfirmPostId(item.id) : undefined}
-      onReport={!owner ? () => setReportPostId(item.id) : undefined}
-    />;
+    const owner =
+      account?.id === item.authorUserId ||
+      account?.profile?.id === item.authorUserId;
+    return (
+      <CommunityPostCard
+        post={item}
+        menuOpen={optionsPostId === item.id}
+        onMenuChange={(open) => setOptionsPostId(open ? item.id : null)}
+        onOpen={() => setDetailPostId(item.id)}
+        onOpenMedia={(index) => openLightbox(item, index)}
+        onLike={() => void handleToggleReaction(item.id)}
+        onShare={() =>
+          void shareCommunityPost(item.id, item.description || "UniNet")
+        }
+        onSave={() => void handleToggleBookmark(item.id)}
+        onEdit={owner ? () => setEditingPost(item) : undefined}
+        onDelete={owner ? () => setDeleteConfirmPostId(item.id) : undefined}
+        onReport={!owner ? () => setReportPostId(item.id) : undefined}
+      />
+    );
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
       <View style={styles.feedLayout}>
-      <View testID="community-feed-column" style={styles.feedColumn}>
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
-      ) : (
-        <FlatList
-          data={feedData}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            if (item.type === "AD") return renderAdCard(item.data);
-            return renderPostCard({ item: item.data });
-          }}
-          onScroll={() => {
-            if (optionsPostId) setOptionsPostId(null);
-          }}
-          ListHeaderComponent={
-            <View style={styles.feedHeader}>
-              {isAuthenticated && <CommunityComposer onCreated={() => fetchFeed(1, true)} />}
-              {showOpportunities && !phone && !wideFeed && <CommunityOpportunitiesCard key={account.id} />}
+        <View testID="community-feed-column" style={styles.feedColumn}>
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.primary} size="large" />
             </View>
-          }
-          contentContainerStyle={[styles.listContent, phone && styles.phoneListContent]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchFeed(1, true)}
+          ) : (
+            <FlatList
+              data={feedData}
+              keyExtractor={(item) => item.id}
+              viewabilityConfig={viewabilityConfig}
+              onViewableItemsChanged={onViewableItemsChanged}
+              renderItem={({ item }) => {
+                if (item.type === "AD") return renderAdCard(item.data);
+                return renderPostCard({ item: item.data });
+              }}
+              onScroll={() => {
+                if (optionsPostId) setOptionsPostId(null);
+              }}
+              ListHeaderComponent={
+                <View style={styles.feedHeader}>
+                  {isAuthenticated && (
+                    <CommunityComposer onCreated={() => fetchFeed(1, true)} />
+                  )}
+                  {showOpportunities && !phone && !wideFeed && (
+                    <CommunityOpportunitiesCard key={account.id} />
+                  )}
+                </View>
+              }
+              contentContainerStyle={[
+                styles.listContent,
+                phone && styles.phoneListContent,
+              ]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => fetchFeed(1, true)}
+                />
+              }
+              onEndReached={() => {
+                if (hasMore && !loading) fetchFeed(page + 1);
+              }}
             />
-          }
-          onEndReached={() => {
-            if (hasMore && !loading) fetchFeed(page + 1);
-          }}
-        />
-      )}
-      </View>
-      {showOpportunities && wideFeed && <View testID="community-opportunities-sidebar" style={[styles.opportunitiesSidebar, { width: Math.min(400, (width - 650) / 2 - 24) }]}><CommunityOpportunitiesCard key={account.id} /></View>}
+          )}
+        </View>
+        {showOpportunities && wideFeed && (
+          <View
+            testID="community-opportunities-sidebar"
+            style={[
+              styles.opportunitiesSidebar,
+              { width: Math.min(400, (width - 650) / 2 - 24) },
+            ]}
+          >
+            <CommunityOpportunitiesCard key={account.id} />
+          </View>
+        )}
       </View>
 
       <CommentModal
@@ -464,9 +578,18 @@ export default function CommunityScreen() {
         }}
       />
 
-      <Modal visible={!!deleteConfirmPostId} transparent animationType="fade" onRequestClose={() => setDeleteConfirmPostId(null)}>
+      <Modal
+        visible={!!deleteConfirmPostId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmPostId(null)}
+      >
         <View style={styles.popupOverlay}>
-      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setDeleteConfirmPostId(null)} />
+          <Pressable
+            accessible={false}
+            style={StyleSheet.absoluteFill}
+            onPress={() => setDeleteConfirmPostId(null)}
+          />
           <View style={styles.popupContent}>
             <Text style={styles.popupTitle}>Xóa bài viết?</Text>
             <View style={styles.popupActions}>
@@ -501,13 +624,33 @@ export default function CommunityScreen() {
       />
 
       {/* OVERLAY XEM ẢNH */}
-      <CommunityMediaLightbox urls={lightboxPost?.mediaUrls ?? []} index={selectedImageIndex} onIndexChange={setSelectedImageIndex} onClose={() => setSelectedImageIndex(null)} />
+      <CommunityMediaLightbox
+        urls={lightboxPost?.mediaUrls ?? []}
+        index={selectedImageIndex}
+        onIndexChange={setSelectedImageIndex}
+        onClose={() => setSelectedImageIndex(null)}
+      />
       {/* OVERLAY BÁO CÁO BÀI VIẾT */}
       {/* OVERLAY BÁO CÁO BÀI VIẾT */}
-      <Modal visible={!!reportPostId} transparent animationType="fade" onRequestClose={() => { setReportPostId(null); setSelectedReason(''); }}>
+      <Modal
+        visible={!!reportPostId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setReportPostId(null);
+          setSelectedReason("");
+        }}
+      >
         {/* Bỏ KeyboardAvoidingView đi vì không còn nhập phím nữa */}
         <View style={[styles.popupOverlay, { alignItems: "center" }]}>
-      <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => { setReportPostId(null); setSelectedReason(''); }} />
+          <Pressable
+            accessible={false}
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              setReportPostId(null);
+              setSelectedReason("");
+            }}
+          />
           <View style={[styles.popupContent, { width: "85%", maxWidth: 400 }]}>
             <Text style={styles.popupTitle}>Báo cáo bài viết</Text>
             <Text
@@ -591,7 +734,12 @@ const styles = StyleSheet.create({
   feedLayout: { flex: 1, width: "100%", alignSelf: "center" },
   feedColumn: { flex: 1, minWidth: 0 },
   feedHeader: { gap: 12 },
-  opportunitiesSidebar: { position: "absolute", top: 12, left: "50%", marginLeft: 337 },
+  opportunitiesSidebar: {
+    position: "absolute",
+    top: 12,
+    left: "50%",
+    marginLeft: 337,
+  },
   phoneListContent: { paddingHorizontal: 0, paddingTop: 0, gap: 8 },
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -661,11 +809,20 @@ const styles = StyleSheet.create({
   popupBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
 
   // Ad Specific Styles
-  adHeader: { alignItems: 'flex-start', gap: 10 },
+  adHeader: { alignItems: "flex-start", gap: 10 },
   adAuthorCopy: { flex: 1, minWidth: 0 },
   adAuthorName: { flexShrink: 1 },
-  adBadge: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 7, backgroundColor: '#EAF3FF' },
-  adBadgeText: { fontSize: 10, fontWeight: '600', color: colors.primary },
+  adBadge: {
+    flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 7,
+    backgroundColor: "#EAF3FF",
+  },
+  adBadgeText: { fontSize: 10, fontWeight: "600", color: colors.primary },
   adMediaBox: { width: "100%" },
   adCtaRow: {
     flexDirection: "row",
@@ -689,7 +846,11 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 7,
   },
-  adCtaButtonText: { color: colors.textPrimary, fontSize: 13, fontWeight: "700" },
+  adCtaButtonText: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
   textInputArea: {
     backgroundColor: "#F9FAFB",
     borderWidth: 1,
