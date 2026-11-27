@@ -1,7 +1,7 @@
 import { useScreenSafeAreaEdges } from '@/hooks/useScreenSafeAreaEdges';
 import { DetailNavigation } from '@/components/navigation/DetailNavigation';
 import { useCallback, useEffect, useState } from 'react';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import { FriendProfileActions } from '@/components/friends/FriendProfileActions'
 import { CommunityProfilePosts } from '@/components/community/CommunityProfilePosts';
 import CompanyProfile from '@/app/(company)/profile';
 import type { CompanyProfile as CompanyProfileData } from '@/services/company.service';
+import { accountHome, accountProfile } from '@/utils/role-navigation';
 
 type LoadedProfile = { publicProfile: PublicRoleProfile; studentPortfolio?: PortfolioResponse };
 
@@ -46,7 +47,7 @@ export default function RoleProfileViewer() {
   const data = loaded?.id === id && loaded.viewerKey === viewerKey ? loaded.data : null;
   const profile = data?.publicProfile;
   const viewedRole = profile?.role ?? (account?.profile?.id === id ? account.role : null);
-  const title = viewedRole === 0 ? 'Hồ sơ sinh viên' : viewedRole === 1 ? 'Hồ sơ đối tác' : viewedRole === 2 ? 'Hồ sơ thẩm định viên' : viewedRole === null ? 'Hồ sơ' : 'Hồ sơ thành viên';
+  const title = viewedRole === 0 ? 'Hồ sơ sinh viên' : viewedRole === 1 ? 'Hồ sơ đối tác' : viewedRole === null ? 'Hồ sơ' : 'Hồ sơ thành viên';
   const isOwnPartner = profile?.role === 1 && account?.role === 1 && account.profile?.id === id;
   const partnerProfile: CompanyProfileData | null = profile?.role === 1 ? {
     id: profile.id, companyName: profile.organizationName || profile.fullName, partnerType: profile.partnerType ?? 4,
@@ -56,6 +57,7 @@ export default function RoleProfileViewer() {
     updatedAt: '', openJobs: [], introduction: profile.introduction,
   } : null;
 
+  if (profile?.role === 2) return <Redirect href={account?.profile?.id === id ? accountProfile(account.role) : accountHome(account?.role)} />;
   if (isOwnPartner) return <SafeAreaView style={s.safe} edges={safeAreaEdges}>
     <DetailNavigation title="Hồ sơ đối tác" role={1} onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/community')} />
     <CompanyProfile />
@@ -77,8 +79,7 @@ export default function RoleProfileViewer() {
             <View style={s.avatar}>{profile.avatarUrl ? <Image accessibilityLabel={`Ảnh đại diện của ${profile.fullName}`} source={{ uri: profile.avatarUrl }} style={s.avatarImage} /> : <Text style={s.avatarText}>{profile.fullName.slice(0, 1).toUpperCase()}</Text>}</View>
             <View style={s.personText}><Text accessibilityRole="header" style={s.name}>{profile.organizationName || profile.fullName}</Text>
               {!!profile.isVerified && <Text style={s.verified}>Đã xác minh</Text>}
-              <Text style={s.role}>{profile.role === 2 ? 'Thẩm định viên' : 'Thành viên UniNet'}</Text>
-              {profile.role === 2 && <FriendProfileActions profileId={profile.id} />}
+              <Text style={s.role}>Thành viên UniNet</Text>
             </View>
           </View>
           {!!profile.bio && <Text style={s.bio}>{profile.bio}</Text>}
@@ -97,7 +98,7 @@ function StudentPortfolioView({ id, portfolio, isAuthenticated, viewerKey, width
       <View role="tablist" aria-label="Nội dung hồ sơ" style={s.tabs}>
         {([{ id: 'profile', label: 'Hồ sơ' }, { id: 'posts', label: 'Bài viết' }] as const).map(tab => <Pressable key={tab.id} role="tab" aria-label={tab.label} aria-selected={activeTab === tab.id} onPress={() => setActiveTab(tab.id)} style={[s.tab, activeTab === tab.id && s.activeTab]}><Text style={[s.tabLabel, activeTab === tab.id && s.activeLabel]}>{tab.label}</Text></Pressable>)}
       </View>
-      <View testID="profile-view-actions" style={s.actions}><FriendProfileActions profileId={portfolio.profile.id} /></View>
+      <View testID="profile-view-actions" style={s.actions}><FriendProfileActions profileId={portfolio.profile.id} profileRole={0} /></View>
     </View>
     <ScrollView key={`${id}:${activeTab}`} contentContainerStyle={s.content}>
       {activeTab === 'profile' ? <View onLayout={event => setFrameWidth(event.nativeEvent.layout.width)}><ProfileTemplateRenderer templateId={getProfileTemplate(portfolio.portfolio.appearance.profile.template).id} data={portfolio} theme={getProfileTheme(getProfileTemplate(portfolio.portfolio.appearance.profile.template).id, portfolio.portfolio.appearance.profile.theme)} width={Math.min(frameWidth || width, 1120)} /></View>

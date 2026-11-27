@@ -2,12 +2,14 @@ import { colors } from '@/constants/colors';
 import type { PostResponse } from '@/services/community.service';
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CommunityPostFooter } from './CommunityPostFooter';
 import { CommunityPostMedia } from './CommunityPostMedia';
 import { useAuthStore } from '@/store/auth.store';
 import { ACCOUNT_ROLE } from '@/constants/roles';
+import { publicProfileService } from '@/services/public-profile.service';
+import { reportApiFailure } from '@/services/api';
 
 type Props = {
   post: PostResponse;
@@ -35,7 +37,12 @@ export function CommunityPostDescription({ text }: { text: string }) {
 export function CommunityPostCard({ post, menuOpen, onMenuChange, onOpen, onOpenMedia, onLike, onShare, onSave, onEdit, onDelete, onReport }: Props) {
   const { account } = useAuthStore();
   const name = post.authorNickname || post.authorName;
-  const openAuthorProfile = () => {
+  const [blockedAuthor, setBlockedAuthor] = useState<string | null>(null);
+  const authorRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => { authorRequest.current?.abort(); authorRequest.current = null; }, [post.authorUserId, account?.id]);
+  const own = account?.profile?.id === post.authorUserId;
+  const canOpenAuthor = own || blockedAuthor !== post.authorUserId;
+  const openAuthorProfile = async () => {
     if (account?.profile?.id === post.authorUserId) {
       if (account.role === ACCOUNT_ROLE.STUDENT) router.push('/(tabs)/profile');
       else if (account.role === ACCOUNT_ROLE.PARTNER) router.push('/(company)/profile');
@@ -43,7 +50,16 @@ export function CommunityPostCard({ post, menuOpen, onMenuChange, onOpen, onOpen
       else router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } });
       return;
     }
-    router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } });
+    if (!canOpenAuthor || authorRequest.current) return;
+    const controller = new AbortController(); authorRequest.current = controller;
+    try {
+      const profile = await publicProfileService.getById(post.authorUserId, controller.signal);
+      if (controller.signal.aborted) return;
+      if (profile.role === ACCOUNT_ROLE.ASSESSOR) { setBlockedAuthor(post.authorUserId); return; }
+      router.push({ pathname: '/profile/view/[id]', params: { id: post.authorUserId, source: 'community' } });
+    } catch (cause) {
+      if (!controller.signal.aborted) reportApiFailure(cause, 'Không thể mở hồ sơ.');
+    } finally { if (authorRequest.current === controller) authorRequest.current = null; }
   };
   const actions = [
     { label: post.isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết', run: onSave, danger: false },
@@ -53,7 +69,7 @@ export function CommunityPostCard({ post, menuOpen, onMenuChange, onOpen, onOpen
   ];
   return <View testID={`community-post-${post.id}`} style={[s.card, menuOpen && s.raised]}>
     <View style={[s.header, menuOpen && s.raised]}>
-      <Pressable accessibilityRole="link" accessibilityLabel={account?.profile?.id === post.authorUserId ? 'Mở hồ sơ của bạn' : `Xem hồ sơ của ${name}`} onPress={openAuthorProfile} style={s.author}>
+      <Pressable accessibilityRole={canOpenAuthor ? 'link' : undefined} accessibilityLabel={canOpenAuthor ? own ? 'Mở hồ sơ của bạn' : `Xem hồ sơ của ${name}` : name} disabled={!canOpenAuthor} onPress={() => void openAuthorProfile()} style={s.author}>
         <View testID="community-author-avatar" style={s.avatar}>{post.authorAvatar ? <Image source={{ uri: post.authorAvatar }} style={StyleSheet.absoluteFill} /> : <Text style={s.initial}>{name?.charAt(0)?.toUpperCase()}</Text>}</View>
         <View style={s.authorCopy}><Text style={s.name}>{name}</Text><Text style={s.date}>{new Date(post.createdAt).toLocaleDateString('vi-VN')}</Text></View>
       </Pressable>
