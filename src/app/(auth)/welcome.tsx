@@ -5,6 +5,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimen
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
 import { useDesktopAuthPageMotion } from '@/components/auth/DesktopAuthTransition';
+import { InstallAppButton } from '@/components/pwa/InstallAppButton';
 
 export default function WelcomeScreen() {
   const { width, height } = useWindowDimensions();
@@ -30,6 +31,7 @@ export default function WelcomeScreen() {
     <Pressable accessibilityRole="button" accessibilityLabel="Tạo tài khoản" onPress={() => wide ? motion.navigate('/(auth)/register') : router.push('/(auth)/register')} style={({ pressed }) => [s.button, wide && s.wideButton, s.secondaryButton, pressed && s.secondaryPressed]}>
       <Text style={[s.buttonText, wide && s.wideButtonText, s.secondaryText]}>Tạo tài khoản</Text><SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={20} tintColor={colors.navy} />
     </Pressable>
+    <InstallAppButton disabled={motion.moving} />
     <View style={s.partnerDivider}><View style={s.rule} /><Text style={[s.partnerQuestion, wide && s.wideSmallText]}>Bạn là doanh nghiệp hoặc tổ chức?</Text><View style={s.rule} /></View>
     <Link href="/(auth)/register-partner" accessibilityLabel="Đăng ký đối tác →" style={s.partnerLink}>Đăng ký đối tác →</Link>
   </View>;

@@ -9,6 +9,7 @@ import { tokenStorage } from '@/utils/storage';
 import { View } from 'react-native';
 import { ToastHost } from '@/components/ui/ToastHost';
 import { AccountShell } from '@/components/navigation/AccountShell';
+import { PwaBootstrap } from '@/components/pwa/PwaBootstrap';
 
 const screenLayout: NonNullable<ComponentProps<typeof Stack>['screenLayout']> = ({ children, route }) => <AccountShell routeName={route.name}>{children}</AccountShell>;
 
@@ -17,5 +18,5 @@ export default function RootLayout() {
   // Restoring an existing account must not remount the public screen after its fragment was removed.
   const publicOnboarding = useSegments()[0] === 'assessor-onboarding';
   useEffect(() => { void authStore.restoreSession(); }, []);
-  return <SafeAreaProvider><View style={{ flex: 1 }}><NotificationsProvider key={publicOnboarding ? 'onboarding-public' : isAuthenticated ? `${account?.id}:${tokenStorage.getSession()?.generation}` : 'anonymous'}><ChatProvider><Stack key={publicOnboarding ? 'onboarding-public' : isAuthenticated ? account?.id : 'anonymous'} screenOptions={{ headerShown: false }} screenLayout={screenLayout} /></ChatProvider></NotificationsProvider><ToastHost /></View></SafeAreaProvider>;
+  return <SafeAreaProvider><View style={{ flex: 1 }}><PwaBootstrap /><NotificationsProvider key={publicOnboarding ? 'onboarding-public' : isAuthenticated ? `${account?.id}:${tokenStorage.getSession()?.generation}` : 'anonymous'}><ChatProvider><Stack key={publicOnboarding ? 'onboarding-public' : isAuthenticated ? account?.id : 'anonymous'} screenOptions={{ headerShown: false }} screenLayout={screenLayout} /></ChatProvider></NotificationsProvider><ToastHost /></View></SafeAreaProvider>;
 }

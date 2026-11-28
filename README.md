@@ -41,3 +41,8 @@ This preview APK uses the template's debug signing key. It is for direct testing
 Set `EXPO_PUBLIC_API_URL` in `.env` to the running UniNet API URL ending in `/api`. Email/password authentication, partner registration and profile saving use the backend endpoints. Google login supports Student accounts on web and Android; [Google login setup](docs/handoffs/google-login.md) describes the OAuth configuration and Android rebuild. Password reset email still needs integration. Sessions use the existing platform storage.
 
 Implementation details and verification are in [the auth handoff](docs/handoffs/mobile-auth.md).
+
+Web users can install UniNet from **Cài UniNet** on Welcome or near the bottom of
+Settings. Publish the complete `npx expo export --platform web` output over HTTPS
+to enable PWA installation; iPhone users receive Add to Home Screen instructions.
+See [PWA setup and verification](docs/handoffs/pwa-installation.md).

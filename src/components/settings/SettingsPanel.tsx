@@ -18,6 +18,7 @@ import { PartnerAccountModal } from '@/components/settings/PartnerAccountModal';
 import type { PartnerVerificationStatus } from '@/services/company.service';
 import { verificationPresentation } from '@/utils/student-verification';
 import { portfolioService } from '@/services/portfolio.service';
+import { InstallAppButton } from '@/components/pwa/InstallAppButton';
 
 export function SettingsPanel({ embedded = false, onPartnerVerificationStatusChange }: { embedded?: boolean; onPartnerVerificationStatusChange?: (value: PartnerVerificationStatus) => void }) {
   const safeAreaEdges = useScreenSafeAreaEdges();
@@ -95,6 +96,7 @@ export function SettingsPanel({ embedded = false, onPartnerVerificationStatusCha
               <SettingsRow title="Chính sách bảo mật" description="Thông tin về quyền riêng tư của bạn." name={{ ios: 'hand.raised', android: 'privacy_tip', web: 'privacy_tip' }} disabled={busy} onPress={() => openLegalPage('/privacy')} />
             </View>
           </View>
+          <InstallAppButton variant="button" disabled={busy} />
           <View style={s.logoutGroup}><SettingsRow title="Đăng xuất" description="Kết thúc phiên trên thiết bị này." name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} danger disabled={busy} loading={loggingOut} onPress={() => { void signOut(); }} /></View>
           {!!logoutError && <Text accessibilityRole="alert" style={s.error}>{logoutError}</Text>}
           {!embedded && <View style={s.footer} testID="settings-brand-footer">
