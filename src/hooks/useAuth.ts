@@ -20,6 +20,15 @@ export function useAuth() {
     registerPartner: (request: RegisterPartnerRequest) => run(() => authService.registerPartner(request), authStore.setAuth),
     logout: () => run(() => authService.logout()),
     logoutAll: () => run(() => authService.logoutAll()),
-    google: () => run(() => Promise.resolve(authService.loginWithGoogle()), authStore.setAuth),
+    google: async (getIdToken: () => Promise<string | null>) => {
+      let authenticated = false;
+      const success = await run(async () => {
+        const idToken = await getIdToken();
+        return idToken === null ? null : authService.loginWithGoogle(idToken);
+      }, async response => {
+        if (response) { await authStore.setAuth(response); authenticated = true; }
+      });
+      return success && authenticated;
+    },
   };
 }

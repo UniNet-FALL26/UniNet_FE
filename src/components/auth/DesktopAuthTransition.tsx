@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { router, usePathname } from 'expo-router';
@@ -6,11 +6,16 @@ import { router, usePathname } from 'expo-router';
 type Destination = '/(auth)/welcome' | '/(auth)/login' | '/(auth)/register';
 type MotionContext = { active: boolean; moving: boolean; reduced: boolean; navigate: (path: Destination) => void };
 const Context = createContext<MotionContext | null>(null);
+const subscribeHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
 
 export function DesktopAuthTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
-  const active = width >= 900 && ['/welcome', '/login', '/register'].includes(pathname);
+  // The server renders the mobile tree; match it until hydration finishes.
+  const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
+  const active = hydrated && width >= 900 && ['/welcome', '/login', '/register'].includes(pathname);
   const progress = useRef(new Animated.Value(pathname === '/welcome' ? 0 : 1)).current;
   const [reduced, setReduced] = useState(true);
   const [moving, setMoving] = useState(false);

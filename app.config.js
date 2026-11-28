@@ -7,7 +7,7 @@ module.exports = ({ config }) => {
   config = { ...config, extra: { ...config.extra, firebaseAndroidEnabled: androidReady, firebaseIosEnabled: iosReady },
     plugins: ['./plugins/with-chat-notifications', ...(config.plugins || []), 'expo-video', 'expo-sharing', ['expo-notifications', { defaultChannel: 'uninet-messages', color: '#1769E0' }],
       ['expo-build-properties', { ios: androidReady || iosReady ? { useFrameworks: 'static' } : {} }],
-      ...(androidReady || iosReady ? ['@react-native-firebase/app', '@react-native-firebase/messaging'] : [])],
+      ...(androidReady || iosReady ? ['@react-native-firebase/app', '@react-native-firebase/messaging', 'react-native-nitro-google-signin'] : [])],
     android: { ...config.android, ...(androidReady ? { googleServicesFile: androidFile } : {}) },
     ios: { ...config.ios, ...(iosReady ? { googleServicesFile: iosFile, bundleIdentifier: config.ios?.bundleIdentifier || 'com.uninet.mobile' } : {}) } };
   const origin = process.env.EXPO_PUBLIC_APP_ORIGIN;

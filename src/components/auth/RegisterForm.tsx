@@ -5,7 +5,7 @@ import { AuthScreen, authStyles } from './AuthScreen';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TextLink } from '@/components/ui/TextLink';
-import { GoogleMark } from './GoogleMark';
+import { GoogleLoginButton } from './GoogleLoginButton';
 import { TermsAgreement } from './TermsAgreement';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeEmail, passwordRules, validEmail } from '@/utils/validation';
@@ -45,7 +45,7 @@ export function RegisterForm() {
       {lastAction === 'register' && !!error && <Text accessibilityRole="alert" style={authStyles.serverError}>{error}</Text>}
       <Button title={loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'} loading={loading} onPress={submit} />
       <View style={authStyles.divider}><View style={authStyles.line} /><Text style={authStyles.dividerText}>Hoặc tiếp tục với</Text><View style={authStyles.line} /></View>
-      <Button title="Đăng ký với Google" leadingIcon={<GoogleMark />} variant="outline" onPress={() => { setLastAction('google'); void google(); }} disabled={loading} />
+      <GoogleLoginButton signup disabled={loading || !terms} onSignIn={async getIdToken => { setLastAction('google'); if (await google(getIdToken)) router.replace('/'); }} />
       {lastAction === 'google' && !!error && <Text accessibilityRole="alert" style={authStyles.serverError}>{error}</Text>}
     </View>
     <View style={authStyles.footer}>

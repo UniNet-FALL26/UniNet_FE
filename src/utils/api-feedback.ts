@@ -20,6 +20,7 @@ const codeMessages: Record<string, string> = {
   INVALID_VERIFICATION_DOCUMENT: 'Giấy tờ xác minh không hợp lệ. Vui lòng chọn lại tệp.',
   STUDENT_PROFILE_REQUIRED: 'Vui lòng hoàn thiện hồ sơ sinh viên trước khi tiếp tục.',
   GOOGLE_NOT_CONFIGURED: 'Đăng nhập Google hiện chưa khả dụng. Vui lòng dùng email và mật khẩu.',
+  GOOGLE_STUDENT_ONLY: 'Đăng nhập Google chỉ dành cho sinh viên. Tài khoản đối tác và nhân sự vui lòng dùng email và mật khẩu.',
   INVALID_GOOGLE_TOKEN: 'Không xác nhận được tài khoản Google. Vui lòng đăng nhập lại.',
   INVALID_REFRESH_TOKEN: 'Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.',
   REFRESH_TOKEN_EXPIRED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',

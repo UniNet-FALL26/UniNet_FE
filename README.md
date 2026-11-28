@@ -38,6 +38,6 @@ This preview APK uses the template's debug signing key. It is for direct testing
 - `src/services`, `src/store`, `src/hooks`, `src/utils`: API boundary, auth state, and validation.
 - `src/constants`, `src/types`: semantic colors, configuration, roles, and auth contracts.
 
-Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` to the running UniNet API URL ending in `/api`. Email and password authentication, partner registration, and profile saving use the backend endpoints. Google OAuth and password reset email still need integration. Tokens are currently held in memory only.
+Set `EXPO_PUBLIC_API_URL` in `.env` to the running UniNet API URL ending in `/api`. Email/password authentication, partner registration and profile saving use the backend endpoints. Google login supports Student accounts on web and Android; [Google login setup](docs/handoffs/google-login.md) describes the OAuth configuration and Android rebuild. Password reset email still needs integration. Sessions use the existing platform storage.
 
 Implementation details and verification are in [the auth handoff](docs/handoffs/mobile-auth.md).
