@@ -46,3 +46,20 @@ Web users can install UniNet from **Cài UniNet** on Welcome or near the bottom 
 Settings. Publish the complete `npx expo export --platform web` output over HTTPS
 to enable PWA installation; iPhone users receive Add to Home Screen instructions.
 See [PWA setup and verification](docs/handoffs/pwa-installation.md).
+
+## Vercel web deployment
+
+Set the Vercel project Root Directory to this app directory (`UniNet_FE` if the
+connected repository contains the full workspace, or `.` for the FE-only repo).
+The checked-in `vercel.json` exports Expo web into `dist`, enables extensionless
+HTML URLs, and falls back to the app entry for client routes on direct visits
+and refreshes. Existing static files are served before the fallback.
+
+Set `EXPO_PUBLIC_API_URL` and any other required public environment variables in
+Vercel before building. Push these changes and redeploy, then open `/`, `/welcome`,
+and a signed-in route directly and refresh each page. Confirm the PWA manifest,
+service workers, and JavaScript assets still load. If `/` still returns Vercel's
+404, check that the production domain points to the new successful deployment
+and that its output contains `dist/index.html`.
+
+Reference: [Expo web hosting](https://docs.expo.dev/guides/publishing-websites/).
