@@ -4,6 +4,8 @@
 - Web uses the official Google Identity Services button; Android uses explicit
   account selection through Credential Manager (`react-native-nitro-google-signin`
   and `react-native-nitro-modules`). Native code loads on interaction.
+- Web loads GIS with `hl=vi` and renders with `locale: 'vi'`, so the Google button
+  uses Vietnamese even when the browser/account language is English.
 - Both exchange the Google ID token at `POST /api/auth/google` with `role: 0`
   and the existing messaging device ID, then store the UniNet session normally.
 - Backend rejects non-Student requests and existing Partner/staff identities
@@ -44,7 +46,7 @@ Ship the Student-only backend change together with the frontend. Removing files
 or adding frontend checks alone cannot restrict the previously deployed endpoint.
 
 ## Verification
-- Results: 13 focused FE tests, 35 backend auth tests, all 8 Chrome fixture cases
+- Results: 14 focused FE tests, 35 backend auth tests, all 8 Chrome fixture cases
   passed. Web and Android JavaScript exports and native dependency compatibility
   validation succeeded. Android native APK compilation/device sign-in is unverified.
 - Focused FE behavioral tests: `node -e "require('./tests/google-login.test.cjs'); require('./tests/student-registration.test.cjs')"`.

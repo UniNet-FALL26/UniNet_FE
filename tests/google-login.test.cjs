@@ -129,3 +129,18 @@ test('web initializes GIS once and only routes credentials to the mounted form',
   assert.equal(renders, 2);
   assert.equal(init.auto_select, false);
 });
+
+test('Google SDK loads in Vietnamese regardless of browser language', async () => {
+  let script;
+  const browser = { setTimeout: () => 1, clearTimeout() {} };
+  const { loadGoogleIdentity } = load('src/services/google-identity.ts', {}, {
+    window: browser,
+    document: { createElement: () => ({ remove() {} }), head: { appendChild: element => { script = element; } } },
+  });
+  const pending = loadGoogleIdentity();
+  const identity = {};
+  browser.google = { accounts: { id: identity } };
+  script.onload();
+  assert.equal(await pending, identity);
+  assert.equal(script.src, 'https://accounts.google.com/gsi/client?hl=vi');
+});

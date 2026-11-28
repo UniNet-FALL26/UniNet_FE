@@ -32,7 +32,7 @@ async function run() {
           const account = { id: 'google-student-fixture', email: 'student@test.local', role: 0, profileComplete: true,
             profile: { id: 'profile-fixture', fullName: 'Student Fixture', displayName: 'Student Fixture', isVerified: true } };
           page.on('pageerror', error => errors.push(error.message));
-          await page.route('https://accounts.google.com/gsi/client', async route => {
+          await page.route('https://accounts.google.com/gsi/client*', async route => {
             scriptAttempts++;
             if (mode === 'retry' && scriptAttempts === 1) return route.abort();
             return route.fulfill({ contentType: 'text/javascript', body: `
