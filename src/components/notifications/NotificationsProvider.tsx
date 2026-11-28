@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { API_URL } from '@/constants/config';
+import { API_ORIGIN } from '@/constants/config';
 import { refreshSession } from '@/services/api';
 import { notificationsService } from '@/services/notifications.service';
 import { useAuthStore } from '@/store/auth.store';
@@ -42,7 +42,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
     refreshRef.current = refresh;
     refresh();
-    const hub = API_URL.replace(/\/api$/, '') + '/hubs/notifications';
+    const hub = API_ORIGIN + '/hubs/notifications';
     const connection = new HubConnectionBuilder().withUrl(hub, {
       accessTokenFactory: async () => {
         if (!active()) throw new Error('Phiên đăng nhập đã thay đổi.');

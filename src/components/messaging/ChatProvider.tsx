@@ -4,7 +4,7 @@ import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection 
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
-import { API_URL } from '@/constants/config';
+import { API_ORIGIN } from '@/constants/config';
 import { useAuthStore } from '@/store/auth.store';
 import { tokenStorage } from '@/utils/storage';
 import { refreshSession } from '@/services/api';
@@ -106,7 +106,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }, 100);
     };
     refreshRef.current = synchronize; synchronize();
-    const hub = new HubConnectionBuilder().withUrl(API_URL.replace(/\/api$/, '') + '/hubs/messaging', { accessTokenFactory: async () => {
+    const hub = new HubConnectionBuilder().withUrl(API_ORIGIN + '/hubs/messaging', { accessTokenFactory: async () => {
       if (!active()) throw new Error('Phiên đăng nhập đã thay đổi.'); const session = tokenStorage.getSession()!;
       if (session.expiresAt && Date.parse(session.expiresAt) <= Date.now() + 30_000) await refreshSession(session);
       if (!active()) throw new Error('Phiên đăng nhập đã thay đổi.'); return tokenStorage.getSession()!.accessToken;
