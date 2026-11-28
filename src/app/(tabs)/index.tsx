@@ -90,35 +90,82 @@ export default function CommunityScreen() {
   const [adPool, setAdPool] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const feedRequest = useRef<AbortController | null>(null);
   const loadedPage = useRef(0);
   const impressedAdKeys = useRef<Set<string>>(new Set());
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50, // Ad hiển thị ít nhất 50% diện tích
-    minimumViewTime: 500, // Hiển thị tối thiểu 500ms mới tính 1 impression
-  }).current;
+  const feedSeed = useRef<string>(
+    `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  );
 
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      for (const token of viewableItems) {
-        if (!token.isViewable || token.item?.type !== "AD") continue;
+  const paginationStateRef = useRef({
+    page: 1,
+    hasMore: true,
+    loading: true,
+    totalPosts: 0,
+    fetchFeed: async (_pageNum: number, _isRefresh?: boolean) => {},
+  });
 
-        // Dùng token.item.id (vd: "ad-123-pos-5") để mỗi vị trí hiển thị chỉ gọi 1 lần
-        const trackKey: string = token.item.id;
-        const campaignId = token.item.data?.campaignId ?? token.item.data?.id;
+  const viewabilityConfigCallbackPairs = useRef([
+    {
+      // Luồng 1: Track Ad Impression (50% diện tích, hiển thị tối thiểu 500ms)
+      viewabilityConfig: {
+        itemVisiblePercentThreshold: 50,
+        minimumViewTime: 500,
+      },
+      onViewableItemsChanged: ({
+        viewableItems,
+      }: {
+        viewableItems: ViewToken[];
+      }) => {
+        for (const token of viewableItems) {
+          if (!token.isViewable || token.item?.type !== "AD") continue;
 
-        if (campaignId && !impressedAdKeys.current.has(trackKey)) {
-          impressedAdKeys.current.add(trackKey);
-          void communityService
-            .trackAdImpression(String(campaignId))
-            .catch((err) => console.warn("Lỗi trackAdImpression:", err));
+          const trackKey: string = token.item.id;
+          const campaignId = token.item.data?.campaignId ?? token.item.data?.id;
+
+          if (campaignId && !impressedAdKeys.current.has(trackKey)) {
+            impressedAdKeys.current.add(trackKey);
+            void communityService
+              .trackAdImpression(String(campaignId))
+              .catch((err) => console.warn("Lỗi trackAdImpression:", err));
+          }
         }
-      }
+      },
     },
-  ).current;
+    {
+      // Luồng 2: Prefetch trang tiếp theo khi lướt tới post thứ 7 (còn 4 post cuối)
+      viewabilityConfig: {
+        itemVisiblePercentThreshold: 10,
+        minimumViewTime: 0,
+      },
+      onViewableItemsChanged: ({
+        viewableItems,
+      }: {
+        viewableItems: ViewToken[];
+      }) => {
+        const { page, hasMore, loading, totalPosts, fetchFeed } =
+          paginationStateRef.current;
+        if (!hasMore || loading || totalPosts === 0) return;
+
+        const reachedPrefetchPoint = viewableItems.some(
+          (token) =>
+            token.isViewable &&
+            token.item?.type === "POST" &&
+            typeof token.item.postIndex === "number" &&
+            token.item.postIndex >= totalPosts - 4,
+        );
+
+        if (reachedPrefetchPoint) {
+          void fetchFeed(page + 1);
+        }
+      },
+    },
+  ]).current;
+
   const [optionsPostId, setOptionsPostId] = useState<string | null>(null);
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(
     null,
@@ -159,30 +206,33 @@ export default function CommunityScreen() {
   };
 
   const feedData = useMemo(() => {
-    const combined: Array<{ type: "POST" | "AD"; id: string; data: any }> = [];
-    let adIndexUsed = 0; // Đếm số quảng cáo đã được lấy ra từ kho
+    const combined: Array<{
+      type: "POST" | "AD";
+      id: string;
+      data: any;
+      postIndex?: number; // <-- Thêm field này
+    }> = [];
+    let adIndexUsed = 0;
 
     posts.forEach((post, index) => {
-      // 1. Luôn chèn bài viết Organic trước
-      combined.push({ type: "POST", id: `post-${post.id}`, data: post });
+      combined.push({
+        type: "POST",
+        id: `post-${post.id}`,
+        data: post,
+        postIndex: index, // <-- Lưu vị trí của bài viết thường
+      });
 
-      // 2. Kiểm tra xem đã đủ số lượng bài để chèn Ad chưa
-      // (Ví dụ: sau bài index 4, 9, 14... -> tức là bài thứ 5, 10, 15)
       const postNumber = index + 1;
       if (postNumber % AD_FREQUENCY === 0 && adPool.length > 0) {
-        // Lấy quảng cáo tiếp theo trong kho.
-        // Dùng % adPool.length để lặp lại quảng cáo nếu scroll quá dài và hết kho.
-        // Nếu API trả về nhiều ads, người dùng sẽ hiếm khi thấy trùng lại.
         const ad = adPool[adIndexUsed % adPool.length];
 
         combined.push({
           type: "AD",
-          // Cần kèm thêm postNumber vào ID để React Key không bị trùng nếu Ad bị lặp lại vòng 2
           id: `ad-${ad.id}-pos-${postNumber}`,
           data: ad,
         });
 
-        adIndexUsed++; // Tăng biến đếm quảng cáo đã dùng
+        adIndexUsed++;
       }
     });
     return combined;
@@ -197,10 +247,11 @@ export default function CommunityScreen() {
       feedRequest.current = controller;
       if (isRefresh) setRefreshing(true);
       else if (pageNum === 1) setLoading(true);
-
+      else setLoadingMore(true);
       try {
-        // Lấy mới kho quảng cáo và reset danh sách đã track impression nếu là trang 1 hoặc refresh
+        // Tạo seed mới, tải lại kho quảng cáo và reset danh sách đã track impression nếu là trang 1 hoặc refresh
         if (pageNum === 1 || isRefresh) {
+          feedSeed.current = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           impressedAdKeys.current.clear();
           fetchAdPool();
         }
@@ -209,6 +260,7 @@ export default function CommunityScreen() {
           {
             page: pageNum,
             pageSize: 10,
+            seed: feedSeed.current,
           },
           controller.signal,
         );
@@ -238,12 +290,20 @@ export default function CommunityScreen() {
           feedRequest.current = null;
           setLoading(false);
           setRefreshing(false);
+          setLoadingMore(false);
         }
       }
     },
     [requestedPostId],
   );
-
+  // Đồng bộ state mới nhất cho viewabilityConfigCallbackPairs
+  paginationStateRef.current = {
+    page,
+    hasMore,
+    loading,
+    totalPosts: posts.length,
+    fetchFeed,
+  };
   useFocusEffect(
     useCallback(() => {
       fetchFeed(1);
@@ -505,8 +565,7 @@ export default function CommunityScreen() {
             <FlatList
               data={feedData}
               keyExtractor={(item) => item.id}
-              viewabilityConfig={viewabilityConfig}
-              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs} // <-- Thay cho viewabilityConfig & onViewableItemsChanged
               renderItem={({ item }) => {
                 if (item.type === "AD") return renderAdCard(item.data);
                 return renderPostCard({ item: item.data });
@@ -524,6 +583,14 @@ export default function CommunityScreen() {
                   )}
                 </View>
               }
+              ListFooterComponent={
+                // <-- Thêm spinner nhỏ ở đáy nếu vuốt nhanh hơn tốc độ mạng
+                loadingMore ? (
+                  <View style={{ paddingVertical: 16 }}>
+                    <ActivityIndicator color={colors.primary} size="small" />
+                  </View>
+                ) : null
+              }
               contentContainerStyle={[
                 styles.listContent,
                 phone && styles.phoneListContent,
@@ -534,6 +601,7 @@ export default function CommunityScreen() {
                   onRefresh={() => fetchFeed(1, true)}
                 />
               }
+              onEndReachedThreshold={0.8}
               onEndReached={() => {
                 if (hasMore && !loading) fetchFeed(page + 1);
               }}

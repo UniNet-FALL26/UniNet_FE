@@ -84,18 +84,38 @@ export interface AdCampaignFeedItem {
 // ==========================================
 
 export const communityService = {
-  getAuthorPosts: (profileId: string, page = 1, pageSize = 10, signal?: AbortSignal): Promise<PostResponse[]> => apiRequest<PostResponse[]>(`/community/posts?authorUserId=${encodeURIComponent(profileId)}&page=${page}&pageSize=${pageSize}`, { signal, feedback: false }),
-  getOwnPosts: (page = 1, pageSize = 10, signal?: AbortSignal): Promise<PostResponse[]> => apiRequest<PostResponse[]>(`/community/posts/mine?page=${page}&pageSize=${pageSize}`, { signal, feedback: false }),
+  getAuthorPosts: (
+    profileId: string,
+    page = 1,
+    pageSize = 10,
+    signal?: AbortSignal,
+  ): Promise<PostResponse[]> =>
+    apiRequest<PostResponse[]>(
+      `/community/posts?authorUserId=${encodeURIComponent(profileId)}&page=${page}&pageSize=${pageSize}`,
+      { signal, feedback: false },
+    ),
+  getOwnPosts: (
+    page = 1,
+    pageSize = 10,
+    signal?: AbortSignal,
+  ): Promise<PostResponse[]> =>
+    apiRequest<PostResponse[]>(
+      `/community/posts/mine?page=${page}&pageSize=${pageSize}`,
+      { signal, feedback: false },
+    ),
   /**
    * Lấy danh sách bài đăng Community Feed (có phân trang)
    */
   getPosts: (
-    params: { page?: number; pageSize?: number } = {},
+    params: { page?: number; pageSize?: number; seed?: string } = {},
     signal?: AbortSignal,
   ): Promise<PaginatedResponse<PostResponse>> => {
     const query = new URLSearchParams();
     query.set("page", String(params.page ?? 1));
     query.set("pageSize", String(params.pageSize ?? 10));
+    if (params.seed) {
+      query.set("seed", params.seed);
+    }
     return apiRequest<PaginatedResponse<PostResponse>>(
       `/community/posts?${query.toString()}`,
       { signal },
@@ -209,11 +229,21 @@ export const communityService = {
   // ==========================================
 
   // The moderation queue is post-based; include the exact comment as evidence.
-  reportComment: (postId: string, comment: CommentResponse, reason: string): Promise<void> =>
+  reportComment: (
+    postId: string,
+    comment: CommentResponse,
+    reason: string,
+  ): Promise<void> =>
     apiRequest<void>(`/community/posts/${encodeURIComponent(postId)}/report`, {
       method: "POST",
-      body: JSON.stringify({ reason: `Báo cáo bình luận ${comment.id}\nTác giả: ${comment.authorName}\nLý do: ${reason}\nNội dung: ${comment.content}` }),
-      feedback: { success: 'Đã gửi báo cáo bình luận. Cảm ơn bạn đã góp phần xây dựng cộng đồng UniNet văn minh và an toàn hơn!', error: false },
+      body: JSON.stringify({
+        reason: `Báo cáo bình luận ${comment.id}\nTác giả: ${comment.authorName}\nLý do: ${reason}\nNội dung: ${comment.content}`,
+      }),
+      feedback: {
+        success:
+          "Đã gửi báo cáo bình luận. Cảm ơn bạn đã góp phần xây dựng cộng đồng UniNet văn minh và an toàn hơn!",
+        error: false,
+      },
     }),
 
   /**
@@ -323,6 +353,7 @@ export const communityService = {
       {
         method: "POST",
         signal,
+        feedback: false,
       },
     );
   },
@@ -336,6 +367,7 @@ export const communityService = {
       {
         method: "POST",
         signal,
+        feedback: false,
       },
     );
   },
